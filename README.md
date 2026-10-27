@@ -101,7 +101,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
-- 0.7.7: mailknop in het logboek is nu een kopie van Magisters eigen icoonknoppen (zelfde maat, kleur en hover) met een envelop-icoon; knop "Mail coach" op de aanmaakpagina en het controlescherm in Magisters navy en Open Sans.
+- 0.7.8: mailknop in het logboek is weer een eigen, randloze icoonknop op de plek van 0.7.6; hij meet maat, kleur en icoongrootte van de prullenbak-knop ernaast op (het kopiëren van Magisters knop uit 0.7.7 brak de indeling).\n- 0.7.7: mailknop in het logboek is nu een kopie van Magisters eigen icoonknoppen (zelfde maat, kleur en hover) met een envelop-icoon; knop "Mail coach" op de aanmaakpagina en het controlescherm in Magisters navy en Open Sans.
 - 0.7.6: na een update toont het menu één keer "Bijgewerkt van X naar Y"; eerste versie die via de ingebouwde updater wordt binnengehaald.
 - 0.7.5: zelf bijwerken: na het eenmalig kiezen van de extensiemap (Instellingen > Updates) haalt de extensie de nieuwe versie op, schrijft de bestanden en herlaadt zichzelf; knop "Nu bijwerken" in het menu; zip-uitpakker zonder externe bibliotheek.
 - 0.7.4: meerdere begeleidingscoaches (naam en e-mail) in de instellingen, keuzelijst in het controlescherm met "Ander adres" als uitwijk; bestaande instelling wordt automatisch overgenomen; klasherkenning op de pagina ook voor klassen met één cijfer (zoals MM2A); "aangemeld voor" staat ook in het onderwerp van de mail.

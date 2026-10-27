@@ -130,70 +130,51 @@ DT.register({
   /* Envelop in de stijl van Magisters lijn-iconen (24-grid, stroke 2, currentColor). */
   ICON: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7.5l9 6 9-6"/></svg>',
 
-  /* Icoonknop die in Magisters knoppenbalk past.
-   * Eerst: een kopie van Magisters eigen dna-button (prullenbak/printer) met ons icoon erin,
-   * zodat maat, kleur, afronding en hover precies gelijk zijn aan de knoppen ernaast.
-   * Lukt dat niet (geen buurknop, icoon niet vindbaar), dan een randloze knop in dezelfde maten. */
+  /* Icoonknop die in Magisters knoppenbalk past: randloos, envelop-icoon, en bij het invoegen
+   * opgemeten aan de knop ernaast (prullenbak/printer): zelfde hoogte, breedte, kleur en icoongrootte.
+   * Wordt als eerste in de balk gezet; dat gaf in 0.7.6 een nette indeling (✉, prullenbak / printer, +). */
   iconButton(DT, bar, item, { title, onclick }) {
-    // deepQuery kijkt niet in de schaduw-DOM van de root zelf; daarom ook daarin zoeken.
     const q = (sel, r) => DT.deepQuery(sel, r) || (r.shadowRoot ? DT.deepQuery(sel, r.shadowRoot) : null);
     const inBar = (n) => Boolean(n && (bar.contains(n) || bar.shadowRoot?.contains(n)));
-    let sib = q("#delete-logbook, #print-logbook, #add-child-logbook, #edit-logbook", item);
+    let sib = q("#delete-logbook, #print-logbook, #add-child-logbook", item);
     if (!inBar(sib)) sib = Array.from(bar.children).find((c) => c.tagName?.toLowerCase() === "dna-button") || null;
-    const ICON = this.ICON;
-    const guard = (e) => { if (e.target.closest?.("[data-dt-mail]")) { e.stopImmediatePropagation(); onclick(e); } };
 
-    if (sib && sib.parentNode && sib.tagName?.toLowerCase() === "dna-button") {
-      const c = sib.cloneNode(true);
-      c.removeAttribute("id");
-      c.setAttribute("data-dt-mail", "1");
-      c.setAttribute("title", title);
-      c.setAttribute("aria-label", title);
-      c.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id"));
-      c.querySelectorAll("button,[aria-label]").forEach((n) => { n.setAttribute("aria-label", title); n.setAttribute("title", title); });
-      sib.parentNode.insertBefore(c, sib);
-      // Klik afvangen vóór Magisters eigen handlers (de kopie heeft die niet, maar het component kan ze opnieuw koppelen).
-      c.addEventListener("click", guard, true);
-      c.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") guard(e); }, true);
+    const b = DT.el("button", { type: "button", "data-dt-mail": "1", title, "aria-label": title, onclick });
+    b.innerHTML = this.ICON;
+    const svg = b.firstElementChild;
+    const st = {
+      display: "inline-flex", alignItems: "center", justifyContent: "center", flex: "0 0 auto", boxSizing: "border-box",
+      width: "2.5rem", height: "2.25rem", padding: "0", margin: "0", border: "0", background: "transparent",
+      color: "inherit", cursor: "pointer", borderRadius: "8px", lineHeight: "0", font: "inherit", outline: "none"
+    };
+    svg.style.width = "1rem"; svg.style.height = "1rem";
+    if (sib) {
+      try {
+        const r = sib.getBoundingClientRect();
+        if (r.width > 8) st.width = `${r.width}px`;
+        if (r.height > 8) st.height = `${r.height}px`;
+        const inner = q("button", sib) || sib;
+        const cs = getComputedStyle(inner);
+        if (cs.color) st.color = cs.color;
+        if (cs.borderRadius && cs.borderRadius !== "0px") st.borderRadius = cs.borderRadius;
+        const sv = q("svg", sib);
+        if (sv) {
+          const sr = sv.getBoundingClientRect();
+          if (sr.width > 4) { svg.style.width = `${sr.width}px`; svg.style.height = `${sr.height}px`; }
+          const sw = sv.getAttribute("stroke-width");
+          if (sw) svg.setAttribute("stroke-width", sw);
+        }
+      } catch {}
+    }
+    Object.assign(b.style, st);
+    b.addEventListener("mouseenter", () => { b.style.background = "rgba(27,58,92,.08)"; });
+    b.addEventListener("mouseleave", () => { b.style.background = "transparent"; });
+    b.addEventListener("focus", () => { b.style.boxShadow = "0 0 0 2px rgba(27,58,92,.35)"; });
+    b.addEventListener("blur", () => { b.style.boxShadow = "none"; });
 
-      const swapIcon = () => {
-        const svg = q("svg", c);
-        const ico = svg || q("dna-icon, [class*=icon]", c);
-        if (!ico || ico.hasAttribute("data-dt-icon")) return Boolean(ico);
-        const mine = DT.el("span", { "data-dt-icon": "1" });
-        mine.innerHTML = this.ICON;
-        const own = mine.firstElementChild;
-        ["class", "style", "width", "height"].forEach((a) => { const v = ico.getAttribute(a); if (v) own.setAttribute(a, v); });
-        if (!own.getAttribute("width") && !own.style.width) { own.style.width = "var(--dna-icon-size,1rem)"; own.style.height = "var(--dna-icon-size,1rem)"; }
-        own.setAttribute("data-dt-icon", "1");
-        ico.replaceWith(own);
-        return true;
-      };
-      let ok = swapIcon();
-      // Het component rendert zijn schaduw-DOM soms pas na het invoegen (of opnieuw): dan nogmaals.
-      const root = c.shadowRoot;
-      if (root) new MutationObserver(() => { if (!q("[data-dt-icon]", c)) swapIcon(); }).observe(root, { childList: true, subtree: true });
-      if (!ok) requestAnimationFrame(() => { if (!swapIcon() && !q("[data-dt-icon]", c)) { c.replaceWith(fallback()); } });
-      return c;
-    }
-    return insert(fallback());
-
-    function fallback() {
-      const b = DT.el("button", { type: "button", "data-dt-mail": "1", title, "aria-label": title, onclick });
-      b.innerHTML = ICON;
-      b.setAttribute("style", "display:inline-flex;align-items:center;justify-content:center;width:2.5rem;height:2rem;padding:0;margin:0;" +
-        "border:0;background:transparent;color:inherit;cursor:pointer;border-radius:var(--dna-button-border-radius,8px);line-height:0;font:inherit");
-      b.firstElementChild.style.width = "var(--dna-icon-size,1rem)";
-      b.firstElementChild.style.height = "var(--dna-icon-size,1rem)";
-      b.addEventListener("mouseenter", () => { b.style.background = "rgba(27,58,92,.08)"; });
-      b.addEventListener("mouseleave", () => { b.style.background = "transparent"; });
-      return b;
-    }
-    function insert(b) {
-      const first = bar.shadowRoot?.firstElementChild || bar.firstElementChild;
-      (bar.shadowRoot || bar).insertBefore(b, first || null);
-      return b;
-    }
+    const first = bar.shadowRoot?.firstElementChild || bar.firstElementChild;
+    (bar.shadowRoot || bar).insertBefore(b, first || null);
+    return b;
   },
 
   /* Item in het overzicht eerst uitklappen (anders is de inhoud niet in de DOM). */
