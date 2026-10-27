@@ -1,0 +1,94 @@
+/* Docent Tools: eigen UI-elementen. Alles heeft prefix dt- zodat Magister-stijlen niet botsen. */
+:root {
+  --dt-accent: #1B3A5C;
+  --dt-accent-ink: #ffffff;
+  --dt-gold: #E8B84A;
+  --dt-bg: #ffffff;
+  --dt-fg: #1a1d21;
+  --dt-muted: #6b7280;
+  --dt-line: #e2e5ea;
+  --dt-radius: 10px;
+  --dt-shadow: 0 10px 30px rgba(10, 20, 40, 0.18);
+  --dt-font: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+html.dt-dark {
+  --dt-bg: #161a20;
+  --dt-fg: #e8eaee;
+  --dt-muted: #9aa3b2;
+  --dt-line: #2b313b;
+}
+
+/* Toasts */
+#dt-toasts { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 2147483000; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.dt-toast { font: 14px/1.3 var(--dt-font); background: var(--dt-fg); color: var(--dt-bg); padding: 10px 16px; border-radius: 8px; opacity: 0; transform: translateY(8px); transition: opacity .2s, transform .2s; box-shadow: var(--dt-shadow); }
+.dt-toast.dt-show { opacity: 1; transform: none; }
+.dt-toast-ok { background: #1f7a4d; color: #fff; }
+.dt-toast-err { background: #a32d2d; color: #fff; }
+
+/* Knoppen */
+.dt-btn { font: 13px/1 var(--dt-font); display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border: 1px solid var(--dt-line); border-radius: 7px; background: var(--dt-bg); color: var(--dt-fg); cursor: pointer; }
+.dt-btn:hover { border-color: var(--dt-accent); }
+.dt-btn:focus-visible { outline: 2px solid var(--dt-gold); outline-offset: 2px; }
+.dt-btn-primary { background: var(--dt-accent); color: var(--dt-accent-ink); border-color: var(--dt-accent); }
+.dt-btn-sm { padding: 4px 8px; font-size: 12px; }
+
+/* Balk (alleen nog bij snelle aanwezigheid) */
+.dt-table-tools { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 8px 0; padding: 6px 8px; font: 12px var(--dt-font); color: var(--dt-muted); background: color-mix(in srgb, var(--dt-accent) 6%, transparent); border: 1px solid color-mix(in srgb, var(--dt-accent) 20%, transparent); border-radius: var(--dt-radius); }
+
+/* Zwevend exportknopje */
+#dt-table-chip { position: fixed; z-index: 2147482500; display: inline-flex; align-items: center; gap: 6px; font: 600 12px/1 var(--dt-font); padding: 6px 10px; border: 0; border-radius: 999px; background: var(--dt-accent); color: var(--dt-accent-ink); box-shadow: 0 4px 14px rgba(0,0,0,.18); cursor: pointer; opacity: 0; transform: translateY(-4px) scale(.96); pointer-events: none; transition: opacity .15s, transform .15s; }
+#dt-table-chip.dt-show { opacity: .92; transform: none; pointer-events: auto; }
+#dt-table-chip:hover, #dt-table-chip:focus-visible { opacity: 1; }
+#dt-table-chip:focus-visible { outline: 2px solid var(--dt-gold); outline-offset: 2px; }
+#dt-table-frame { position: fixed; z-index: 2147482400; pointer-events: none; border: 2px solid var(--dt-accent); border-radius: 6px; opacity: 0; transition: opacity .15s; }
+#dt-table-frame.dt-show { opacity: .7; }
+#dt-table-menu { position: fixed; z-index: 2147482600; min-width: 220px; background: var(--dt-bg); color: var(--dt-fg); border: 1px solid var(--dt-line); border-radius: 10px; box-shadow: var(--dt-shadow); padding: 6px; font: 13px var(--dt-font); }
+.dt-menu-head { padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 2px; border-bottom: 1px solid var(--dt-line); margin-bottom: 4px; }
+.dt-menu-head small, .dt-menu-item small { color: var(--dt-muted); font-size: 11px; }
+.dt-menu-item { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 7px 8px; border: 0; border-radius: 6px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.dt-menu-item:hover, .dt-menu-item:focus-visible { background: color-mix(in srgb, var(--dt-accent) 12%, transparent); outline: none; }
+.dt-menu-sep { height: 1px; background: var(--dt-line); margin: 4px 0; }
+@media (prefers-reduced-motion: reduce) { #dt-table-chip, #dt-table-frame { transition: none; } }
+
+/* Tabellenlijst in het paneel */
+.dt-tablerow { padding: 6px 0; border-bottom: 1px dashed var(--dt-line); display: flex; flex-direction: column; gap: 4px; }
+.dt-tablerow:last-child { border-bottom: 0; }
+.dt-linkbtn { all: unset; cursor: pointer; font-size: 13px; color: var(--dt-accent); }
+html.dt-dark .dt-linkbtn { color: #8fb6e6; }
+.dt-linkbtn:hover { text-decoration: underline; }
+
+/* Zijpaneel */
+#dt-panel { position: fixed; top: 0; right: 0; height: 100vh; width: 340px; max-width: 92vw; background: var(--dt-bg); color: var(--dt-fg); font: 14px/1.45 var(--dt-font); border-left: 1px solid var(--dt-line); box-shadow: var(--dt-shadow); z-index: 2147482000; transform: translateX(100%); transition: transform .22s ease; display: flex; flex-direction: column; }
+#dt-panel.dt-left { right: auto; left: 0; border-left: 0; border-right: 1px solid var(--dt-line); transform: translateX(-100%); }
+#dt-panel.dt-open { transform: none; }
+@media (prefers-reduced-motion: reduce) { #dt-panel { transition: none; } }
+.dt-panel-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 3px solid var(--dt-gold); }
+.dt-panel-head h2 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .01em; }
+.dt-panel-body { overflow-y: auto; padding: 12px 16px 24px; flex: 1; }
+.dt-widget { padding: 12px 0; border-bottom: 1px solid var(--dt-line); }
+.dt-widget:last-child { border-bottom: 0; }
+.dt-widget h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--dt-muted); }
+.dt-widget ul { margin: 0; padding: 0; list-style: none; }
+.dt-widget li { padding: 4px 0; }
+.dt-widget a { color: var(--dt-accent); text-decoration: none; }
+html.dt-dark .dt-widget a { color: #8fb6e6; }
+.dt-widget a:hover { text-decoration: underline; }
+.dt-widget textarea { width: 100%; min-height: 110px; box-sizing: border-box; font: 13px/1.4 var(--dt-font); border: 1px solid var(--dt-line); border-radius: 7px; padding: 8px; background: var(--dt-bg); color: var(--dt-fg); resize: vertical; }
+.dt-clock { font-size: 30px; font-weight: 600; letter-spacing: -.01em; }
+.dt-clock small { display: block; font-size: 13px; font-weight: 400; color: var(--dt-muted); }
+.dt-row { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* Paneel-handvat */
+#dt-handle { position: fixed; top: 50%; right: 0; transform: translateY(-50%); z-index: 2147481000; writing-mode: vertical-rl; background: var(--dt-accent); color: var(--dt-accent-ink); font: 12px var(--dt-font); padding: 10px 5px; border-radius: 6px 0 0 6px; cursor: pointer; opacity: .85; }
+#dt-handle:hover { opacity: 1; }
+#dt-handle.dt-left { right: auto; left: 0; border-radius: 0 6px 6px 0; writing-mode: vertical-lr; }
+
+/* Inspector */
+.dt-inspect-hover { outline: 2px dashed var(--dt-gold) !important; outline-offset: 1px !important; cursor: crosshair !important; }
+#dt-inspect-bar { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 2147483100; background: var(--dt-fg); color: var(--dt-bg); font: 13px var(--dt-font); padding: 8px 14px; border-radius: 8px; box-shadow: var(--dt-shadow); display: flex; gap: 10px; align-items: center; }
+#dt-inspect-bar code { background: rgba(255,255,255,.12); padding: 2px 6px; border-radius: 4px; max-width: 50vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.dt-field { display: grid; grid-template-columns: 110px 1fr; gap: 8px; align-items: center; font-size: 13px; }
+.dt-field select, .dt-field input[type=color] { width: 100%; box-sizing: border-box; min-height: 30px; }
+
+#dt-role-menu { position: fixed; z-index: 2147483200; min-width: 230px; background: var(--dt-bg); color: var(--dt-fg); border: 1px solid var(--dt-line); border-radius: 10px; box-shadow: var(--dt-shadow); padding: 6px; font: 13px var(--dt-font); }

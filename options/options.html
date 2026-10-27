@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Docent Tools voor Magister: instellingen</title>
+<style>
+  :root { --accent:#1B3A5C; --gold:#E8B84A; --fg:#1a1d21; --muted:#6b7280; --line:#e2e5ea; --bg:#fff; }
+  @media (prefers-color-scheme: dark) { :root { --fg:#e8eaee; --muted:#9aa3b2; --line:#2b313b; --bg:#161a20; } }
+  body { margin:0; font:15px/1.5 "Segoe UI", system-ui, sans-serif; color:var(--fg); background:var(--bg); }
+  main { max-width:720px; margin:0 auto; padding:32px 24px 60px; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 28px; }
+  section { padding:20px 0; border-top:1px solid var(--line); }
+  section h2 { font-size:16px; margin:0 0 4px; display:flex; align-items:center; justify-content:space-between; }
+  section p { margin:0 0 12px; color:var(--muted); font-size:14px; }
+  label.row { display:flex; align-items:center; gap:10px; margin:8px 0; }
+  input[type=text], input[type=url], select, textarea { font:inherit; padding:7px 10px; border:1px solid var(--line); border-radius:7px; background:var(--bg); color:var(--fg); }
+  textarea { width:100%; box-sizing:border-box; min-height:90px; font-family: ui-monospace, Consolas, monospace; font-size:13px; }
+  .switch { position:relative; width:42px; height:24px; }
+  .switch input { opacity:0; width:0; height:0; }
+  .switch span { position:absolute; inset:0; background:#c3c9d3; border-radius:24px; transition:.15s; }
+  .switch span::before { content:""; position:absolute; width:18px; height:18px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.15s; }
+  .switch input:checked + span { background:var(--accent); }
+  .switch input:checked + span::before { transform:translateX(18px); }
+  .switch input:focus-visible + span { outline:2px solid var(--gold); }
+  .links { display:grid; grid-template-columns: 1fr 2fr auto; gap:6px; align-items:center; }
+  button { font:inherit; padding:7px 12px; border:1px solid var(--line); border-radius:7px; background:var(--bg); color:var(--fg); cursor:pointer; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .status { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:var(--fg); color:var(--bg); padding:8px 14px; border-radius:8px; opacity:0; transition:.2s; }
+  .status.show { opacity:1; }
+  kbd { font:12px ui-monospace, monospace; border:1px solid var(--line); border-radius:4px; padding:1px 5px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Docent Tools voor Magister</h1>
+  <p class="sub">Alles wordt lokaal in je browser bewaard. Wijzigingen zijn direct zichtbaar in open Magister-tabbladen.</p>
+
+  <section>
+    <h2>Thema <label class="switch"><input type="checkbox" data-path="theme.enabled"><span></span></label></h2>
+    <p>Kies een thema. <kbd>Alt</kbd>+<kbd>T</kbd> wisselt tussen je laatst gebruikte lichte en donkere thema.</p>
+    <label class="row">Thema
+      <select data-path="theme.preset">
+        <optgroup label="Licht">
+          <option value="magister">Magister (standaard)</option>
+          <option value="mca">MCA blauw</option>
+          <option value="zand">Zand (warm licht)</option>
+          <option value="mint">Mint (rustig licht)</option>
+          <option value="contrast">Hoog contrast licht</option>
+          <option value="krant">Krant (serif, scherp)</option>
+          <option value="pastel">Pastel (zacht, rond)</option>
+          <option value="retro">Retro (jaren 70)</option>
+          <option value="oceaan">Oceaan (fris blauw)</option>
+        </optgroup>
+        <optgroup label="Donker">
+          <option value="nacht">Nacht (donkergrijs)</option>
+          <option value="marine">Marine (donkerblauw)</option>
+          <option value="bos">Bos (donkergroen)</option>
+          <option value="oled">Zwart (OLED)</option>
+          <option value="sepia">Sepia (avondlezen)</option>
+          <option value="terminal">Terminal (groen op zwart)</option>
+          <option value="synthwave">Synthwave (paars/roze)</option>
+        </optgroup>
+        <optgroup label="Zelf instellen">
+          <option value="custom">Eigen accentkleur (licht/donker volgt systeem of keuze hieronder)</option>
+        </optgroup>
+      </select>
+    </label>
+    <label class="row">Donkere stijl
+      <select data-path="theme.darkStyle"><option value="invert">Inversie (werkt op alle schermen)</option><option value="tokens">Echte kleuren (nieuwe schermen, experimenteel)</option></select>
+    </label>
+    <label class="row">Bij "Eigen accentkleur": modus
+      <select data-path="theme.mode"><option value="auto">Volg systeem</option><option value="light">Licht</option><option value="dark">Donker</option></select>
+    </label>
+    <label class="row">Eigen accentkleur <input type="color" data-path="theme.accent"></label>
+    <label class="row">Lettertype
+      <select data-path="theme.font"><option value="thema">Volgens thema</option><option value="standaard">Magister standaard</option><option value="systeem">Systeem</option><option value="rond">Rond</option><option value="serif">Serif</option><option value="mono">Monospace</option><option value="smal">Smal</option><option value="speels">Speels</option><option value="dyslexie">Dyslexie-vriendelijk</option></select>
+    </label>
+    <label class="row">Lettergrootte
+      <select data-path="theme.fontScale"><option value="0.85">85%</option><option value="0.9">90%</option><option value="1">100%</option><option value="1.1">110%</option><option value="1.2">120%</option><option value="1.35">135%</option></select>
+    </label>
+    <label class="row">Hoeken
+      <select data-path="theme.radius"><option value="thema">Volgens thema</option><option value="0px">Scherp</option><option value="4px">Licht rond</option><option value="10px">Rond</option><option value="18px">Extra rond</option></select>
+    </label>
+    <p style="margin-top:12px">Eigen aanvullingen: elementen die je via de Inspector (<kbd>Alt</kbd>+<kbd>I</kbd>, <kbd>C</kbd>) liet meekleuren. Eén per regel als <code>rol | selector</code>, rol is achtergrond, vlak, accent of tekst. Regel weghalen = ongedaan maken.</p>
+    <textarea id="extraList" placeholder="vlak | div.container > header"></textarea>
+    <label class="row">Dichtheid
+      <select data-path="theme.density"><option value="normal">Normaal</option><option value="compact">Compact (90%)</option><option value="extra">Extra compact (80%)</option></select>
+    </label>
+  </section>
+
+  <section>
+    <h2>Opgeruimde interface <label class="switch"><input type="checkbox" data-path="compact.enabled"><span></span></label></h2>
+    <p>Verbergt elementen die je niet gebruikt. Eén CSS-selector per regel. Tip: start de Inspector in Magister (<kbd>Alt</kbd>+<kbd>I</kbd>), beweeg over een element en druk op <kbd>H</kbd>.</p>
+    <textarea data-path="compact.hideSelectors" data-type="lines" placeholder=".banner-promo&#10;#sidebar-widget-x"></textarea>
+  </section>
+
+  <section>
+    <h2>Docentenpaneel <label class="switch"><input type="checkbox" data-path="panel.enabled"><span></span></label></h2>
+    <p>Zijpaneel met klok, snelle links, notities en exportknoppen. Openen met <kbd>Alt</kbd>+<kbd>D</kbd>.</p>
+    <label class="row">Positie
+      <select data-path="panel.position"><option value="right">Rechts</option><option value="left">Links</option></select>
+    </label>
+    <label class="row">Widgets (volgorde, komma-gescheiden)
+      <input type="text" data-path="panel.widgets" data-type="csv" placeholder="klok, links, notities, export, instellingen">
+    </label>
+    <p>Snelle links</p>
+    <div class="links" id="links"></div>
+    <button id="addLink">Link toevoegen</button>
+  </section>
+
+  <section>
+    <h2>Tabellen <label class="switch"><input type="checkbox" data-path="tables.enabled"><span></span></label></h2>
+    <p>Knoppen boven elke tabel: Excel, CSV, Kopiëren (plakt als cellen), Naar AI en Instellen. Met Instellen kies je welke kolommen meegaan, of de kopregel meegaat, of namen gemaskeerd worden en of lege rijen en kolommen wegblijven. De keuze wordt onthouden per soort tabel. <kbd>Alt</kbd>+<kbd>E</kbd> exporteert alle tabellen van de pagina naar één Excel-bestand.</p>
+    <label class="row"><label class="switch"><input type="checkbox" data-path="tables.alwaysAsk"><span></span></label> Bij elke export eerst het instelvenster tonen</label>
+  </section>
+
+  <section>
+    <h2>Sneller invoeren <label class="switch"><input type="checkbox" data-path="quickinput.enabled"><span></span></label></h2>
+    <p><kbd>Enter</kbd> in een invoerveld springt naar dezelfde kolom in de volgende rij. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> plakt een kolom uit Excel in opeenvolgende velden.</p>
+    <label class="row"><label class="switch"><input type="checkbox" data-path="quickinput.shortcuts"><span></span></label> Sneltoetsen actief</label>
+  </section>
+
+  <section>
+    <h2>Snelle aanwezigheid <label class="switch"><input type="checkbox" data-path="aanwezigheid.enabled"><span></span></label></h2>
+    <p>Op Lesdashboard > leerlinglijst: knop "Iedereen aanwezig", zoekveld om naar een naam te springen, en toetsenbordmodus (<kbd>Alt</kbd>+<kbd>A</kbd>): pijltjes door de lijst, letters voor de kolommen (P, A, V, T, U, H, M, K), spatie voor Pr, Esc om te stoppen.</p>
+  </section>
+
+  <section>
+    <h2>AI-hulp <label class="switch"><input type="checkbox" data-path="ai.enabled"><span></span></label></h2>
+    <p>Bouwt een prompt uit een tabel of selectie, kopieert die en opent je assistent. Niets wordt automatisch verstuurd.</p>
+    <label class="row">Assistent
+      <select data-path="ai.provider"><option value="claude">Claude</option><option value="chatgpt">ChatGPT</option><option value="copilot">Microsoft Copilot</option></select>
+    </label>
+  </section>
+
+  <section>
+    <h2>Mail bij Melding Expertisecentrum <label class="switch"><input type="checkbox" data-path="melding.enabled"><span></span></label></h2>
+    <p>Bij een nieuwe melding (knop naast "Volgende") of bij een bestaande melding in het logboek (✉ in de knoppenbalk) opent een controlescherm en daarna een concept-mail in Outlook met naam, studentnummer, klas, "aangemeld voor" en de samenvatting. Er wordt niets automatisch verzonden. Sneltoets <kbd>Alt</kbd>+<kbd>M</kbd>.</p>
+    <label class="row">E-mailadres begeleidingscoach <input type="text" data-path="melding.to" placeholder="naam@school.nl" style="min-width:260px"></label>
+    <label class="row">Naam (voor de aanhef) <input type="text" data-path="melding.name" placeholder="Esther Benschop"></label>
+    <label class="row">Cc (optioneel) <input type="text" data-path="melding.cc" placeholder="collega@school.nl"></label>
+    <label class="row">Je eigen naam onder de mail <input type="text" data-path="melding.afzender" placeholder="Mark"></label>
+    <label class="row"><label class="switch"><input type="checkbox" data-path="melding.extra"><span></span></label> Ook problematiek, hulp binnen/buiten school en "ouders op de hoogte" meesturen</label>
+  </section>
+
+  <section>
+    <h2>Inspector (ontwikkelhulp) <label class="switch"><input type="checkbox" data-path="inspector.enabled"><span></span></label></h2>
+    <p>Vindt selectors en maakt een paginarapport (<kbd>R</kbd>) zonder persoonsgegevens, om de Magister-specifieke modules op jullie omgeving af te stemmen.</p>
+  </section>
+
+  <section>
+    <h2>Updates <label class="switch"><input type="checkbox" data-path="updates.check"><span></span></label></h2>
+    <p>Controleert om de 6 uur bij GitHub of er een nieuwere versie is (<a href="https://github.com/mark-jg/magister-docent/releases" target="_blank" rel="noopener">mark-jg/magister-docent</a>). Er wordt alleen het versienummer en de downloadlink opgehaald; er gaat niets over jou of je Magister-omgeving mee. Bij een nieuwe versie krijgt het extensie-icoon een gele badge en staat in het menu een downloadknop. Een uitgepakte extensie kan zichzelf niet vervangen: zip uitpakken over je extensiemap en op Herladen klikken blijft nodig.</p>
+    <label class="row"><button id="checkUpdate">Nu controleren</button> <span id="updateStatus" style="color:var(--muted);font-size:14px"></span></label>
+  </section>
+
+  <section>
+    <button id="reset">Standaardinstellingen herstellen</button>
+    <p style="margin-top:12px" id="versionLine"></p>
+  </section>
+</main>
+<div class="status" id="status">Opgeslagen</div>
+<script src="../content/defaults.js"></script>
+<script src="options.js"></script>
+</body>
+</html>

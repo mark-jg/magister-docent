@@ -1,0 +1,90 @@
+{
+  "manifest_version": 3,
+  "name": "Docent Tools voor Magister",
+  "version": "0.7.1",
+  "description": "Verbeteringen voor Magister (docenten/personeel): thema, overzichtspaneel, tabelexport naar Excel, snelle invoer, AI-hulp en een concept-mail naar de begeleidingscoach bij een Melding Expertisecentrum. Draait volledig lokaal.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "storage",
+    "clipboardWrite",
+    "alarms"
+  ],
+  "host_permissions": [
+    "*://*.magister.net/*"
+  ],
+  "action": {
+    "default_title": "Docent Tools voor Magister",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png"
+    }
+  },
+  "options_page": "options/options.html",
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.magister.net/*"
+      ],
+      "js": [
+        "lib/xlsx.full.min.js",
+        "content/defaults.js",
+        "content/core.js",
+        "content/modules/theme.js",
+        "content/modules/compact.js",
+        "content/modules/panel.js",
+        "content/modules/tables.js",
+        "content/modules/quickinput.js",
+        "content/modules/navigation.js",
+        "content/modules/aanwezigheid.js",
+        "content/modules/ai.js",
+        "content/modules/melding.js",
+        "content/modules/inspector.js",
+        "content/boot.js"
+      ],
+      "css": [
+        "content/base.css"
+      ],
+      "run_at": "document_idle",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "*://*.magister.net/*"
+      ],
+      "js": [
+        "content/netlog.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "MAIN"
+    }
+  ],
+  "commands": {
+    "toggle-panel": {
+      "suggested_key": {
+        "default": "Alt+D"
+      },
+      "description": "Docentenpaneel openen/sluiten"
+    },
+    "toggle-theme": {
+      "suggested_key": {
+        "default": "Alt+T"
+      },
+      "description": "Donker/licht thema wisselen"
+    },
+    "mail-coach": {
+      "suggested_key": {
+        "default": "Alt+M"
+      },
+      "description": "Concept-mail naar begeleidingscoach (bij een Melding Expertisecentrum)"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
