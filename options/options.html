@@ -137,9 +137,10 @@
   <section>
     <h2>Mail bij Melding Expertisecentrum <label class="switch"><input type="checkbox" data-path="melding.enabled"><span></span></label></h2>
     <p>Bij een nieuwe melding (knop naast "Volgende") of bij een bestaande melding in het logboek (✉ in de knoppenbalk) opent een controlescherm en daarna een concept-mail in Outlook met naam, studentnummer, klas, "aangemeld voor" en de samenvatting. Er wordt niets automatisch verzonden. Sneltoets <kbd>Alt</kbd>+<kbd>M</kbd>.</p>
-    <label class="row">E-mailadres begeleidingscoach <input type="text" data-path="melding.to" placeholder="naam@school.nl" style="min-width:260px"></label>
-    <label class="row">Naam (voor de aanhef) <input type="text" data-path="melding.name" placeholder="Esther Benschop"></label>
-    <label class="row">Cc (optioneel) <input type="text" data-path="melding.cc" placeholder="collega@school.nl"></label>
+    <p>Begeleidingscoaches: in het controlescherm kies je uit deze lijst aan wie de mail gaat. De naam wordt gebruikt voor de aanhef.</p>
+    <div class="links" id="coaches"></div>
+    <button id="addCoach">Coach toevoegen</button>
+    <label class="row" style="margin-top:14px">Cc (optioneel) <input type="text" data-path="melding.cc" placeholder="collega@school.nl"></label>
     <label class="row">Je eigen naam onder de mail <input type="text" data-path="melding.afzender" placeholder="Mark"></label>
     <label class="row"><label class="switch"><input type="checkbox" data-path="melding.extra"><span></span></label> Ook problematiek, hulp binnen/buiten school en "ouders op de hoogte" meesturen</label>
   </section>

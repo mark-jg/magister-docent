@@ -37,7 +37,14 @@ DT.register({
   ],
 
   defaults() {
-    return Object.assign({ to: "", cc: "", name: "Esther Benschop", extra: true, afzender: "" }, DT.settings.melding || {});
+    return Object.assign({ coaches: [], to: "", cc: "", name: "", extra: true, afzender: "" }, DT.settings.melding || {});
+  },
+
+  /* Lijst met coaches uit de instellingen; een oude losse instelling (to + name) telt als één coach. */
+  coaches(s) {
+    const list = (s.coaches || []).filter((c) => c && c.email).map((c) => ({ name: (c.name || "").trim(), email: c.email.trim() }));
+    if (!list.length && s.to) list.push({ name: s.name || "", email: s.to });
+    return list;
   },
 
   /* Sneltoets of popup: open het controlescherm als deze frame een melding toont. */
@@ -274,11 +281,11 @@ DT.register({
     const bits = this.sources(DT);
     const all = bits.join(" | ");
     const nr = (all.match(/\b(\d{5,8})\b/) || [])[1] || "";
-    const klas = (all.match(/\b([A-Z]{2,5}\d{2}[A-Z0-9]{0,2})\b/) || [])[1] || "";
+    const klas = (all.match(/\b([A-Z]{1,5}\d{1,2}[A-Z0-9]{0,3})\b/) || [])[1] || "";
     // Naam: eerste tekst zonder cijfers die niet een vaste kop is.
     const skip = /^(leerlingen?|logboek|begeleiding|detailkaarten|nieuwe? melding|melding|expertisecentrum|algemeen|samenvatting|velden|magister.*)$/i;
     const clean = (t) => t.replace(/\(.*?\)/g, " ").replace(/\b\d{5,8}\b/g, " ")
-      .replace(/\b[A-Z]{2,5}\d{2}[A-Z0-9]{0,2}\b/g, " ").replace(/\s*[|:,\-·]+\s*$/, "").replace(/\s+/g, " ").trim();
+      .replace(/\b[A-Z]{1,5}\d{1,2}[A-Z0-9]{0,3}\b/g, " ").replace(/\s*[|:,\-·]+\s*$/, "").replace(/\s+/g, " ").trim();
     // Voorkeur: een regel waar nummer of klas in stond (dan is de rest vrijwel zeker de naam).
     const withId = bits.filter((t) => (nr && t.includes(nr)) || (klas && t.includes(klas)));
     const naam = [...withId, ...bits].map(clean)
@@ -324,7 +331,7 @@ DT.register({
     const naam = f.naam || "[naam]";
     const wanneer = f.bestaand ? (f.datum ? `op ${f.datum} ` : "") : "zojuist ";
     const regel = (k, v) => (v ? `${k}: ${v}\n` : "");
-    let body = `Beste ${s.name.split(" ")[0] || "collega"},\n\n` +
+    let body = `Beste ${(s.name || "").trim().split(" ")[0] || "collega"},\n\n` +
       `Ik heb ${wanneer}in Magister een Melding Expertisecentrum aangemaakt voor:\n\n` +
       regel("Naam", naam) + regel("Studentnummer", f.nr) + regel("Klas", f.klas) +
       regel("Aangemeld voor", f.voorWie.join(", ") || "[niet aangevinkt]") +
@@ -337,7 +344,8 @@ DT.register({
     }
     body += `Samenvatting:\n${f.samenvatting || "[samenvatting]"}\n\n` +
       `De volledige melding staat in Magister (logboek van de student).\n\nMet vriendelijke groet,\n${s.afzender || ""}`;
-    const subject = `Melding Expertisecentrum: ${naam}${f.klas ? ` (${f.klas})` : ""}`;
+    const voor = (f.voorWie || []).join(", ");
+    const subject = `Melding Expertisecentrum: ${naam}${f.klas ? ` (${f.klas})` : ""}${voor ? ` - ${voor}` : ""}`;
     return { subject, body };
   },
 
@@ -360,7 +368,22 @@ DT.register({
       DT.el("span", { text: label }),
       DT.el("input", { type: "text", "data-k": key, value: val, ...attrs })
     ]);
-    const to = inp("Aan (e-mail coach)", "to", s.to, { placeholder: "naam@school.nl" });
+    // Aan: keuzelijst met coaches uit de instellingen, of een los adres.
+    const coaches = this.coaches(s);
+    const sel = DT.el("select", { "data-k": "coach" });
+    coaches.forEach((c, i) => sel.append(DT.el("option", { value: String(i), text: c.name ? `${c.name} <${c.email}>` : c.email })));
+    sel.append(DT.el("option", { value: "other", text: coaches.length ? "Ander adres…" : "Adres invullen (of voeg coaches toe bij Instellingen)" }));
+    const toInput = DT.el("input", { type: "text", "data-k": "to", value: "", placeholder: "naam@school.nl" });
+    const to = DT.el("label", { class: "dt-m-field" }, [DT.el("span", { text: "Aan (begeleidingscoach)" }), sel, toInput]);
+    const last = coaches.findIndex((c) => c.email === s.to);
+    sel.value = coaches.length ? String(last >= 0 ? last : 0) : "other";
+    const coach = () => (sel.value === "other" ? null : coaches[+sel.value]);
+    const syncTo = () => {
+      const c = coach();
+      toInput.hidden = !!c;
+      if (c) toInput.value = c.email; else if (toInput.value === "" || coaches.some((x) => x.email === toInput.value)) toInput.value = coaches.length ? "" : s.to;
+    };
+    syncTo();
     const naam = inp("Naam student", "naam", f.naam);
     const nr = inp("Studentnummer", "nr", f.nr);
     const klas = inp("Klas", "klas", f.klas);
@@ -376,7 +399,7 @@ DT.register({
       const g = (el) => el.querySelector("input").value.trim();
       return {
         f: { ...f, naam: g(naam), nr: g(nr), klas: g(klas), voorWie: g(voor).split(/\s*,\s*/).filter(Boolean) },
-        s: { ...s, to: g(to), extra: extra.querySelector("input").checked }
+        s: { ...s, to: g(to), name: coach()?.name || "", extra: extra.querySelector("input").checked }
       };
     };
     const refresh = () => {
@@ -385,6 +408,7 @@ DT.register({
       subjEl.value = m.subject; bodyTa.value = m.body;
     };
     [naam, nr, klas, voor, extra].forEach((el) => el.addEventListener("input", refresh));
+    sel.addEventListener("change", () => { syncTo(); refresh(); check(); if (!coach()) toInput.focus(); });
     refresh();
 
     const warn = DT.el("div", { class: "dt-m-warn" });
@@ -404,7 +428,7 @@ DT.register({
     const send = async () => {
       const r = check();
       if (!r.s.to) { DT.toast("Vul het e-mailadres van de coach in", "err"); return; }
-      await DT.saveSettings({ melding: { enabled: true, to: r.s.to, extra: r.s.extra } });
+      await DT.saveSettings({ melding: { enabled: true, to: r.s.to, name: r.s.name, extra: r.s.extra } });
       const url = this.mailto(r.s.to, subjEl.value, bodyTa.value, r.s.cc);
       if (url.length > 1900) DT.toast("Lange mail: als Outlook de tekst afkapt, gebruik dan Kopiëren", "info", 5000);
       window.location.href = url;
@@ -446,7 +470,7 @@ DT.register({
     dlg.addEventListener("keydown", (e) => { if (e.key === "Escape") dlg.remove(); });
     document.body.append(dlg);
     this._dlg = dlg;
-    (s.to ? naam : to).querySelector("input").focus();
+    (coach() ? naam.querySelector("input") : toInput).focus();
   },
 
   css() {
@@ -458,7 +482,8 @@ DT.register({
 #dt-melding .dt-m-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
 #dt-melding .dt-m-grid .dt-m-field:first-child{grid-column:1/-1}
 #dt-melding .dt-m-field{display:flex;flex-direction:column;gap:3px;font-size:12px;color:#555}
-#dt-melding input[type=text],#dt-melding textarea{font:inherit;font-size:14px;color:#222;background:#fff;border:1px solid #ccc;border-radius:6px;padding:6px 8px;width:100%;box-sizing:border-box}
+#dt-melding input[type=text],#dt-melding select,#dt-melding textarea{font:inherit;font-size:14px;color:#222;background:#fff;border:1px solid #ccc;border-radius:6px;padding:6px 8px;width:100%;box-sizing:border-box}
+#dt-melding [hidden]{display:none}
 #dt-melding textarea{resize:vertical;min-height:180px;font-family:inherit}
 #dt-melding .dt-m-check{display:flex;gap:8px;align-items:center;font-size:13px}
 #dt-melding .dt-m-warn{color:#b3261e;font-size:12px;min-height:1em}

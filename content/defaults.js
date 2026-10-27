@@ -11,7 +11,7 @@ globalThis.DT_DEFAULTS = {
   aanwezigheid: { enabled: true },
   inspector: { enabled: true },
   updates: { check: true },
-  melding: { enabled: true, to: "", cc: "", name: "Esther Benschop", extra: true, afzender: "" },
+  melding: { enabled: true, coaches: [], to: "", cc: "", name: "", extra: true, afzender: "" },
   links: [
     { label: "Magister Web", url: "https://accounts.magister.net" },
     { label: "Mediacollege Amsterdam", url: "https://www.ma-web.nl" }

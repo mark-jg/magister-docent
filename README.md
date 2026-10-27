@@ -48,7 +48,7 @@ Een uitgepakte extensie kan zichzelf niet overschrijven (dat staat Chrome alleen
 | Snelle aanwezigheid (Lesdashboard > leerlinglijst): "Iedereen aanwezig", springen naar een naam, toetsenbordmodus met letters per kolom | Alt+A, of de balk boven de registratielijst |
 | Navigatie: commandopalet met alle menu-onderdelen en acties | Ctrl+K (of Alt+K); Alt+1 t/m 9 springt naar hoofdmenu-items; Alt+S naar het zoekveld |
 | Thema bijwerken: elementen die niet meekleuren zelf toevoegen | Alt+I, beweeg over het element, C, kies achtergrond/vlak/accent/tekst |
-| Mail bij Melding Expertisecentrum: controlescherm met naam, studentnummer, klas, "aangemeld voor" en samenvatting, daarna een concept-mail in Outlook naar de begeleidingscoach (niets wordt automatisch verzonden) | knop "Mail coach" naast "Volgende" bij een nieuwe melding, ✉ in de knoppenbalk van een bestaande melding in het logboek, of Alt+M; e-mailadres en naam in de instellingen |
+| Mail bij Melding Expertisecentrum: controlescherm met naam, studentnummer, klas, "aangemeld voor" en samenvatting, daarna een concept-mail in Outlook naar de begeleidingscoach (niets wordt automatisch verzonden) | knop "Mail coach" naast "Volgende" bij een nieuwe melding, ✉ in de knoppenbalk van een bestaande melding in het logboek, of Alt+M; coaches (naam en e-mail) in de instellingen, in het controlescherm kies je aan wie |
 | Inspector: selectors vinden, paginarapport (R, nu ook met bovenliggende frames en koppen van de hoofdpagina) en netwerkrapport (N, welke API-calls en velden, zonder waarden) | Alt+I |
 
 Instellingen: klik op het extensie-icoon > Instellingen, of in het paneel.
@@ -99,6 +99,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.7.4: meerdere begeleidingscoaches (naam en e-mail) in de instellingen, keuzelijst in het controlescherm met "Ander adres" als uitwijk; bestaande instelling wordt automatisch overgenomen; klasherkenning op de pagina ook voor klassen met één cijfer (zoals MM2A); "aangemeld voor" staat ook in het onderwerp van de mail.
 - 0.7.3: mailmodule haalt naam, studentnummer en klas op via Magisters eigen API (leerling-id uit de adresbalk, API-calls van de bovenliggende detailkaart), met de koppen op de pagina als uitwijk; het controlescherm zegt waar de gegevens vandaan komen en de Bronnen-knop toont welke API-calls en veldnamen gevonden zijn (zonder waarden).
 - 0.7.2: updatecontrole werkt met een privé repo: GitHub-tokenveld bij Instellingen > Updates (lokaal bewaard), zip-download via de API, duidelijkere foutmeldingen (geen toegang, token ongeldig, limiet bereikt).
 - 0.7.1: updatecontrole via GitHub Releases (badge op het icoon, downloadknop en Herladen in het menu, instelling om de controle uit te zetten); versienummer komt uit `manifest.json`; releaseworkflow en `scripts/release.sh`.

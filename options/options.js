@@ -15,6 +15,13 @@ async function load() {
     else el.value = v ?? "";
   }
   renderLinks();
+  // Oude instelling (één adres + naam) overzetten naar de coachlijst.
+  settings.melding.coaches ||= [];
+  if (!settings.melding.coaches.length && settings.melding.to) {
+    settings.melding.coaches.push({ name: settings.melding.name || "", email: settings.melding.to });
+    save();
+  }
+  renderCoaches();
   const ex = document.getElementById("extraList");
   ex.value = (settings.theme.extra || []).map((x) => `${x.role} | ${x.sel}`).join("\n");
   ex.oninput = () => {
@@ -34,6 +41,20 @@ function renderLinks() {
     url.oninput = () => { settings.links[i].url = url.value; save(); };
     del.onclick = () => { settings.links.splice(i, 1); renderLinks(); save(); };
     host.append(label, url, del);
+  });
+}
+
+function renderCoaches() {
+  const host = document.getElementById("coaches");
+  host.replaceChildren();
+  settings.melding.coaches.forEach((c, i) => {
+    const name = Object.assign(document.createElement("input"), { type: "text", value: c.name || "", placeholder: "Naam (voor de aanhef)" });
+    const email = Object.assign(document.createElement("input"), { type: "text", value: c.email || "", placeholder: "naam@school.nl" });
+    const del = Object.assign(document.createElement("button"), { textContent: "Verwijderen" });
+    name.oninput = () => { settings.melding.coaches[i].name = name.value; save(); };
+    email.oninput = () => { settings.melding.coaches[i].email = email.value.trim(); save(); };
+    del.onclick = () => { settings.melding.coaches.splice(i, 1); renderCoaches(); save(); };
+    host.append(name, email, del);
   });
 }
 
@@ -57,6 +78,7 @@ document.addEventListener("input", (e) => {
 });
 
 document.getElementById("addLink").onclick = () => { settings.links.push({ label: "", url: "" }); renderLinks(); };
+document.getElementById("addCoach").onclick = () => { settings.melding.coaches.push({ name: "", email: "" }); renderCoaches(); document.querySelector("#coaches input:last-of-type")?.focus(); };
 document.getElementById("reset").onclick = async () => {
   if (!confirm("Alle instellingen terugzetten naar standaard?")) return;
   settings = structuredClone(DEFAULTS); await save(); load();
