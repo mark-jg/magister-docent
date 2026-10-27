@@ -84,8 +84,8 @@ DT.register({
     return /magister-lvs\/#\/overview\//.test(location.href) && !!DT.deepQuery("app-logbook-list");
   },
 
-  BTN_STYLE: "padding:6px 14px;border-radius:8px;border:2px solid var(--dt-accent,#056dc2);" +
-    "background:#fff;color:var(--dt-accent,#056dc2);font:600 .875rem/1.25rem open-sans,Arial,sans-serif;cursor:pointer;white-space:nowrap",
+  BTN_STYLE: "display:inline-flex;align-items:center;gap:.5rem;height:2.5rem;padding:0 1rem;border-radius:var(--dna-button-border-radius,8px);" +
+    "border:var(--dna-button-border-width,2px) solid #1B3A5C;background:#fff;color:#1B3A5C;font:600 .875rem/1.25rem open-sans,\"Open Sans\",Arial,sans-serif;cursor:pointer;white-space:nowrap",
 
   mount(DT) {
     this.mountCreate(DT);
@@ -99,9 +99,10 @@ DT.register({
     const next = DT.deepQuery("#to-next-tab");
     const btn = DT.el("button", {
       type: "button", id: "dt-melding-btn", title: "Concept-mail naar begeleidingscoach (Alt+M)",
-      text: "✉ Mail coach",
       onclick: (e) => { e.preventDefault(); this.open(DT, document); }
     });
+    btn.innerHTML = this.ICON + "<span>Mail coach</span>";
+    btn.firstElementChild.style.width = "1rem"; btn.firstElementChild.style.height = "1rem";
     btn.setAttribute("style", this.BTN_STYLE + ";margin-right:12px");
     if (next && next.parentNode) next.parentNode.insertBefore(btn, next);
     else { btn.style.cssText += ";position:fixed;right:24px;bottom:72px;z-index:99999;box-shadow:0 2px 8px rgba(0,0,0,.2)"; document.body.append(btn); }
@@ -118,15 +119,81 @@ DT.register({
       if (!/expertisecentrum/i.test(type)) return;
       const bar = DT.deepQuery("dna-card-title dna-button-bar", item);
       if (!bar) return;
-      const btn = DT.el("button", {
-        type: "button", "data-dt-mail": "1", title: "Concept-mail naar begeleidingscoach", text: "✉",
+      const btn = this.iconButton(DT, bar, item, {
+        title: "Concept-mail naar begeleidingscoach",
         onclick: (e) => { e.preventDefault(); e.stopPropagation(); this.openItem(DT, item); }
       });
-      btn.setAttribute("style", this.BTN_STYLE + ";padding:2px 10px;margin-right:6px;line-height:1.5rem");
-      const first = bar.shadowRoot?.firstElementChild || bar.firstElementChild;
-      (bar.shadowRoot || bar).insertBefore(btn, first || null);
-      this._itemBtns.push(btn);
+      if (btn) this._itemBtns.push(btn);
     });
+  },
+
+  /* Envelop in de stijl van Magisters lijn-iconen (24-grid, stroke 2, currentColor). */
+  ICON: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7.5l9 6 9-6"/></svg>',
+
+  /* Icoonknop die in Magisters knoppenbalk past.
+   * Eerst: een kopie van Magisters eigen dna-button (prullenbak/printer) met ons icoon erin,
+   * zodat maat, kleur, afronding en hover precies gelijk zijn aan de knoppen ernaast.
+   * Lukt dat niet (geen buurknop, icoon niet vindbaar), dan een randloze knop in dezelfde maten. */
+  iconButton(DT, bar, item, { title, onclick }) {
+    // deepQuery kijkt niet in de schaduw-DOM van de root zelf; daarom ook daarin zoeken.
+    const q = (sel, r) => DT.deepQuery(sel, r) || (r.shadowRoot ? DT.deepQuery(sel, r.shadowRoot) : null);
+    const inBar = (n) => Boolean(n && (bar.contains(n) || bar.shadowRoot?.contains(n)));
+    let sib = q("#delete-logbook, #print-logbook, #add-child-logbook, #edit-logbook", item);
+    if (!inBar(sib)) sib = Array.from(bar.children).find((c) => c.tagName?.toLowerCase() === "dna-button") || null;
+    const ICON = this.ICON;
+    const guard = (e) => { if (e.target.closest?.("[data-dt-mail]")) { e.stopImmediatePropagation(); onclick(e); } };
+
+    if (sib && sib.parentNode && sib.tagName?.toLowerCase() === "dna-button") {
+      const c = sib.cloneNode(true);
+      c.removeAttribute("id");
+      c.setAttribute("data-dt-mail", "1");
+      c.setAttribute("title", title);
+      c.setAttribute("aria-label", title);
+      c.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id"));
+      c.querySelectorAll("button,[aria-label]").forEach((n) => { n.setAttribute("aria-label", title); n.setAttribute("title", title); });
+      sib.parentNode.insertBefore(c, sib);
+      // Klik afvangen vóór Magisters eigen handlers (de kopie heeft die niet, maar het component kan ze opnieuw koppelen).
+      c.addEventListener("click", guard, true);
+      c.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") guard(e); }, true);
+
+      const swapIcon = () => {
+        const svg = q("svg", c);
+        const ico = svg || q("dna-icon, [class*=icon]", c);
+        if (!ico || ico.hasAttribute("data-dt-icon")) return Boolean(ico);
+        const mine = DT.el("span", { "data-dt-icon": "1" });
+        mine.innerHTML = this.ICON;
+        const own = mine.firstElementChild;
+        ["class", "style", "width", "height"].forEach((a) => { const v = ico.getAttribute(a); if (v) own.setAttribute(a, v); });
+        if (!own.getAttribute("width") && !own.style.width) { own.style.width = "var(--dna-icon-size,1rem)"; own.style.height = "var(--dna-icon-size,1rem)"; }
+        own.setAttribute("data-dt-icon", "1");
+        ico.replaceWith(own);
+        return true;
+      };
+      let ok = swapIcon();
+      // Het component rendert zijn schaduw-DOM soms pas na het invoegen (of opnieuw): dan nogmaals.
+      const root = c.shadowRoot;
+      if (root) new MutationObserver(() => { if (!q("[data-dt-icon]", c)) swapIcon(); }).observe(root, { childList: true, subtree: true });
+      if (!ok) requestAnimationFrame(() => { if (!swapIcon() && !q("[data-dt-icon]", c)) { c.replaceWith(fallback()); } });
+      return c;
+    }
+    return insert(fallback());
+
+    function fallback() {
+      const b = DT.el("button", { type: "button", "data-dt-mail": "1", title, "aria-label": title, onclick });
+      b.innerHTML = ICON;
+      b.setAttribute("style", "display:inline-flex;align-items:center;justify-content:center;width:2.5rem;height:2rem;padding:0;margin:0;" +
+        "border:0;background:transparent;color:inherit;cursor:pointer;border-radius:var(--dna-button-border-radius,8px);line-height:0;font:inherit");
+      b.firstElementChild.style.width = "var(--dna-icon-size,1rem)";
+      b.firstElementChild.style.height = "var(--dna-icon-size,1rem)";
+      b.addEventListener("mouseenter", () => { b.style.background = "rgba(27,58,92,.08)"; });
+      b.addEventListener("mouseleave", () => { b.style.background = "transparent"; });
+      return b;
+    }
+    function insert(b) {
+      const first = bar.shadowRoot?.firstElementChild || bar.firstElementChild;
+      (bar.shadowRoot || bar).insertBefore(b, first || null);
+      return b;
+    }
   },
 
   /* Item in het overzicht eerst uitklappen (anders is de inhoud niet in de DOM). */
@@ -475,23 +542,31 @@ DT.register({
 
   css() {
     return `
-#dt-melding{position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;font:14px/1.4 var(--dt-font,system-ui,sans-serif);color:#222}
-#dt-melding .dt-m-box{background:#fff;color:#222;width:min(720px,94vw);max-height:92vh;overflow:auto;border-radius:12px;padding:18px 20px;box-shadow:0 12px 40px rgba(0,0,0,.3);display:flex;flex-direction:column;gap:10px}
-#dt-melding .dt-m-head{display:flex;justify-content:space-between;align-items:center;font-size:16px}
-#dt-melding .dt-m-x{border:0;background:none;font-size:16px;cursor:pointer;color:#666}
-#dt-melding .dt-m-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+#dt-melding{position:fixed;inset:0;z-index:2147483000;background:rgba(27,58,92,.32);display:flex;align-items:center;justify-content:center;font:14px/1.45 open-sans,"Open Sans",var(--dt-font,system-ui,sans-serif);color:#1f2933}
+#dt-melding *{box-sizing:border-box}
+#dt-melding .dt-m-box{background:#fff;color:#1f2933;width:min(720px,94vw);max-height:92vh;overflow:auto;border-radius:12px;padding:20px 24px 18px;box-shadow:0 16px 48px rgba(27,58,92,.28);display:flex;flex-direction:column;gap:12px}
+#dt-melding .dt-m-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-bottom:10px;border-bottom:1px solid #e3e7ec}
+#dt-melding .dt-m-head strong{font-size:18px;font-weight:600;color:#1B3A5C}
+#dt-melding .dt-m-x{width:32px;height:32px;border:0;border-radius:8px;background:none;font-size:16px;line-height:1;cursor:pointer;color:#1B3A5C}
+#dt-melding .dt-m-x:hover{background:rgba(27,58,92,.08)}
+#dt-melding .dt-m-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
 #dt-melding .dt-m-grid .dt-m-field:first-child{grid-column:1/-1}
-#dt-melding .dt-m-field{display:flex;flex-direction:column;gap:3px;font-size:12px;color:#555}
-#dt-melding input[type=text],#dt-melding select,#dt-melding textarea{font:inherit;font-size:14px;color:#222;background:#fff;border:1px solid #ccc;border-radius:6px;padding:6px 8px;width:100%;box-sizing:border-box}
+#dt-melding .dt-m-field{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:#1B3A5C}
+#dt-melding input[type=text],#dt-melding select,#dt-melding textarea{font:inherit;font-size:14px;font-weight:400;color:#1f2933;background:#fff;border:1px solid #c2cad4;border-radius:8px;padding:8px 10px;width:100%;min-height:38px}
+#dt-melding input[type=text]:focus,#dt-melding select:focus,#dt-melding textarea:focus{outline:none;border-color:#1B3A5C;box-shadow:0 0 0 2px rgba(27,58,92,.18)}
 #dt-melding [hidden]{display:none}
 #dt-melding textarea{resize:vertical;min-height:180px;font-family:inherit}
 #dt-melding .dt-m-check{display:flex;gap:8px;align-items:center;font-size:13px}
+#dt-melding .dt-m-check input{accent-color:#1B3A5C}
 #dt-melding .dt-m-warn{color:#b3261e;font-size:12px;min-height:1em}
-#dt-melding .dt-m-actions{display:flex;justify-content:flex-end;gap:8px}
-#dt-melding .dt-m-btn{font:600 14px/1 inherit;padding:9px 16px;border-radius:8px;border:2px solid var(--dt-accent,#056dc2);background:#fff;color:var(--dt-accent,#056dc2);cursor:pointer}
-#dt-melding .dt-m-ghost{border-color:#ccc;color:#666;margin-right:auto}
-#dt-melding .dt-m-primary{background:var(--dt-accent,#056dc2);color:var(--dt-accent-ink,#fff)}
-#dt-melding .dt-m-hint{font-size:12px;color:#777}
+#dt-melding .dt-m-actions{display:flex;justify-content:flex-end;gap:8px;padding-top:4px}
+#dt-melding .dt-m-btn{font:600 14px/1.25rem inherit;padding:7px 16px;border-radius:8px;border:2px solid #1B3A5C;background:#fff;color:#1B3A5C;cursor:pointer;white-space:nowrap}
+#dt-melding .dt-m-btn:hover{background:rgba(27,58,92,.08)}
+#dt-melding .dt-m-btn:focus-visible{outline:2px solid #1B3A5C;outline-offset:2px}
+#dt-melding .dt-m-ghost{border-color:transparent;color:#52606d;margin-right:auto;padding-left:8px;padding-right:8px}
+#dt-melding .dt-m-primary{background:#1B3A5C;color:#fff}
+#dt-melding .dt-m-primary:hover{background:#16304c}
+#dt-melding .dt-m-hint{font-size:12px;color:#52606d}
 `;
   }
 });
