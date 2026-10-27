@@ -101,6 +101,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.7.9: mailknop staat op dezelfde rij als prullenbak, printer en plus (vóór Magisters knoppenbalk, met controle dat hij echt op die rij staat); icoon in Magisters navy en iets groter.
 - 0.7.8: mailknop in het logboek is weer een eigen, randloze icoonknop op de plek van 0.7.6; hij meet maat, kleur en icoongrootte van de prullenbak-knop ernaast op (het kopiëren van Magisters knop uit 0.7.7 brak de indeling).
 - 0.7.7: mailknop in het logboek is nu een kopie van Magisters eigen icoonknoppen (zelfde maat, kleur en hover) met een envelop-icoon; knop "Mail coach" op de aanmaakpagina en het controlescherm in Magisters navy en Open Sans.
 - 0.7.6: na een update toont het menu één keer "Bijgewerkt van X naar Y"; eerste versie die via de ingebouwde updater wordt binnengehaald.

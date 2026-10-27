@@ -130,34 +130,38 @@ DT.register({
   /* Envelop in de stijl van Magisters lijn-iconen (24-grid, stroke 2, currentColor). */
   ICON: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7.5l9 6 9-6"/></svg>',
 
-  /* Icoonknop die in Magisters knoppenbalk past: randloos, envelop-icoon, en bij het invoegen
-   * opgemeten aan de knop ernaast (prullenbak/printer): zelfde hoogte, breedte, kleur en icoongrootte.
-   * Wordt als eerste in de balk gezet; dat gaf in 0.7.6 een nette indeling (✉, prullenbak / printer, +). */
+  /* Icoonknop in de stijl van Magisters knoppenbalk: randloos, envelop-icoon, opgemeten aan de
+   * knop ernaast (prullenbak/printer): hoogte, breedte, kleur en icoongrootte.
+   * Plaatsing: eerst als buurelement vóór de balk (zelfde rij: ✉ prullenbak printer + ^). Blijkt hij
+   * na het plaatsen niet naast de eerste knop van de balk te staan, dan als eerste knop ín de balk. */
   iconButton(DT, bar, item, { title, onclick }) {
     const q = (sel, r) => DT.deepQuery(sel, r) || (r.shadowRoot ? DT.deepQuery(sel, r.shadowRoot) : null);
     const inBar = (n) => Boolean(n && (bar.contains(n) || bar.shadowRoot?.contains(n)));
+    const visible = (n) => { const r = n.getBoundingClientRect(); return r.width > 4 && r.height > 4; };
     let sib = q("#delete-logbook, #print-logbook, #add-child-logbook", item);
     if (!inBar(sib)) sib = Array.from(bar.children).find((c) => c.tagName?.toLowerCase() === "dna-button") || null;
+    const NAVY = "#1B3A5C";
+    const isBlack = (c) => /^rgba?\(0,\s*0,\s*0/.test(c || "");
 
     const b = DT.el("button", { type: "button", "data-dt-mail": "1", title, "aria-label": title, onclick });
     b.innerHTML = this.ICON;
     const svg = b.firstElementChild;
     const st = {
       display: "inline-flex", alignItems: "center", justifyContent: "center", flex: "0 0 auto", boxSizing: "border-box",
-      width: "2.5rem", height: "2.25rem", padding: "0", margin: "0", border: "0", background: "transparent",
-      color: "inherit", cursor: "pointer", borderRadius: "8px", lineHeight: "0", font: "inherit", outline: "none"
+      alignSelf: "center", width: "2.5rem", height: "2.25rem", padding: "0", margin: "0", border: "0", background: "transparent",
+      color: NAVY, cursor: "pointer", borderRadius: "8px", lineHeight: "0", font: "inherit", outline: "none"
     };
-    svg.style.width = "1rem"; svg.style.height = "1rem";
+    svg.style.width = "1.25rem"; svg.style.height = "1.25rem";
+    svg.setAttribute("stroke-width", "1.75");
     if (sib) {
       try {
         const r = sib.getBoundingClientRect();
         if (r.width > 8) st.width = `${r.width}px`;
         if (r.height > 8) st.height = `${r.height}px`;
-        const inner = q("button", sib) || sib;
-        const cs = getComputedStyle(inner);
-        if (cs.color) st.color = cs.color;
-        if (cs.borderRadius && cs.borderRadius !== "0px") st.borderRadius = cs.borderRadius;
         const sv = q("svg", sib);
+        const colorOf = (n) => { const c = getComputedStyle(n); return [c.color, c.fill, c.stroke].find((v) => v && v !== "none" && !/currentcolor/i.test(v) && !isBlack(v)); };
+        const col = (sv && colorOf(sv)) || colorOf(q("button", sib) || sib) || colorOf(sib);
+        if (col) st.color = col;
         if (sv) {
           const sr = sv.getBoundingClientRect();
           if (sr.width > 4) { svg.style.width = `${sr.width}px`; svg.style.height = `${sr.height}px`; }
@@ -172,6 +176,23 @@ DT.register({
     b.addEventListener("focus", () => { b.style.boxShadow = "0 0 0 2px rgba(27,58,92,.35)"; });
     b.addEventListener("blur", () => { b.style.boxShadow = "none"; });
 
+    // Referentie: de eerste zichtbare knop in de balk (prullenbak), anders de balk zelf.
+    const ref = [sib, ...DT.deepQueryAll("dna-button, button", bar), ...(bar.shadowRoot ? DT.deepQueryAll("dna-button, button", bar.shadowRoot) : [])]
+      .find((n) => n && !n.hasAttribute("data-dt-mail") && visible(n)) || bar;
+    const sameRow = () => {
+      const a = b.getBoundingClientRect(), c = ref.getBoundingClientRect();
+      if (a.width < 4 || c.width < 4) return true; // niets te meten (ingeklapt): laten staan
+      const dy = Math.abs((a.top + a.height / 2) - (c.top + c.height / 2));
+      return dy <= 6 && a.right <= c.left + 2 && c.left - a.right <= 24;
+    };
+
+    // 1. Buurelement vóór de balk, in dezelfde rij.
+    if (bar.parentNode) {
+      bar.parentNode.insertBefore(b, bar);
+      if (sameRow()) return b;
+      b.remove();
+    }
+    // 2. Als eerste knop in de balk (indeling van 0.7.6/0.7.8).
     const first = bar.shadowRoot?.firstElementChild || bar.firstElementChild;
     (bar.shadowRoot || bar).insertBefore(b, first || null);
     return b;
