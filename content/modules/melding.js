@@ -189,6 +189,87 @@ DT.register({
     return [...new Set(bits.filter(Boolean))];
   },
 
+  /* ---------- Leerling via Magisters eigen API ----------
+   * De naam, het nummer en de klas staan niet in het logboek-frame maar komen in de
+   * bovenliggende detailkaart binnen via de API. We zoeken in alle frames op dit domein
+   * de API-calls waar de leerling-id uit de adresbalk in voorkomt, vragen die opnieuw op
+   * (met Magisters eigen headers) en zoeken in het antwoord naar naam-, nummer- en
+   * klasvelden. Diagnose (geen waarden) komt in de Bronnen-knop terecht. */
+  KEYS: {
+    nr: /^(stamnummer|stamnr|leerlingnummer|leerlingnr|studentnummer|studentnr|llnr|nummer)$/i,
+    roep: /^(roepnaam|voornaam|voornamen|firstname)$/i,
+    tussen: /^(tussenvoegsel|tussenvoegsels|voorvoegsel|officieletussenvoegsels?)$/i,
+    achter: /^(achternaam|officieleachternaam|surname|lastname)$/i,
+    vol: /^(naam|volledigenaam|weergavenaam|displayname|fullname|leerlingnaam|naamvolledig|roepnaamachternaam)$/i,
+    klas: /^(klas|stamklas|klasnaam|klascode|stamgroep|groep|groepsnaam|huidigegroep|huidigeklas|lesgroep)$/i
+  },
+
+  pickStudent(json, id) {
+    const K = this.KEYS;
+    const str = (v) => (v === null || v === undefined || typeof v === "object") ? "" : String(v).trim();
+    const klasOf = (v) => typeof v === "object" && v ? str(v.naam || v.omschrijving || v.code || v.afkorting || v.klas || v.groep) : str(v);
+    const cands = [], klassen = [];
+    let n = 0;
+    const walk = (node, depth, parentKlas, parentKey = "") => {
+      if (!node || typeof node !== "object" || depth > 6 || n++ > 4000) return;
+      if (Array.isArray(node)) { node.forEach((x) => walk(x, depth + 1, parentKlas, parentKey)); return; }
+      const keys = Object.keys(node);
+      const find = (re) => keys.find((k) => re.test(k));
+      // Een object onder een sleutel als "groepen" of "huidigeKlas" is een klas, geen leerling.
+      const isKlasObj = /klas|groep/i.test(parentKey) && !find(K.achter) && !find(K.nr);
+      if (isKlasObj) { const kn = klasOf(node); if (kn) klassen.push({ klas: kn, veld: parentKey, depth }); for (const k of keys) walk(node[k], depth + 1, parentKlas, k); return; }
+      const kNr = find(K.nr), kAchter = find(K.achter), kVol = find(K.vol), kKlas = find(K.klas);
+      let klas = kKlas ? klasOf(node[kKlas]) : "";
+      if (kNr || kAchter || kVol) {
+        const roep = str(node[find(K.roep)]), tussen = str(node[find(K.tussen)]), achter = str(node[kAchter]);
+        const naam = achter ? [roep, tussen, achter].filter(Boolean).join(" ") : str(node[kVol]);
+        const nr = str(node[kNr]);
+        // Alleen echte nummers; een "nummer" dat op een telefoonnummer lijkt telt niet.
+        const nrOk = /^\d{4,10}$/.test(nr) ? nr : "";
+        const velden = [kNr, kAchter, kVol, find(K.roep), find(K.tussen), kKlas].filter(Boolean);
+        const score = (String(node.id ?? node.Id ?? node.leerlingId ?? node.persoonId ?? "") === String(id) ? 10 : 0) + (achter ? 3 : 0) + (nrOk ? 2 : 0) + (klas ? 1 : 0) - depth * 0.1;
+        if (naam || nrOk) cands.push({ naam, nr: nrOk, klas: klas || parentKlas || "", velden, score });
+      }
+      for (const k of keys) walk(node[k], depth + 1, klas || parentKlas, k);
+    };
+    walk(json, 0, "");
+    // Klas kan in een ander object zitten (groepen, lesgroepen): pak de beste naam en vul klas aan.
+    cands.sort((a, b) => b.score - a.score);
+    const best = cands[0];
+    if (best && !best.klas) {
+      const k = cands.find((c) => c.klas) || klassen.sort((a, b) => a.depth - b.depth)[0];
+      if (k) { best.klas = k.klas; best.velden.push(k.veld || k.velden.find((v) => K.klas.test(v))); }
+    }
+    return best || null;
+  },
+
+  async studentFromApi(DT) {
+    const id = this.leerlingId();
+    const diag = [];
+    if (!id) return { data: null, diag: ["Geen leerling-id in de adresbalk gevonden."] };
+    const anon = (u) => String(u).replace(/^https?:\/\/[^/]+/, "").replace(/\d{3,}/g, "{id}").slice(0, 160);
+    const pattern = `(^|[/=,])${id}([/?&,]|$)`;
+    const seen = new Set();
+    let best = null;
+    for (const win of DT.windows()) {
+      const urls = await DT.apiFind(pattern, 1500, { win, all: true });
+      for (const url of urls) {
+        if (seen.has(url) || seen.size >= 10) continue;
+        seen.add(url);
+        const r = await DT.api(url, { full: true, win, timeout: 8000 });
+        const keys = r.json ? (Array.isArray(r.json) ? `[${Object.keys(r.json[0] || {}).slice(0, 12).join(", ")}]` : Object.keys(r.json).slice(0, 12).join(", ")) : "";
+        const pick = r.json ? this.pickStudent(r.json, id) : null;
+        diag.push(`API ${anon(url)} → ${r.status}${r.error ? " " + r.error : ""}${keys ? `; velden: ${keys}` : ""}` +
+          (pick ? `; gevonden: ${["naam", "nr", "klas"].filter((k) => pick[k]).join("+") || "niets"} via ${pick.velden.join(", ")}` : ""));
+        if (pick && (!best || pick.score > best.score)) best = pick;
+        if (best && best.naam && best.nr && best.klas) break;
+      }
+      if (best && best.naam && best.nr && best.klas) break;
+    }
+    if (!seen.size) diag.push("Geen API-call met de leerling-id in het netwerklog (open de leerling opnieuw of herlaad de pagina).");
+    return { data: best, diag };
+  },
+
   student(DT) {
     const bits = this.sources(DT);
     const all = bits.join(" | ");
@@ -211,9 +292,16 @@ DT.register({
     return (ed?.innerText || "").trim();
   },
 
-  collect(DT, root = document) {
+  async collect(DT, root = document) {
     const chk = this.checked(DT, root);
-    const d = this.student(DT);
+    const dom = this.student(DT);
+    const api = await this.studentFromApi(DT);
+    const a = api.data || {};
+    const d = {
+      naam: a.naam || dom.naam, nr: a.nr || dom.nr, klas: a.klas || dom.klas,
+      bronnen: dom.bronnen, apiDiag: api.diag,
+      viaApi: ["naam", "nr", "klas"].filter((k) => a[k])
+    };
     const isItem = root !== document;
     return {
       ...d,
@@ -261,12 +349,13 @@ DT.register({
 
   /* ---------- Controlescherm ---------- */
 
-  open(DT, root = document) {
+  async open(DT, root = document) {
     if (Date.now() - (this._openedAt || 0) < 500) return;
     this._openedAt = Date.now();
     this._dlg?.remove();
     const s = this.defaults();
-    const f = this.collect(DT, root);
+    DT.toast("Leerlinggegevens ophalen…", "info", 1500);
+    const f = await this.collect(DT, root);
     const inp = (label, key, val, attrs = {}) => DT.el("label", { class: "dt-m-field" }, [
       DT.el("span", { text: label }),
       DT.el("input", { type: "text", "data-k": key, value: val, ...attrs })
@@ -339,11 +428,16 @@ DT.register({
         warn,
         DT.el("div", { class: "dt-m-actions" }, [
           DT.el("button", { type: "button", class: "dt-m-btn dt-m-ghost", text: "Bronnen", title: "Welke teksten zijn gevonden voor naam, nummer en klas (voor afstemming)",
-            onclick: () => DT.copy(`leerlingId: ${this.leerlingId()}\n` + (f.bronnen || []).map((b) => "- " + b).join("\n")) }),
+            onclick: () => DT.copy(
+              `leerlingId: ${this.leerlingId() || "(geen)"}\n` +
+              `via API: ${f.viaApi?.length ? f.viaApi.join(", ") : "niets"}\n` +
+              (f.apiDiag || []).map((l) => "- " + l).join("\n") +
+              `\n\nTeksten op de pagina (uitwijk; lak namen weg voor je dit deelt):\n` +
+              (f.bronnen || []).map((b) => "- " + b).join("\n")) }),
           DT.el("button", { type: "button", class: "dt-m-btn", text: "Kopiëren", onclick: copy }),
           DT.el("button", { type: "button", class: "dt-m-btn dt-m-primary", text: "Open in Outlook", onclick: send })
         ]),
-        DT.el("div", { class: "dt-m-hint", text: (s.cc ? `Cc: ${s.cc}. ` : "") + (f.bestaand
+        DT.el("div", { class: "dt-m-hint", text: (f.viaApi?.length === 3 ? "Naam, nummer en klas komen uit Magister. " : f.viaApi?.length ? `Uit Magister: ${f.viaApi.join(", ")}; de rest is van de pagina afgelezen, controleer die. ` : "Gegevens zijn van de pagina afgelezen, controleer ze (Bronnen helpt bij afstemmen). ") + (s.cc ? `Cc: ${s.cc}. ` : "") + (f.bestaand
           ? "Controleer de gegevens. De mail opent als concept; er wordt niets automatisch verzonden."
           : "Controleer de gegevens. De mail opent als concept; er wordt niets automatisch verzonden. Sla de melding daarna nog wel op in Magister.") })
       ])

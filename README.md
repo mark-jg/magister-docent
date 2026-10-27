@@ -64,7 +64,7 @@ De bovenstaande functies werken op elke Magister-pagina zonder kennis van de int
 
 Per pagina volgt dan een module die precies op die structuur werkt.
 
-Voor de mailmodule: klopt de naam, het nummer of de klas niet, klik dan in het controlescherm op **Bronnen**. Dat zet de gevonden teksten (zonder leerlinggegevens te hoeven typen) op het klembord; plak die in het gesprek, met de naam weggelakt.
+Voor de mailmodule: klopt de naam, het nummer of de klas niet, klik dan in het controlescherm op **Bronnen**. Dat zet op het klembord welke API-calls en veldnamen gevonden zijn (zonder waarden) en welke teksten op de pagina stonden; plak dat in het gesprek, met de naam weggelakt.
 
 ## Mappen
 
@@ -99,6 +99,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.7.3: mailmodule haalt naam, studentnummer en klas op via Magisters eigen API (leerling-id uit de adresbalk, API-calls van de bovenliggende detailkaart), met de koppen op de pagina als uitwijk; het controlescherm zegt waar de gegevens vandaan komen en de Bronnen-knop toont welke API-calls en veldnamen gevonden zijn (zonder waarden).
 - 0.7.2: updatecontrole werkt met een privé repo: GitHub-tokenveld bij Instellingen > Updates (lokaal bewaard), zip-download via de API, duidelijkere foutmeldingen (geen toegang, token ongeldig, limiet bereikt).
 - 0.7.1: updatecontrole via GitHub Releases (badge op het icoon, downloadknop en Herladen in het menu, instelling om de controle uit te zetten); versienummer komt uit `manifest.json`; releaseworkflow en `scripts/release.sh`.
 - 0.7.0: module "Mail bij Melding Expertisecentrum" (nieuw formulier en logboek), Alt+M, instellingen voor adres, aanhef, cc en ondertekening; standaardinstellingen samengevoegd in `content/defaults.js`; paginarapport toont bovenliggende frames en koppen van de hoofdpagina (namen en nummers gemaskeerd).

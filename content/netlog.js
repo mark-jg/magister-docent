@@ -55,24 +55,34 @@
     return os.apply(this, arguments);
   };
 
-  /* Laatste echte URL die op een patroon past (voor de probe). */
+  /* Verzoeken komen van dit frame zelf of van een frame op hetzelfde domein (de extensie in
+   * het logboek-frame vraagt zo de API-calls op die de bovenliggende detailkaart deed). */
+  const trusted = (e) => { try { return e.source === window || (e.source && e.source.location.host === location.host); } catch { return false; } };
+  const reply = (e, msg) => { try { e.source.postMessage(msg, e.origin || "*"); } catch {} };
+
+  /* Laatste echte URL die op een patroon past (voor de probe); met all=true alle (max 12). */
   window.addEventListener("message", (e) => {
-    if (!(e.data && e.data.type === "dt:api:find" && e.source === window)) return;
-    let found = null;
-    try { const re = new RegExp(e.data.pattern, "i"); for (let i = raw.length - 1; i >= 0; i--) if (re.test(raw[i].url) && raw[i].status < 300) { found = raw[i].url; break; } } catch {}
-    window.postMessage({ type: "dt:api:found", id: e.data.id, url: found }, "*");
+    if (!(e.data && e.data.type === "dt:api:find" && trusted(e))) return;
+    let found = null; const urls = [];
+    try {
+      const re = new RegExp(e.data.pattern, "i");
+      for (let i = raw.length - 1; i >= 0 && urls.length < 12; i--) {
+        if (re.test(raw[i].url) && raw[i].status < 300 && !urls.includes(raw[i].url)) { urls.push(raw[i].url); found ??= raw[i].url; }
+      }
+    } catch {}
+    reply(e, { type: "dt:api:found", id: e.data.id, url: found, urls: e.data.all ? urls : undefined });
   });
 
   /* Op verzoek van de extensie één API-call doen met Magister's eigen headers.
    * Antwoord: status en veldnamen (shape), of met full=true de hele JSON. */
   window.addEventListener("message", async (e) => {
-    if (!(e.data && e.data.type === "dt:api:get" && e.source === window)) return;
+    if (!(e.data && e.data.type === "dt:api:get" && trusted(e))) return;
     const { id, url, full } = e.data;
     try {
       const res = await of(url, { method: "GET", credentials: "include", headers: { Accept: "application/json", ...(lastHeaders || {}) } });
       let json = null; try { json = await res.clone().json(); } catch {}
-      window.postMessage({ type: "dt:api:result", id, status: res.status, shape: json ? shape(json) : null, json: full ? json : undefined, hadHeaders: !!lastHeaders }, "*");
-    } catch (err) { window.postMessage({ type: "dt:api:result", id, status: 0, error: String(err) }, "*"); }
+      reply(e, { type: "dt:api:result", id, status: res.status, shape: json ? shape(json) : null, json: full ? json : undefined, hadHeaders: !!lastHeaders });
+    } catch (err) { reply(e, { type: "dt:api:result", id, status: 0, error: String(err) }); }
   });
   window.addEventListener("message", (e) => {
     if (e.data && e.data.type === "dt:netlog:get" && e.source) {

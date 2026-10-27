@@ -95,25 +95,38 @@
 
     /* Vraagt de pagina om een Magister-API-call te doen met haar eigen headers.
      * Geeft { status, shape, json? } terug. json alleen met full=true. */
-    api(url, { full = false, timeout = 15000 } = {}) {
+    /* Met win een ander frame op hetzelfde domein (bijvoorbeeld window.parent): dat frame
+     * doet dan de call met zíjn headers en antwoordt aan ons. */
+    api(url, { full = false, timeout = 15000, win = window } = {}) {
       return new Promise((resolve) => {
         const id = Math.random().toString(36).slice(2);
-        const h = (e) => { if (e.source === window && e.data?.type === "dt:api:result" && e.data.id === id) { window.removeEventListener("message", h); resolve(e.data); } };
+        const h = (e) => { if (DT.sameOrigin(e.source) && e.data?.type === "dt:api:result" && e.data.id === id) { window.removeEventListener("message", h); resolve(e.data); } };
         window.addEventListener("message", h);
-        window.postMessage({ type: "dt:api:get", id, url, full }, "*");
+        try { win.postMessage({ type: "dt:api:get", id, url, full }, "*"); } catch { resolve({ status: 0, error: "frame onbereikbaar" }); }
         setTimeout(() => { window.removeEventListener("message", h); resolve({ status: 0, error: "time-out" }); }, timeout);
       });
     },
 
-    /* Zoekt de laatste echte API-URL die de pagina zelf aanriep en op een patroon past. */
-    apiFind(pattern, timeout = 3000) {
+    /* Zoekt de laatste echte API-URL die de pagina zelf aanriep en op een patroon past.
+     * Met all=true een lijst van alle passende URL's (nieuwste eerst). */
+    apiFind(pattern, timeout = 3000, { win = window, all = false } = {}) {
       return new Promise((resolve) => {
         const id = Math.random().toString(36).slice(2);
-        const h = (e) => { if (e.source === window && e.data?.type === "dt:api:found" && e.data.id === id) { window.removeEventListener("message", h); resolve(e.data.url); } };
+        const h = (e) => { if (DT.sameOrigin(e.source) && e.data?.type === "dt:api:found" && e.data.id === id) { window.removeEventListener("message", h); resolve(all ? (e.data.urls || []) : e.data.url); } };
         window.addEventListener("message", h);
-        window.postMessage({ type: "dt:api:find", id, pattern }, "*");
-        setTimeout(() => { window.removeEventListener("message", h); resolve(null); }, timeout);
+        try { win.postMessage({ type: "dt:api:find", id, pattern, all }, "*"); } catch { resolve(all ? [] : null); }
+        setTimeout(() => { window.removeEventListener("message", h); resolve(all ? [] : null); }, timeout);
       });
+    },
+
+    sameOrigin(w) { try { return w === window || (!!w && w.location.host === location.host); } catch { return false; } },
+
+    /* Dit frame en alle bovenliggende frames op hetzelfde domein, binnenste eerst. */
+    windows() {
+      const out = [window];
+      let w = window;
+      while (w !== w.parent) { w = w.parent; if (!DT.sameOrigin(w)) break; out.push(w); }
+      return out;
     },
 
     /* Doorzoekt ook alle open shadow roots (Magister OP gebruikt webcomponenten). */
