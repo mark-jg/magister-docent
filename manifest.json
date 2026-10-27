@@ -16,7 +16,8 @@
   "host_permissions": [
     "*://*.magister.net/*",
     "https://api.github.com/*",
-    "https://*.githubusercontent.com/*"
+    "https://*.githubusercontent.com/*",
+    "https://github.com/*"
   ],
   "action": {
     "default_title": "Docent Tools voor Magister",

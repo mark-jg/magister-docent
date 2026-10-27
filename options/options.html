@@ -150,9 +150,13 @@
     <p>Vindt selectors en maakt een paginarapport (<kbd>R</kbd>) zonder persoonsgegevens, om de Magister-specifieke modules op jullie omgeving af te stemmen.</p>
   </section>
 
-  <section>
+  <section id="updates">
     <h2>Updates <label class="switch"><input type="checkbox" data-path="updates.check"><span></span></label></h2>
-    <p>Controleert om de 6 uur bij GitHub of er een nieuwere versie is (<a href="https://github.com/mark-jg/magister-docent/releases" target="_blank" rel="noopener">mark-jg/magister-docent</a>). Er wordt alleen het versienummer en de downloadlink opgehaald; er gaat niets over jou of je Magister-omgeving mee. Bij een nieuwe versie krijgt het extensie-icoon een gele badge en staat in het menu een downloadknop. Een uitgepakte extensie kan zichzelf niet vervangen: zip uitpakken over je extensiemap en op Herladen klikken blijft nodig.</p>
+    <p>Controleert om de 6 uur bij GitHub of er een nieuwere versie is (<a href="https://github.com/mark-jg/magister-docent/releases" target="_blank" rel="noopener">mark-jg/magister-docent</a>). Er wordt alleen het versienummer en de downloadlink opgehaald; er gaat niets over jou of je Magister-omgeving mee. Bij een nieuwe versie krijgt het extensie-icoon een gele badge en staat in het menu de knop "Nu bijwerken".</p>
+    <p><strong>Zelf bijwerken.</strong> Kies één keer de map waarin je de extensie hebt uitgepakt (de map met <code>manifest.json</code>). Daarna haalt de extensie bij "Nu bijwerken" de nieuwe versie op, schrijft de bestanden in die map en herlaadt zichzelf. Chrome vraagt bij elke update met één klik om toestemming voor de map. Er wordt niets verwijderd.</p>
+    <label class="row"><button id="pickFolder">Extensiemap kiezen</button> <span id="folderName" style="color:var(--muted);font-size:14px"></span> <button id="forgetFolder" hidden>Vergeten</button></label>
+    <label class="row"><button id="doUpdate" class="primary" disabled>Nu bijwerken</button> <a href="#" id="manualZip" style="font-size:13px;color:var(--muted)">Handmatig: zip downloaden</a></label>
+    <p id="updateProgress" style="min-height:1.4em"></p>
     <p>De repo is privé, dus de controle heeft een <strong>GitHub-token</strong> nodig. Maak een <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">fine-grained token</a> aan: Resource owner <code>mark-jg</code>, Only select repositories → <code>magister-docent</code>, Repository permissions → <strong>Contents: Read-only</strong>. Het token wordt alleen op dit apparaat bewaard en alleen naar api.github.com gestuurd.</p>
     <label class="row">GitHub-token <input type="password" id="ghToken" placeholder="github_pat_…" autocomplete="off" spellcheck="false" style="min-width:320px;font-family:ui-monospace,Consolas,monospace"> <button id="ghTokenClear">Wissen</button></label>
     <label class="row"><button id="checkUpdate">Nu controleren</button> <span id="updateStatus" style="color:var(--muted);font-size:14px"></span></label>
@@ -166,5 +170,6 @@
 <div class="status" id="status">Opgeslagen</div>
 <script src="../content/defaults.js"></script>
 <script src="options.js"></script>
+<script src="updater.js"></script>
 </body>
 </html>

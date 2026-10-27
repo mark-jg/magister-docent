@@ -35,7 +35,7 @@ async function downloadZip() {
   const btn = $("updDownload");
   const fallback = () => chrome.tabs.create({ url: upd.zip || upd.page });
   if (!upd.zipApi) return fallback();
-  btn.disabled = true; btn.textContent = "Downloaden…";
+  btn.textContent = "downloaden…";
   try {
     const headers = await chrome.runtime.sendMessage({ type: "getDownloadHeaders" });
     const res = await fetch(upd.zipApi, { headers, cache: "no-store" });
@@ -45,18 +45,18 @@ async function downloadZip() {
     const a = Object.assign(document.createElement("a"), { href: url, download: upd.zipName || `magister-docent-tools-v${upd.latest}.zip` });
     document.body.append(a); a.click(); a.remove();
     note("Zip gedownload. Pak uit, vervang de bestanden en klik op Herladen.");
-    btn.textContent = "Opnieuw downloaden";
+    btn.textContent = "zip downloaden";
   } catch (e) {
     note(`Download via API mislukt (${e.message}), downloadpagina geopend.`);
-    btn.textContent = "Download zip";
+    btn.textContent = "zip downloaden";
     fallback();
-  } finally {
-    btn.disabled = false;
   }
 }
-$("updDownload").onclick = downloadZip;
+$("updDownload").onclick = (e) => { e.preventDefault(); downloadZip(); };
+$("updNow").onclick = () => { chrome.tabs.create({ url: chrome.runtime.getURL("options/options.html#update") }); window.close(); };
 $("updNotes").onclick = () => { if (upd) chrome.tabs.create({ url: upd.page }); };
-$("updReload").onclick = () => {
+$("updReload").onclick = (e) => {
+  e.preventDefault();
   note("Extensie wordt herladen…");
   chrome.runtime.sendMessage({ type: "reloadExtension" });
   setTimeout(() => window.close(), 300);

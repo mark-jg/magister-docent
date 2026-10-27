@@ -17,9 +17,11 @@ Werkt ook in Edge (`edge://extensions`).
 
 De extensie kijkt om de 6 uur op GitHub of er een nieuwere release is (alleen versienummer en downloadlink, er gaat niets over jou mee; uit te zetten bij Instellingen > Updates). Is er een nieuwe versie, dan krijgt het extensie-icoon een gele badge en staat bovenin het menu een blok met:
 
-1. **Download zip**: haalt de nieuwe versie op (via de GitHub-API met je token, zie hieronder).
-2. Pak de zip uit en vervang de bestanden in je extensiemap (de map die je bij het installeren koos).
-3. **Herladen**: de extensie laadt de nieuwe bestanden. Herlaad daarna open Magister-tabbladen.
+1. **Nu bijwerken**: opent Instellingen > Updates. De eerste keer kies je daar de map waarin je de extensie hebt uitgepakt (de map met `manifest.json`); die keuze wordt onthouden.
+2. Klik op **Nu bijwerken naar X**. Chrome vraagt om toestemming voor de map (één klik). De extensie haalt de zip op met je token, schrijft de bestanden in de map en herlaadt zichzelf. Herlaad daarna open Magister-tabbladen.
+3. Handmatig blijft mogelijk: zip downloaden, uitpakken over de extensiemap en op Herladen klikken.
+
+Er worden alleen bestanden geschreven of overschreven, nooit verwijderd. Het manifest wordt als laatste geschreven, zodat een afgebroken update geen half nieuwe extensie achterlaat.
 
 ### GitHub-token (eenmalig)
 
@@ -33,7 +35,7 @@ Omdat de repo privé is, heeft de updatecontrole een token nodig. Zonder token m
 
 Het token staat alleen in de lokale opslag van de extensie op dat apparaat (niet in de gesynchroniseerde instellingen) en gaat alleen naar `api.github.com`.
 
-Een uitgepakte extensie kan zichzelf niet overschrijven (dat staat Chrome alleen toe via de Web Store of een beheerd bedrijfsbeleid), daarom blijft stap 2 handwerk. Wie liever met git werkt: `git clone https://github.com/mark-jg/magister-docent`, die map als uitgepakte extensie laden, en bijwerken met `git pull` plus Herladen.
+Chrome laat een uitgepakte extensie zijn eigen map alleen beschrijven als de gebruiker die map zelf aanwijst (File System Access API); daarom die eenmalige keuze en de toestemmingsvraag per update. Wie liever met git werkt: `git clone https://github.com/mark-jg/magister-docent`, die map als uitgepakte extensie laden, en bijwerken met `git pull` plus Herladen.
 
 ## Wat zit erin
 
@@ -75,7 +77,7 @@ content/defaults.js      Standaardinstellingen (één plek, gedeeld door alles)
 content/core.js          Modulesysteem, instellingen, helpers
 content/base.css         Stijl van de eigen UI (paneel, knoppen, toasts)
 content/modules/*.js     Eén bestand per functie
-options/                 Instellingenpagina
+options/                 Instellingenpagina en zelf-updater (updater.js)
 popup/                   Menu onder het extensie-icoon
 lib/xlsx.full.min.js     SheetJS (Excel-export), Apache 2.0
 scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
@@ -99,6 +101,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.7.5: zelf bijwerken: na het eenmalig kiezen van de extensiemap (Instellingen > Updates) haalt de extensie de nieuwe versie op, schrijft de bestanden en herlaadt zichzelf; knop "Nu bijwerken" in het menu; zip-uitpakker zonder externe bibliotheek.
 - 0.7.4: meerdere begeleidingscoaches (naam en e-mail) in de instellingen, keuzelijst in het controlescherm met "Ander adres" als uitwijk; bestaande instelling wordt automatisch overgenomen; klasherkenning op de pagina ook voor klassen met één cijfer (zoals MM2A); "aangemeld voor" staat ook in het onderwerp van de mail.
 - 0.7.3: mailmodule haalt naam, studentnummer en klas op via Magisters eigen API (leerling-id uit de adresbalk, API-calls van de bovenliggende detailkaart), met de koppen op de pagina als uitwijk; het controlescherm zegt waar de gegevens vandaan komen en de Bronnen-knop toont welke API-calls en veldnamen gevonden zijn (zonder waarden).
 - 0.7.2: updatecontrole werkt met een privé repo: GitHub-tokenveld bij Instellingen > Updates (lokaal bewaard), zip-download via de API, duidelijkere foutmeldingen (geen toegang, token ongeldig, limiet bereikt).

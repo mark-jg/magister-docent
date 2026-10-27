@@ -16,9 +16,8 @@
   .update .row { display:flex; gap:6px; }
   .update .row button { flex:1; justify-content:center; font-size:13px; padding:6px 8px; }
   .update .primary { background:#1B3A5C; color:#fff; border-color:#1B3A5C; }
-  .update .step { margin-top:8px; font-size:12px; }
-  .update .step ol { margin:4px 0 6px; padding-left:18px; }
-  .update .step button { width:100%; justify-content:center; font-size:13px; padding:6px 8px; }
+  .update .small { margin:8px 0 0; font-size:11px; }
+  .update .small a { color:inherit; }
   .foot { display:flex; justify-content:space-between; padding:6px 14px 10px; font-size:11px; color:#6b7280; border-top:1px solid #e2e5ea33; }
   .foot a { color:inherit; }
 </style></head>
@@ -28,17 +27,10 @@
   <strong id="updTitle">Nieuwe versie beschikbaar</strong>
   <p id="updText"></p>
   <div class="row">
-    <button class="primary" id="updDownload">Download zip</button>
+    <button class="primary" id="updNow">Nu bijwerken</button>
     <button id="updNotes">Wat is nieuw</button>
   </div>
-  <div class="step">
-    Daarna:
-    <ol>
-      <li>Pak de zip uit en vervang de bestanden in je extensiemap.</li>
-      <li>Klik hieronder op Herladen.</li>
-    </ol>
-    <button id="updReload">Herladen (bestanden zijn vervangen)</button>
-  </div>
+  <p class="small">Handmatig: <a href="#" id="updDownload">zip downloaden</a> · <a href="#" id="updReload">herladen</a> na het vervangen van de bestanden.</p>
 </div>
 <div class="list">
   <button data-cmd="toggle-panel">Paneel openen <kbd>Alt+D</kbd></button>
