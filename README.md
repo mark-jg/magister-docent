@@ -101,6 +101,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.7.6: na een update toont het menu één keer "Bijgewerkt van X naar Y"; eerste versie die via de ingebouwde updater wordt binnengehaald.
 - 0.7.5: zelf bijwerken: na het eenmalig kiezen van de extensiemap (Instellingen > Updates) haalt de extensie de nieuwe versie op, schrijft de bestanden en herlaadt zichzelf; knop "Nu bijwerken" in het menu; zip-uitpakker zonder externe bibliotheek.
 - 0.7.4: meerdere begeleidingscoaches (naam en e-mail) in de instellingen, keuzelijst in het controlescherm met "Ander adres" als uitwijk; bestaande instelling wordt automatisch overgenomen; klasherkenning op de pagina ook voor klassen met één cijfer (zoals MM2A); "aangemeld voor" staat ook in het onderwerp van de mail.
 - 0.7.3: mailmodule haalt naam, studentnummer en klas op via Magisters eigen API (leerling-id uit de adresbalk, API-calls van de bovenliggende detailkaart), met de koppen op de pagina als uitwijk; het controlescherm zegt waar de gegevens vandaan komen en de Bronnen-knop toont welke API-calls en veldnamen gevonden zijn (zonder waarden).

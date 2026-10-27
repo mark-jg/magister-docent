@@ -26,7 +26,16 @@ function renderUpdate(info) {
   $("updDownload").disabled = !upd.zip && !upd.page;
 }
 
-chrome.storage.local.get("update").then(({ update }) => renderUpdate(update));
+chrome.storage.local.get(["update", "justUpdated"]).then(({ update, justUpdated }) => {
+  renderUpdate(update);
+  // Bevestiging na een update, één keer tonen en dan wissen.
+  if (justUpdated?.to === current) {
+    note(`Bijgewerkt van ${justUpdated.from} naar ${justUpdated.to}.`);
+    chrome.storage.local.remove("justUpdated");
+  } else if (justUpdated) {
+    chrome.storage.local.remove("justUpdated");
+  }
+});
 
 /* Privé repo: de zip via de API ophalen met het token (headers komen uit background).
  * Lukt dat niet, dan de gewone downloadlink in een tabblad (werkt als je bij GitHub ingelogd bent). */

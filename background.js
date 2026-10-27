@@ -114,9 +114,14 @@ chrome.commands.onCommand.addListener(async (command) => {
 });
 
 /* ---------- Installatie en herladen ---------- */
-chrome.runtime.onInstalled.addListener(async ({ reason }) => {
+chrome.runtime.onInstalled.addListener(async ({ reason, previousVersion }) => {
   scheduleUpdateCheck();
   checkForUpdate();
+  // Na een (zelf)update: één keer "Bijgewerkt van X naar Y" in het menu tonen.
+  const current = chrome.runtime.getManifest().version;
+  if (reason === "update" && previousVersion && previousVersion !== current) {
+    await chrome.storage.local.set({ justUpdated: { from: previousVersion, to: current, at: Date.now() } });
+  }
   if (reason !== "install") return;
   const { settings } = await chrome.storage.sync.get("settings");
   if (settings) return;
