@@ -14,7 +14,9 @@
     "alarms"
   ],
   "host_permissions": [
-    "*://*.magister.net/*"
+    "*://*.magister.net/*",
+    "https://api.github.com/*",
+    "https://*.githubusercontent.com/*"
   ],
   "action": {
     "default_title": "Docent Tools voor Magister",

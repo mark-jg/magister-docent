@@ -4,7 +4,7 @@ Chrome-extensie voor Magister (docenten/personeel). Alles draait lokaal in je br
 
 ## Installeren (lokaal laden)
 
-1. Download de nieuwste `magister-docent-tools-vX.Y.Z.zip` van de [Releases-pagina](https://github.com/mark-jg/magister-docent/releases/latest).
+1. Download de nieuwste `magister-docent-tools-vX.Y.Z.zip` van de [Releases-pagina](https://github.com/mark-jg/magister-docent/releases/latest). De repo is privé: je moet bij GitHub ingelogd zijn met een account dat toegang heeft.
 2. Pak de zip uit in een map die je laat staan (bijvoorbeeld `Documenten/magister-docent-tools`).
 3. Open Chrome en ga naar `chrome://extensions`.
 4. Zet rechtsboven **Ontwikkelaarsmodus** aan.
@@ -17,9 +17,21 @@ Werkt ook in Edge (`edge://extensions`).
 
 De extensie kijkt om de 6 uur op GitHub of er een nieuwere release is (alleen versienummer en downloadlink, er gaat niets over jou mee; uit te zetten bij Instellingen > Updates). Is er een nieuwe versie, dan krijgt het extensie-icoon een gele badge en staat bovenin het menu een blok met:
 
-1. **Download zip**: haalt de nieuwe versie op.
+1. **Download zip**: haalt de nieuwe versie op (via de GitHub-API met je token, zie hieronder).
 2. Pak de zip uit en vervang de bestanden in je extensiemap (de map die je bij het installeren koos).
 3. **Herladen**: de extensie laadt de nieuwe bestanden. Herlaad daarna open Magister-tabbladen.
+
+### GitHub-token (eenmalig)
+
+Omdat de repo privé is, heeft de updatecontrole een token nodig. Zonder token meldt de extensie "de repo is privé; vul een GitHub-token in".
+
+1. Ga naar [github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new) (ingelogd met een account dat toegang heeft tot de repo).
+2. Token name: bijvoorbeeld `magister-docent-tools`. Expiration: kies zelf; na afloop vraagt de extensie om een nieuw token.
+3. Resource owner: `mark-jg`. Repository access: **Only select repositories** → `magister-docent`.
+4. Repository permissions: **Contents: Read-only** (Metadata wordt automatisch meegenomen). Verder niets.
+5. Generate token, kopieer het en plak het in de extensie bij **Instellingen > Updates > GitHub-token**. De controle start direct.
+
+Het token staat alleen in de lokale opslag van de extensie op dat apparaat (niet in de gesynchroniseerde instellingen) en gaat alleen naar `api.github.com`.
 
 Een uitgepakte extensie kan zichzelf niet overschrijven (dat staat Chrome alleen toe via de Web Store of een beheerd bedrijfsbeleid), daarom blijft stap 2 handwerk. Wie liever met git werkt: `git clone https://github.com/mark-jg/magister-docent`, die map als uitgepakte extensie laden, en bijwerken met `git pull` plus Herladen.
 
@@ -87,6 +99,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.7.2: updatecontrole werkt met een privé repo: GitHub-tokenveld bij Instellingen > Updates (lokaal bewaard), zip-download via de API, duidelijkere foutmeldingen (geen toegang, token ongeldig, limiet bereikt).
 - 0.7.1: updatecontrole via GitHub Releases (badge op het icoon, downloadknop en Herladen in het menu, instelling om de controle uit te zetten); versienummer komt uit `manifest.json`; releaseworkflow en `scripts/release.sh`.
 - 0.7.0: module "Mail bij Melding Expertisecentrum" (nieuw formulier en logboek), Alt+M, instellingen voor adres, aanhef, cc en ondertekening; standaardinstellingen samengevoegd in `content/defaults.js`; paginarapport toont bovenliggende frames en koppen van de hoofdpagina (namen en nummers gemaskeerd).
 - 0.6.1: zwevende exportknop, recolor-engine, snelle aanwezigheid, commandopalet, Inspector met netwerkrapport.

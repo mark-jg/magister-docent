@@ -9,8 +9,21 @@ importScripts("content/defaults.js");
 const REPO = "mark-jg/magister-docent";
 const RELEASES_API = `https://api.github.com/repos/${REPO}/releases/latest`;
 const RELEASES_PAGE = `https://github.com/${REPO}/releases`;
+const REPO_API = `https://api.github.com/repos/${REPO}`;
 const ALARM = "dt-update-check";
 const CHECK_INTERVAL_MIN = 6 * 60;
+
+/* De repo is privé. Een fine-grained token (alleen Contents: lezen op deze repo) staat in
+ * chrome.storage.local (dit apparaat, niet gesynchroniseerd) en gaat alleen naar api.github.com. */
+async function getToken() {
+  return ((await chrome.storage.local.get("ghToken")).ghToken || "").trim();
+}
+
+function ghHeaders(token, accept = "application/vnd.github+json") {
+  const h = { Accept: accept, "X-GitHub-Api-Version": "2022-11-28" };
+  if (token) h.Authorization = `Bearer ${token}`;
+  return h;
+}
 
 function cmpVersion(a, b) {
   const pa = String(a).split(".").map((n) => parseInt(n, 10) || 0);
@@ -43,12 +56,23 @@ async function checkForUpdate(force = false) {
     return { current, disabled: true };
   }
   const prev = (await chrome.storage.local.get("update")).update || {};
+  const token = await getToken();
   let info;
   try {
-    const res = await fetch(RELEASES_API, { headers: { Accept: "application/vnd.github+json" }, cache: "no-store" });
-    if (res.status === 404) {
-      // Nog geen release gepubliceerd.
-      info = { current, latest: null, available: false, page: RELEASES_PAGE, zip: null, checkedAt: Date.now(), error: null };
+    const res = await fetch(RELEASES_API, { headers: ghHeaders(token), cache: "no-store" });
+    if (res.status === 401) {
+      throw new Error("het GitHub-token is ongeldig of verlopen");
+    } else if (res.status === 403 || res.status === 429) {
+      throw new Error("GitHub-limiet bereikt, probeer het later opnieuw");
+    } else if (res.status === 404) {
+      // Óf er is nog geen release, óf we hebben geen toegang tot de (privé) repo.
+      const repo = await fetch(REPO_API, { headers: ghHeaders(token), cache: "no-store" });
+      if (!repo.ok) {
+        throw new Error(token
+          ? "het token geeft geen toegang tot deze repo (controleer repo en rechten)"
+          : "de repo is privé; vul een GitHub-token in bij Instellingen > Updates");
+      }
+      info = { current, latest: null, available: false, page: RELEASES_PAGE, zip: null, zipApi: null, zipName: null, hasToken: Boolean(token), checkedAt: Date.now(), error: null };
     } else if (!res.ok) {
       throw new Error(`GitHub antwoordde met ${res.status}`);
     } else {
@@ -61,6 +85,9 @@ async function checkForUpdate(force = false) {
         available: Boolean(latest) && cmpVersion(latest, current) > 0,
         page: rel.html_url || RELEASES_PAGE,
         zip: asset?.browser_download_url || null,
+        zipApi: asset?.url || null,
+        zipName: asset?.name || null,
+        hasToken: Boolean(token),
         notes: String(rel.body || "").slice(0, 1500),
         publishedAt: rel.published_at || null,
         checkedAt: Date.now(),
@@ -68,7 +95,7 @@ async function checkForUpdate(force = false) {
       };
     }
   } catch (e) {
-    info = { ...prev, current, available: prev.available && cmpVersion(prev.latest, current) > 0, checkedAt: Date.now(), error: String(e?.message || e) };
+    info = { ...prev, current, available: Boolean(prev.latest) && cmpVersion(prev.latest, current) > 0, hasToken: Boolean(token), checkedAt: Date.now(), error: String(e?.message || e) };
   }
   await chrome.storage.local.set({ update: info });
   await setBadge(Boolean(info.available));
@@ -105,6 +132,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     case "checkUpdate":
       checkForUpdate(true).then(sendResponse);
       return true; // asynchroon antwoord
+    case "setToken":
+      chrome.storage.local.set({ ghToken: String(msg.token || "").trim() }).then(() => checkForUpdate(true)).then(sendResponse);
+      return true;
+    case "getDownloadHeaders":
+      // Voor de popup: headers om de zip via de API op te halen (privé repo).
+      getToken().then((t) => sendResponse(ghHeaders(t, "application/octet-stream")));
+      return true;
     case "reloadExtension":
       // Laadt de (inmiddels vervangen) bestanden op schijf opnieuw.
       setTimeout(() => chrome.runtime.reload(), 150);

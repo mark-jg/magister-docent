@@ -28,7 +28,33 @@ function renderUpdate(info) {
 
 chrome.storage.local.get("update").then(({ update }) => renderUpdate(update));
 
-$("updDownload").onclick = () => { if (upd) chrome.tabs.create({ url: upd.zip || upd.page }); };
+/* Privé repo: de zip via de API ophalen met het token (headers komen uit background).
+ * Lukt dat niet, dan de gewone downloadlink in een tabblad (werkt als je bij GitHub ingelogd bent). */
+async function downloadZip() {
+  if (!upd) return;
+  const btn = $("updDownload");
+  const fallback = () => chrome.tabs.create({ url: upd.zip || upd.page });
+  if (!upd.zipApi) return fallback();
+  btn.disabled = true; btn.textContent = "Downloaden…";
+  try {
+    const headers = await chrome.runtime.sendMessage({ type: "getDownloadHeaders" });
+    const res = await fetch(upd.zipApi, { headers, cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = Object.assign(document.createElement("a"), { href: url, download: upd.zipName || `magister-docent-tools-v${upd.latest}.zip` });
+    document.body.append(a); a.click(); a.remove();
+    note("Zip gedownload. Pak uit, vervang de bestanden en klik op Herladen.");
+    btn.textContent = "Opnieuw downloaden";
+  } catch (e) {
+    note(`Download via API mislukt (${e.message}), downloadpagina geopend.`);
+    btn.textContent = "Download zip";
+    fallback();
+  } finally {
+    btn.disabled = false;
+  }
+}
+$("updDownload").onclick = downloadZip;
 $("updNotes").onclick = () => { if (upd) chrome.tabs.create({ url: upd.page }); };
 $("updReload").onclick = () => {
   note("Extensie wordt herladen…");
@@ -42,7 +68,7 @@ $("updCheck").onclick = async (e) => {
   const info = await chrome.runtime.sendMessage({ type: "checkUpdate" }).catch(() => null);
   if (!info) { note("Controleren mislukt."); return; }
   renderUpdate(info);
-  if (info.error) note(`Kon GitHub niet bereiken (${info.error}).`);
+  if (info.error) note(`Kon GitHub niet bereiken: ${info.error}.`);
   else if (info.available) note("");
   else if (!info.latest) note("Er is nog geen release gepubliceerd.");
   else note(`Je hebt de nieuwste versie (${info.current}).`);

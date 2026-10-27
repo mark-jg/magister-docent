@@ -63,15 +63,35 @@ document.getElementById("reset").onclick = async () => {
 };
 
 document.getElementById("versionLine").textContent = `Versie ${chrome.runtime.getManifest().version}`;
-document.getElementById("checkUpdate").onclick = async () => {
+function showUpdateStatus(info) {
   const out = document.getElementById("updateStatus");
-  out.textContent = "Controleren…";
-  const info = await chrome.runtime.sendMessage({ type: "checkUpdate" }).catch(() => null);
   if (!info) out.textContent = "Controleren mislukt.";
-  else if (info.error) out.textContent = `Kon GitHub niet bereiken (${info.error}).`;
-  else if (info.available) { out.textContent = ""; out.append(`Versie ${info.latest} beschikbaar: `, Object.assign(document.createElement("a"), { href: info.zip || info.page, target: "_blank", rel: "noopener", textContent: "downloaden" })); }
-  else if (!info.latest) out.textContent = "Er is nog geen release gepubliceerd.";
+  else if (info.error) out.textContent = `Kon GitHub niet bereiken: ${info.error}.`;
+  else if (info.available) { out.textContent = ""; out.append(`Versie ${info.latest} beschikbaar: `, Object.assign(document.createElement("a"), { href: info.page, target: "_blank", rel: "noopener", textContent: "open het extensiemenu om te downloaden" })); }
+  else if (!info.latest) out.textContent = "Toegang in orde, er is nog geen release gepubliceerd.";
   else out.textContent = `Je hebt de nieuwste versie (${info.current}).`;
+}
+
+document.getElementById("checkUpdate").onclick = async () => {
+  document.getElementById("updateStatus").textContent = "Controleren…";
+  showUpdateStatus(await chrome.runtime.sendMessage({ type: "checkUpdate" }).catch(() => null));
+};
+
+/* GitHub-token: apart van de gesynchroniseerde instellingen, alleen lokaal op dit apparaat. */
+const tokenField = document.getElementById("ghToken");
+chrome.storage.local.get("ghToken").then(({ ghToken }) => { tokenField.value = ghToken || ""; });
+let tokenTimer;
+tokenField.oninput = () => {
+  clearTimeout(tokenTimer);
+  tokenTimer = setTimeout(async () => {
+    document.getElementById("updateStatus").textContent = "Token opgeslagen, controleren…";
+    showUpdateStatus(await chrome.runtime.sendMessage({ type: "setToken", token: tokenField.value }).catch(() => null));
+  }, 600);
+};
+document.getElementById("ghTokenClear").onclick = async () => {
+  tokenField.value = "";
+  document.getElementById("updateStatus").textContent = "Token gewist.";
+  await chrome.runtime.sendMessage({ type: "setToken", token: "" }).catch(() => null);
 };
 
 function merge(base, patch) {
