@@ -41,7 +41,7 @@ Chrome laat een uitgepakte extensie zijn eigen map alleen beschrijven als de geb
 
 | Functie | Hoe |
 |---|---|
-| Thema's: 16 presets (van Magister-standaard tot Krant, Terminal en Synthwave) of een eigen accentkleur; lettertype, lettergrootte, hoeken en dichtheid apart instelbaar | in het zijpaneel (Alt+D), Alt+T wisselt tussen je lichte en donkere thema |
+| Thema's: 18 presets (van Magister-standaard tot Krant, Terminal, Synthwave en Apple licht/donker) of een eigen accentkleur; lettertype, lettergrootte, hoeken en dichtheid apart instelbaar | in het zijpaneel (Alt+D), Alt+T wisselt tussen je lichte en donkere thema |
 | Docentenpaneel: klok en weeknummer, snelle links, notities, exportknoppen | Alt+D, of klik op het handvat |
 | Tabellen: zwevend knopje "Exporteren" bij hover over een datatabel (kalenders en roosters worden overgeslagen), en een overzicht van alle tabellen in het zijpaneel. Naar Excel, CSV of klembord (plakt als cellen), sorteerbare koppen; per soort tabel instelbaar welke kolommen meegaan, kopregel, namen maskeren, lege rijen en kolommen weglaten | knoppen boven elke tabel, "Instellen" voor de opties; Alt+E exporteert alle tabellen op de pagina |
 | Sneller invoeren: Enter springt naar de volgende rij, Ctrl+Shift+V plakt een kolom uit Excel in opeenvolgende velden | automatisch in invoertabellen |
@@ -101,6 +101,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.8.0: thema's "Apple (licht)" en "Apple (donker)" naar de Human Interface Guidelines: systeemlettertype (SF Pro), systeemblauw, gegroepeerde grijze achtergrond met witte vlakken, hairline-scheidingslijnen in plaats van randen, 10px/14px hoeken, doorschijnende balken, lichte zijbalk met blauwe selectie en een focusring; werkt ook binnen Magisters dna-componenten. Lettertype "Apple (SF Pro)" apart kiesbaar.
 - 0.7.10: mailknop probeert meerdere plaatsingen rond Magisters knoppenbalk en meet welke op dezelfde rij uitkomt; de Bronnen-tekst meldt de gekozen plaatsing en de opbouw van de balk (alleen maten en structuur).
 - 0.7.9: mailknop staat op dezelfde rij als prullenbak, printer en plus (vóór Magisters knoppenbalk, met controle dat hij echt op die rij staat); icoon in Magisters navy en iets groter.
 - 0.7.8: mailknop in het logboek is weer een eigen, randloze icoonknop op de plek van 0.7.6; hij meet maat, kleur en icoongrootte van de prullenbak-knop ernaast op (het kopiëren van Magisters knop uit 0.7.7 brak de indeling).

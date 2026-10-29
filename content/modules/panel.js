@@ -98,7 +98,7 @@ DT.register({
           t.preset === "custom" ? sel("Modus", "theme.mode", [["auto", "Volg systeem"], ["light", "Licht"], ["dark", "Donker"]], t.mode) : null,
           sel("Donkere stijl", "theme.darkStyle", [["invert", "Inversie (overal)"], ["tokens", "Echte kleuren (nieuw)"]], t.darkStyle || "invert"),
           sel("Vaste kleuren", "theme.recolor", [["true", "Meekleuren (aanbevolen)"], ["false", "Laten zoals Magister"]], String(t.recolor !== false)),
-          sel("Lettertype", "theme.font", [["thema", "Volgens thema"], ["standaard", "Magister standaard"], ["systeem", "Systeem"], ["rond", "Rond"], ["serif", "Serif"], ["mono", "Monospace"], ["smal", "Smal"], ["speels", "Speels"], ["dyslexie", "Dyslexie-vriendelijk"]], t.font || "thema"),
+          sel("Lettertype", "theme.font", [["thema", "Volgens thema"], ["standaard", "Magister standaard"], ["systeem", "Systeem"], ["apple", "Apple (SF Pro)"], ["rond", "Rond"], ["serif", "Serif"], ["mono", "Monospace"], ["smal", "Smal"], ["speels", "Speels"], ["dyslexie", "Dyslexie-vriendelijk"]], t.font || "thema"),
           sel("Lettergrootte", "theme.fontScale", [[0.85, "85%"], [0.9, "90%"], [1, "100%"], [1.1, "110%"], [1.2, "120%"], [1.35, "135%"]], t.fontScale || 1),
           sel("Hoeken", "theme.radius", [["thema", "Volgens thema"], ["0px", "Scherp"], ["4px", "Licht rond"], ["10px", "Rond"], ["18px", "Extra rond"]], t.radius || "thema"),
           sel("Exportknop", "tables.mode", [["hover", "Zwevend bij tabellen"], ["panel", "Alleen in dit paneel"]], DT.settings.tables.mode || "hover"),

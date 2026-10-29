@@ -28,6 +28,10 @@ DT.register({
     terminal:   { label: "Terminal (groen op zwart)",  dark: true,  accent: "#33ff66", bg: "#050805", surface: "#0b120c", surface2: "#122015", border: "#1f5a2a", fg: "#b8f5c5", muted: "#5fbf74", link: "#33ff66", font: "mono", radius: "0px" },
     synthwave:  { label: "Synthwave (paars/roze)",     dark: true,  accent: "#ff4fd8", bg: "#140b2b", surface: "#1d1140", surface2: "#2a1a57", border: "#4b2e8f", fg: "#f3e8ff", muted: "#b39ddb", link: "#5ef0ff", font: "systeem", radius: "10px" },
     oceaan:     { label: "Oceaan (fris blauw)",        dark: false, accent: "#0369a1", bg: "#e8f4fb", surface: "#ffffff", surface2: "#d6eaf6", border: "#a9cfe6", fg: "#0b2a3f", muted: "#4b6b80", link: "#0369a1", font: "rond", radius: "12px" },
+    /* Apple: systeemkleuren en -lettertype uit de Human Interface Guidelines, zachte hoeken,
+     * scheidingslijnen in plaats van randen, doorschijnende balken (look: "apple"). */
+    apple:      { label: "Apple (licht)",              dark: false, accent: "#007AFF", bg: "#F2F2F7", surface: "#FFFFFF", surface2: "#F5F5F7", border: "#D1D1D6", fg: "#1D1D1F", muted: "#6E6E73", link: "#007AFF", font: "apple", radius: "10px", look: "apple" },
+    appleDonker:{ label: "Apple (donker)",             dark: true,  accent: "#0A84FF", bg: "#1C1C1E", surface: "#2C2C2E", surface2: "#3A3A3C", border: "#48484A", fg: "#F5F5F7", muted: "#98989D", link: "#0A84FF", font: "apple", radius: "10px", look: "apple", darkStyle: "tokens" },
     custom:     { label: "Eigen accentkleur",    dark: null }
   },
 
@@ -50,6 +54,9 @@ DT.register({
   },
 
   preset(DT) { return this.presets[DT.settings.theme.preset] || this.presets.custom; },
+
+  /* Donkere stijl: een preset kan "tokens" afdwingen (bijv. Apple donker), anders de instelling. */
+  darkStyle(DT) { return this.preset(DT).darkStyle || DT.settings.theme.darkStyle || "invert"; },
 
   isDark(DT) {
     const p = this.preset(DT);
@@ -89,7 +96,8 @@ DT.register({
     `;
     const zoom = { normal: 1, compact: 0.9, extra: 0.8 }[s.density || "normal"] || 1;
     if (zoom !== 1) css += ` ui-view[name="main"] { zoom: ${zoom}; } td, th { padding-top: 2px !important; padding-bottom: 2px !important; }`;
-    css += fontCss(FONTS[s.font === "thema" || !s.font ? (p.font || "standaard") : s.font], Number(s.fontScale) || 1);
+    const fontStack = FONTS[s.font === "thema" || !s.font ? (p.font || "standaard") : s.font];
+    css += fontCss(fontStack, Number(s.fontScale) || 1);
     const radius = s.radius === "thema" || !s.radius ? p.radius : s.radius;
     if (radius) css += ` :root { --sl-size-borderRadius-default: ${radius} !important; --sl-size-borderRadius-md: ${radius} !important; --sl-size-borderRadius-lg: ${radius} !important; --sl-size-borderRadius-xl: ${radius} !important; --dt-radius: ${radius}; }
       .widget, .mg-panel, .content-pane, .ui-grid, button, .btn, input, select, textarea, .dt-btn { border-radius: ${radius} !important; }`;
@@ -99,7 +107,7 @@ DT.register({
     this._sig = [s.preset, s.accent, dark ? 1 : 0, s.darkStyle].join("|");
     const root = document.documentElement.style;
     if (p.bg) {
-      const useInvert = dark && (s.darkStyle || "invert") === "invert";
+      const useInvert = dark && this.darkStyle(DT) === "invert";
       if (useInvert) {
         css += invertCss(accent, ink);
       } else {
@@ -111,6 +119,15 @@ DT.register({
       }
     } else if (dark) {
       css += invertCss(accent, ink);
+    }
+    if (fontStack) {
+      this._vars = { ...(this._vars || {}), "--dna-font-family-base": fontStack, "--dna-font-family-header": fontStack };
+      root.setProperty("--dna-font-family-base", fontStack); root.setProperty("--dna-font-family-header", fontStack);
+    }
+    this._shadowCss = "";
+    if (p.look === "apple" && (!dark || this.darkStyle(DT) !== "invert")) {
+      css += appleCss(p, dark, accent);
+      this._shadowCss = appleShadowCss(p, dark, accent);
     }
     if (p.custom !== false) {
       root.setProperty("--sl-color-background-primary-bold", accent);
@@ -144,7 +161,7 @@ DT.register({
   recolor(DT) {
     const p = this.preset(DT);
     const active = DT.settings.theme.enabled !== false && DT.settings.theme.preset !== "magister" && String(DT.settings.theme.recolor) !== "false"
-      && !(this.isDark(DT) && (DT.settings.theme.darkStyle || "invert") === "invert");
+      && !(this.isDark(DT) && this.darkStyle(DT) === "invert");
     const props = [["color", "color"], ["background-color", "background-color"], ["border-top-color", "border-color"], ["border-bottom-color", "border-color"], ["border-left-color", "border-color"], ["fill", "fill"]];
     if (!active) {
       walkAll(document.documentElement, (el) => { if (el.dataset?.dtRc) { for (const [, prop] of props) el.style.removeProperty(prop); el.style.removeProperty("border-top-color"); el.style.removeProperty("border-bottom-color"); el.style.removeProperty("border-left-color"); delete el.dataset.dtRc; } });
@@ -178,7 +195,7 @@ DT.register({
 
   /* Themavariabelen ook binnen elke shadow root zetten (componenten die ze op :host herdefiniëren). */
   injectShadow(DT, vars) {
-    const css = vars ? `:host { ${Object.entries(vars).map(([k, v]) => `${k}: ${v} !important;`).join(" ")} }` : "";
+    const css = (vars ? `:host { ${Object.entries(vars).map(([k, v]) => `${k}: ${v} !important;`).join(" ")} }` : "") + (this._shadowCss || "");
     walkAll(document.documentElement, (el) => {
       const sr = el.shadowRoot; if (!sr) return;
       let st = sr.getElementById("dt-shadow-tokens");
@@ -240,6 +257,7 @@ DT.register({
 const FONTS = {
   standaard: "",
   systeem: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  apple: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', system-ui, 'Segoe UI', Helvetica, Arial, sans-serif",
   rond: "'Avenir Next Rounded', 'Nunito', 'Segoe UI', 'Trebuchet MS', 'Varela Round', Arial, sans-serif",
   serif: "Georgia, 'Times New Roman', 'Iowan Old Style', serif",
   mono: "'JetBrains Mono', 'Fira Code', Menlo, Consolas, 'Courier New', monospace",
@@ -285,7 +303,7 @@ function walkAll(root, fn) {
 
 function clearRootVars() {
   const root = document.documentElement.style;
-  [...root].filter((n) => n.startsWith("--sl-") || n.startsWith("--background") || n.startsWith("--chrome") || /text-color$/.test(n) || n.startsWith("--dt-")).forEach((n) => root.removeProperty(n));
+  [...root].filter((n) => n.startsWith("--sl-") || n.startsWith("--background") || n.startsWith("--chrome") || /text-color$/.test(n) || n.startsWith("--dt-") || n.startsWith("--dna-")).forEach((n) => root.removeProperty(n));
 }
 
 function invertCss(accent, ink) {
@@ -386,6 +404,108 @@ function tokenCss(p, dark) {
     .widget, .mg-panel, .content-pane, .head-bar, section.main { background: ${p.surface} !important; color: ${p.fg} !important; }
     .ui-grid, .ui-grid-header, .ui-grid-row, .ui-grid-cell, .ui-grid-top-panel, .ui-grid-footer-panel { background: ${p.surface} !important; color: ${p.fg} !important; border-color: ${p.border} !important; }
     .ui-grid-row:nth-child(even) .ui-grid-cell { background: ${p.surface2} !important; }
+  `;
+}
+
+/* ---------- Apple-look ----------
+ * Naar de Human Interface Guidelines: systeemlettertype (SF Pro), systeemblauw als enige accent,
+ * gegroepeerde grijze achtergrond met witte vlakken, hairline-scheidingslijnen in plaats van randen,
+ * zachte hoeken (10px knoppen en velden, 14px kaarten), doorschijnende balken (materiaal),
+ * een lichte zijbalk met een blauwe selectie en een focusring van 3px in het accent. */
+function rgba(hex, a) { const { r, g, b } = hex2rgb(hex); return `rgba(${r}, ${g}, ${b}, ${a})`; }
+
+function appleCss(p, dark, accent) {
+  const sep = dark ? "rgba(84, 84, 88, .65)" : "rgba(60, 60, 67, .29)";
+  const hair = `0 0 0 .5px ${dark ? "rgba(255,255,255,.08)" : "rgba(0,0,0,.06)"}`;
+  const cardShadow = dark ? `${hair}, 0 1px 3px rgba(0,0,0,.4)` : `${hair}, 0 1px 3px rgba(0,0,0,.06)`;
+  const sidebar = dark ? "#1C1C1E" : "#F5F5F7";
+  const material = dark ? "rgba(28, 28, 30, .72)" : "rgba(255, 255, 255, .72)";
+  const hover = dark ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.04)";
+  const focus = `0 0 0 3px ${rgba(accent, .35)}`;
+  return `
+    html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+    h1, h2, h3, .page-title, dna-page-header { font-weight: 600 !important; letter-spacing: -0.02em; }
+    h1, ui-view[name="main"] h1 { color: ${p.fg} !important; }
+    a { text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    ::selection { background: ${rgba(accent, .25)}; }
+    /* Zijbalk: licht materiaal, donkere tekst, blauwe selectie als afgerond vlak */
+    .menu-host, nav.menu, .menu-container { background: ${sidebar} !important; border-right: 1px solid ${sep} !important; box-shadow: none !important; }
+    .menu-footer, .menu-footer a { background: ${sidebar} !important; color: ${p.muted} !important; border-top: 1px solid ${sep} !important; }
+    ul.main-menu li a, ul.main-menu li span.caption { color: ${p.fg} !important; border-radius: 8px; }
+    ul.main-menu li a { margin: 1px 8px !important; transition: background .12s; }
+    ul.main-menu li a:hover { background: ${hover} !important; }
+    ul.main-menu li.active > a, ul.main-menu li[class*="active"] > a, ul.main-menu li a[class*="active"], ul.main-menu li[class*="selected"] > a {
+      background: ${accent} !important; color: #ffffff !important;
+    }
+    ul.main-menu li.active > a *, ul.main-menu li[class*="active"] > a * { color: #ffffff !important; }
+    /* Bovenbalk en kopbalken: doorschijnend materiaal met hairline, geen gekleurde streep */
+    .appbar-host, mg-appbar, div.appbar {
+      background: ${material} !important; color: ${p.fg} !important;
+      -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 1px solid ${sep} !important; box-shadow: none !important;
+    }
+    .appbar-host *, mg-appbar *, div.appbar * { color: ${p.fg}; }
+    .head-bar, .page-header, [class*="page-header"], header:not(#dt-panel *), .main-header, .detail-header, [class*="detail-header"] {
+      box-shadow: none !important; border-bottom: 1px solid ${sep} !important; background: ${p.surface} !important;
+    }
+    /* Vlakken en kaarten: geen rand, hairline plus zachte schaduw, 14px hoeken */
+    .widget, .mg-panel, .content-pane, section.main, .card, [class*="card"]:not([class*="card-"]):not(dna-card-title) {
+      border: 0 !important; border-radius: 14px !important; box-shadow: ${cardShadow} !important; background: ${p.surface} !important;
+    }
+    .widget-header, .panel-heading, .mg-panel > header { background: transparent !important; border-bottom: 1px solid ${sep} !important; font-weight: 600; }
+    /* Velden: hairline-rand, 10px hoeken, focusring in het accent */
+    input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=submit]):not([type=button]), select, textarea, .form-control {
+      border: 1px solid ${dark ? "#48484A" : "#D1D1D6"} !important; border-radius: 10px !important; background: ${dark ? "#1C1C1E" : "#FFFFFF"} !important;
+      color: ${p.fg} !important; box-shadow: none !important; transition: box-shadow .12s, border-color .12s;
+    }
+    input:not([type=checkbox]):not([type=radio]):focus, select:focus, textarea:focus, .form-control:focus {
+      border-color: ${accent} !important; box-shadow: ${focus} !important; outline: none !important;
+    }
+    :focus-visible { outline: 3px solid ${rgba(accent, .35)} !important; outline-offset: 1px; }
+    input[type=checkbox], input[type=radio] { accent-color: ${accent}; }
+    /* Knoppen: gevuld accent zonder rand, of lichtgrijs vlak; 10px hoeken, medium gewicht */
+    button, .btn, [class*="button"] { border-radius: 10px !important; font-weight: 500; letter-spacing: -0.01em; box-shadow: none !important; }
+    button[class*="primary"], .btn-primary, [class*="button--primary"], input[type="submit"] { border: 0 !important; font-weight: 600 !important; }
+    button[class*="primary"]:hover, .btn-primary:hover, input[type="submit"]:hover { filter: brightness(1.06); }
+    .btn-default, button.btn:not([class*="primary"]):not(.btn-link), .btn-secondary { background: ${dark ? "#3A3A3C" : "#E9E9EB"} !important; border: 0 !important; color: ${p.fg} !important; }
+    /* Tabellen: alleen horizontale scheidingslijnen, koppen in secundaire kleur */
+    table, .ui-grid, .table { border: 0 !important; border-collapse: separate !important; border-spacing: 0; }
+    th, .ui-grid-header-cell { font-weight: 600 !important; color: ${p.muted} !important; font-size: .8125rem !important; background: ${p.surface} !important; border-left: 0 !important; border-right: 0 !important; border-bottom: 1px solid ${sep} !important; }
+    td, .ui-grid-cell { border-left: 0 !important; border-right: 0 !important; border-top: 0 !important; border-bottom: 1px solid ${sep} !important; }
+    .ui-grid-row:nth-child(even) .ui-grid-cell, tr:nth-child(even) td { background: ${p.surface} !important; }
+    tbody tr:hover td, .ui-grid-row:hover .ui-grid-cell { background: ${hover} !important; }
+    /* Tabbladen: onderstreping in het accent, geen kaders */
+    .tabs, ul.tabs, .page-nav, [role=tablist] { border: 0 !important; border-bottom: 1px solid ${sep} !important; background: transparent !important; }
+    .tabs li a, ul.tabs li a, [role=tab] { border: 0 !important; color: ${p.muted} !important; border-radius: 0 !important; }
+    .tabs li.active a, ul.tabs li.active a, [role=tab][aria-selected=true] { color: ${accent} !important; box-shadow: inset 0 -2px 0 ${accent} !important; font-weight: 600; }
+    /* Schuifbalken */
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: ${dark ? "rgba(255,255,255,.22)" : "rgba(0,0,0,.22)"}; border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    /* Eigen UI van de extensie */
+    :root { --dt-shadow: ${dark ? "0 12px 40px rgba(0,0,0,.5)" : "0 12px 40px rgba(0,0,0,.14)"}; }
+  `;
+}
+
+/* Binnen Magisters shadow-DOM-componenten (dna-*): zelfde taal via :host-regels. */
+function appleShadowCss(p, dark, accent) {
+  const sep = dark ? "rgba(84, 84, 88, .65)" : "rgba(60, 60, 67, .29)";
+  const hair = `0 0 0 .5px ${dark ? "rgba(255,255,255,.08)" : "rgba(0,0,0,.06)"}`;
+  const cardShadow = dark ? `${hair}, 0 1px 3px rgba(0,0,0,.4)` : `${hair}, 0 1px 3px rgba(0,0,0,.06)`;
+  return `
+    :host { --dna-button-border-radius: 10px !important; --dna-button-border-width: 1px !important; --dna-radius-small: 6px !important; --dna-font-family-header: var(--dna-font-family-base) !important; }
+    :host(dna-card) { border-radius: 14px !important; box-shadow: ${cardShadow} !important; border: 0 !important; background: ${p.surface} !important; }
+    :host(dna-button) button { border-radius: 10px !important; font-weight: 500 !important; letter-spacing: -0.01em; }
+    :host(dna-button) button:focus-visible { outline: 3px solid ${rgba(accent, .35)} !important; outline-offset: 1px; }
+    :host(dna-tabs) .tabs, :host(dna-tabs) [role=tablist] { border-bottom: 1px solid ${sep} !important; }
+    :host(dna-select) .dna-select-control, :host(dna-input) input, :host(dna-textarea) textarea, :host(dna-datepicker) input {
+      border-radius: 10px !important; border: 1px solid ${dark ? "#48484A" : "#D1D1D6"} !important; background: ${dark ? "#1C1C1E" : "#FFFFFF"} !important; box-shadow: none !important;
+    }
+    :host(dna-select) .dna-select-control:focus-within, :host(dna-input) input:focus, :host(dna-textarea) textarea:focus { border-color: ${accent} !important; box-shadow: 0 0 0 3px ${rgba(accent, .35)} !important; }
+    :host(dna-checkbox) input, :host(dna-radio) input { accent-color: ${accent}; }
+    :host(dna-page-header) h1, :host(dna-page-header) h2 { font-weight: 600 !important; letter-spacing: -0.02em; color: ${p.fg} !important; }
+    :host(dna-overlay-container) .overlay, :host(dna-menu) { border-radius: 12px !important; box-shadow: ${dark ? "0 12px 40px rgba(0,0,0,.6)" : "0 12px 40px rgba(0,0,0,.16)"}, ${hair} !important; }
   `;
 }
 
