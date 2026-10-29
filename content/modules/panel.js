@@ -102,6 +102,7 @@ DT.register({
           sel("Lettergrootte", "theme.fontScale", [[0.85, "85%"], [0.9, "90%"], [1, "100%"], [1.1, "110%"], [1.2, "120%"], [1.35, "135%"]], t.fontScale || 1),
           sel("Hoeken", "theme.radius", [["thema", "Volgens thema"], ["0px", "Scherp"], ["4px", "Licht rond"], ["10px", "Rond"], ["18px", "Extra rond"]], t.radius || "thema"),
           sel("Exportknop", "tables.mode", [["hover", "Zwevend bij tabellen"], ["panel", "Alleen in dit paneel"]], DT.settings.tables.mode || "hover"),
+          sel("Agendakleur", "theme.agendaKleur", [["vak", "Per vak (Apple-thema's)"], ["klas", "Per klas (Apple-thema's)"], ["geen", "Uit"]], t.agendaKleur || "vak"),
           sel("Dichtheid", "theme.density", [["normal", "Normaal"], ["compact", "Compact (90%)"], ["extra", "Extra compact (80%)"]], t.density || "normal"),
           DT.el("div", { style: "font-size:12px;color:var(--dt-muted);margin-top:4px", text: "Modules" }),
           ...mods

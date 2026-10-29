@@ -38,7 +38,7 @@ DT.register({
   },
 
   init(DT) {
-    this._stopObs = DT.observe(() => { this.applyExtraInline(DT); this.injectShadow(DT, this._vars); this.recolor(DT); }, { debounce: 600, poll: 2500 });
+    this._stopObs = DT.observe(() => { this.applyExtraInline(DT); this.injectShadow(DT, this._vars); this.recolor(DT); this.agendaPass(DT); }, { debounce: 600, poll: 2500 });
     this._style = DT.el("style", { id: "dt-theme-style" });
     document.head.append(this._style);
     this._mq = window.matchMedia("(prefers-color-scheme: dark)");
@@ -205,6 +205,13 @@ DT.register({
       el.dataset.dtRc = sig;
       if (!changed) return;
     });
+  },
+
+  /* Agenda: kleur per vak of klas (Apples agendapalet) en voorbije afspraken dimmen. Alleen bij look-thema's. */
+  agendaPass(DT) {
+    const p = this.preset(DT);
+    const mode = p.look ? (DT.settings.theme.agendaKleur || "vak") : "geen";
+    agendaColorPass(document, mode, this.isDark(DT));
   },
 
   /* Themavariabelen ook binnen elke shadow root zetten (componenten die ze op :host herdefiniëren). */
@@ -425,6 +432,45 @@ function tokenCss(p, dark) {
     .ui-grid, .ui-grid-header, .ui-grid-row, .ui-grid-cell, .ui-grid-top-panel, .ui-grid-footer-panel { background: ${p.surface} !important; color: ${p.fg} !important; border-color: ${p.border} !important; }
     .ui-grid-row:nth-child(even) .ui-grid-cell { background: ${p.surface2} !important; }
   `;
+}
+
+/* ---------- Agendakleuren (Apple-palet) ----------
+ * Leest de titel van een afspraak ("MIP1B - M1INTR - (C2.13)"): deel 1 is de klas, deel 2 het vak.
+ * Zet --ev op de afspraak; de CSS mengt daar achtergrond, rand, tekst en chips uit.
+ * Voorbije afspraken (links van vandaag, of boven de nu-lijn) krijgen data-dt-past. */
+const EV_LIGHT = ["#FF3B30", "#FF9500", "#D4A200", "#34C759", "#00A99D", "#30B0C7", "#007AFF", "#5856D6", "#AF52DE", "#FF2D55", "#A2845E"];
+const EV_DARK = ["#FF453A", "#FF9F0A", "#FFD60A", "#30D158", "#63E6E2", "#40C8E0", "#0A84FF", "#5E5CE6", "#BF5AF2", "#FF375F", "#AC8E68"];
+function agendaColorPass(root, mode, dark) {
+  const items = [...root.querySelectorAll("#calendar .fc-event, li.vandaag-agenda-list-item")];
+  if (!items.length) return;
+  const pal = dark ? EV_DARK : EV_LIGHT;
+  // FNV-1a met een extra mengstap: vakken die op elkaar lijken (M1ENG, M1SLB) krijgen verschillende kleuren.
+  const hash = (str) => { let h = 0x811c9dc5; for (const c of str) { h ^= c.charCodeAt(0); h = Math.imul(h, 0x01000193) >>> 0; } h ^= h >>> 13; h = Math.imul(h, 0x5bd1e995) >>> 0; h ^= h >>> 15; return h >>> 0; };
+  const today = root.querySelector("#calendar .fc-day.fc-today, #calendar .fc-bg .fc-today");
+  const nowLine = root.querySelector("#calendar .fc-now-indicator-line");
+  const todayRect = today && today.getBoundingClientRect(), nowRect = nowLine && nowLine.getBoundingClientRect();
+  const keyOf = (el) => {
+    const txt = (el.querySelector(".event-description-content, .event-description-content-examen, .classroom, .fc-title") || el).textContent.replace(/\s+/g, " ").trim();
+    const parts = txt.split(/\s+-\s+/);
+    const klas = /^[A-Z]{1,5}\d[A-Z0-9]*$/.test(parts[0] || "") ? parts[0] : "";
+    const vak = klas ? (parts[1] || "").replace(/\(.*$/, "").trim() : "";
+    return mode === "klas" ? klas : mode === "vak" ? vak : "";
+  };
+  // Kleurtoewijzing: hash als voorkeur, maar binnen de zichtbare set geen twee vakken dezelfde kleur
+  // (alfabetisch toegewezen, dus stabiel zolang het rooster dezelfde vakken bevat).
+  const keys = [...new Set(items.map(keyOf).filter(Boolean))].sort();
+  const colorOf = new Map(); const used = new Set();
+  for (const k of keys) { let i = hash(k) % pal.length; if (used.size < pal.length) while (used.has(i)) i = (i + 1) % pal.length; used.add(i); colorOf.set(k, pal[i]); }
+  for (const el of items) {
+    const key = keyOf(el);
+    if (key) { el.style.setProperty("--ev", colorOf.get(key)); el.dataset.dtEv = key; }
+    else if (el.dataset.dtEv) { el.style.removeProperty("--ev"); delete el.dataset.dtEv; }
+    if (todayRect && el.classList.contains("fc-event")) {
+      const r = el.getBoundingClientRect();
+      const past = r.right <= todayRect.left + 1 || (nowRect && r.left >= todayRect.left - 1 && r.right <= todayRect.right + 1 && r.bottom <= nowRect.top);
+      if (past) el.dataset.dtPast = "1"; else delete el.dataset.dtPast;
+    }
+  }
 }
 
 /* ---------- Apple-look ----------
@@ -725,23 +771,34 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     .fc-now-indicator { border-color: ${t.red} !important; }
     .fc-time-grid .fc-now-indicator-line { border-top-width: 2px !important; }
     .fc-time-grid .fc-now-indicator-arrow { border-width: 0 !important; width: 10px; height: 10px; border-radius: 50%; background: ${t.red}; margin-top: -5px !important; margin-left: -5px; left: 100%; }
-    /* Afspraken: zachte tint met een gekleurde linkerrand, afgerond, zonder kader */
-    #calendar .fc-event, #calendar .fc-time-grid-event, #calendar .fc-day-grid-event { background: ${rgba(accent, t.dark ? .22 : .12)} !important; border: 0 !important; border-left: 3px solid ${t.accent} !important; border-radius: 6px !important; color: ${t.fg} !important; box-shadow: none !important; margin-right: 2px; }
+    /* Afspraken: kleur per vak/klas (--ev, gezet door agendaColorPass; standaard het accent), zachte tint,
+       gekleurde linkerrand, tekst in de donkere variant van de kleur, voorbije afspraken gedimd */
+    #calendar .fc-event, #calendar .fc-time-grid-event, #calendar .fc-day-grid-event { --ev: ${t.accent}; background: color-mix(in srgb, var(--ev) ${t.dark ? "24%" : "13%"}, ${t.surface}) !important; border: 0 !important; border-left: 3px solid var(--ev) !important; border-radius: 7px !important; color: ${t.fg} !important; box-shadow: none !important; margin-right: 2px; transition: opacity .15s, filter .15s; }
     #calendar .fc-time-grid-event { margin-bottom: 1px; }
     #calendar .fc-event .fc-bg { display: none; }
-    #calendar .fc-event .fc-content { padding: 3px 4px 3px 6px; }
-    #calendar .fc-time-grid-event .fc-title, #calendar .fc-time-grid-event .event-description, #calendar .fc-time-grid-event .event-description-content, #calendar .fc-time-grid-event .event-description-content-examen, #calendar .fc-h-event .fc-content { color: ${t.dark ? mix(accent, "#ffffff", .55) : mix(accent, "#000000", .45)} !important; font: 500 .75rem/1.25 ${t.font} !important; padding: 0 !important; }
-    #calendar .fc-time-grid-event .calendar-event .event-description-content, #calendar .fc-time-grid-event .calendar-event .event-description-content-examen { padding: 2px 0 0 !important; width: 100% !important; }
+    #calendar .fc-event .fc-content { padding: 4px 4px 4px 7px; }
+    #calendar .fc-time-grid-event .fc-title, #calendar .fc-time-grid-event .event-description, #calendar .fc-time-grid-event .event-description-content, #calendar .fc-time-grid-event .event-description-content-examen, #calendar .fc-h-event .fc-content { color: color-mix(in srgb, var(--ev) ${t.dark ? "45%, #ffffff" : "68%, #000000"}) !important; font: 500 .75rem/1.25 ${t.font} !important; padding: 0 !important; letter-spacing: -.005em; }
+    #calendar .fc-time-grid-event .calendar-event .event-description-content, #calendar .fc-time-grid-event .calendar-event .event-description-content-examen { padding: 1px 0 0 !important; width: 100% !important; }
     #calendar .fc-time-grid-event .calendar-event:has(.nrblock) .event-description-content, #calendar .fc-time-grid-event .calendar-event:has(.nrblock) .event-description-content-examen { width: calc(100% - 44px) !important; }
     #calendar .fc-time-grid-event .fc-time { color: ${t.muted} !important; font-size: .6875rem !important; }
-    #calendar .fc-time-grid-event .nrblock, #calendar .fc-time-grid-event .calendar-event .nrblock { background: ${rgba(accent, t.dark ? .3 : .16)} !important; color: ${t.dark ? mix(accent, "#ffffff", .5) : mix(accent, "#000000", .3)} !important; box-shadow: none !important; border-radius: 6px !important; font: 600 .6875rem/18px ${t.font} !important; height: 18px !important; right: 4px !important; top: 3px !important; }
-    .fc-day-grid-event.current-event, .fc-time-grid-event.current-event { background: ${rgba(accent, t.dark ? .38 : .24)} !important; }
-    .fc-day-grid-event.active-event, .fc-time-grid-event.active-event { background: ${rgba(accent, t.dark ? .32 : .2)} !important; box-shadow: 0 0 0 2px ${t.accent} !important; }
+    #calendar .fc-time-grid-event .nrblock, #calendar .fc-time-grid-event .calendar-event .nrblock { background: color-mix(in srgb, var(--ev) ${t.dark ? "34%" : "18%"}, ${t.surface}) !important; color: color-mix(in srgb, var(--ev) ${t.dark ? "55%, #ffffff" : "62%, #000000"}) !important; box-shadow: none !important; border-radius: 6px !important; font: 600 .6875rem/18px ${t.font} !important; height: 18px !important; right: 5px !important; top: 4px !important; }
+    .fc-day-grid-event.current-event, .fc-time-grid-event.current-event { background: color-mix(in srgb, var(--ev) ${t.dark ? "40%" : "24%"}, ${t.surface}) !important; }
+    .fc-day-grid-event.active-event, .fc-time-grid-event.active-event { background: color-mix(in srgb, var(--ev) ${t.dark ? "36%" : "20%"}, ${t.surface}) !important; box-shadow: 0 0 0 2px var(--ev) !important; }
+    #calendar .fc-event[data-dt-past] { opacity: .55; }
+    #calendar .fc-event[data-dt-past]:hover { opacity: .85; }
     #calendar .fc-time-grid-event.current-event .nrblock, #calendar .fc-time-grid-event.active-event .nrblock { box-shadow: none !important; }
-    #calendar .fc-event:has(.calendar-event.info) { border-left-color: ${t.red} !important; background: ${rgba(t.red === "#FF3B30" ? "#FF3B30" : "#FF453A", .1)} !important; }
+    #calendar .fc-event:has(.calendar-event.info) { --ev: ${t.red}; }
     .calendar-event.info:before { display: none !important; }
-    #calendar .fc-event:has(.calendar-event.info) .event-description-content { color: ${t.red} !important; }
     #calendar .fc-event:hover { filter: brightness(.96); }
+    /* Markeringen in de afspraak: klein en rustig, rechtsonder; "niet verantwoord" als oranje stip */
+    #calendar .fc-time-grid-event .icons-block.week-view, #calendar .fc-time-grid-event ag-lesblok-iconen > .icons-block { position: absolute !important; right: 5px; bottom: 4px; display: flex !important; gap: 3px; align-items: center; margin: 0 !important; padding: 0 !important; text-align: right; }
+    #calendar .icons-block.week-view .dna-badge, #calendar .icons-block .dna-badge { font: 600 .625rem/16px ${t.font} !important; padding: 0 5px !important; border-radius: 5px !important; background: color-mix(in srgb, var(--ev) 18%, ${t.surface}) !important; color: color-mix(in srgb, var(--ev) 62%, #000000) !important; border: 0 !important; height: 16px; }
+    #calendar .icons-block.week-view dna-icon, #calendar .icons-block dna-icon { --icon-size: .75rem !important; --_icon-size: .75rem !important; --dna-icon-size: .75rem !important; color: var(--ev) !important; }
+    #calendar .icons-block dna-icon.niet-verantwoord, #calendar .icons-block .niet-verantwoord { width: 16px; height: 16px; border-radius: 50%; background: ${t.orange} !important; color: #fff !important; --icon-size: .5625rem !important; --_icon-size: .5625rem !important; --dna-icon-size: .5625rem !important; display: inline-grid !important; place-items: center; }
+    /* Startscherm-agenda: zelfde kleur per vak/klas op het balkje en de chip */
+    .list li.vandaag-agenda-list-item { --ev: ${t.accent}; }
+    .list li.vandaag-agenda-list-item.alert-info:before, .list li.vandaag-agenda-list-item.alert:before { background: var(--ev) !important; }
+    .list li.vandaag-agenda-list-item span.nrblock { background: color-mix(in srgb, var(--ev) 14%, ${t.surface}) !important; color: color-mix(in srgb, var(--ev) 65%, #000000) !important; }
     #calendar .fc-highlight { background: ${rgba(accent, .12)} !important; opacity: 1 !important; }
     /* Rechterzijbalk: tabs als segmentknop, kaarten van 20px */
     aside .head-bar { background: transparent !important; border: 0 !important; height: 44px !important; line-height: 44px !important; padding: 6px 0 0 !important; }

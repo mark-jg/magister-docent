@@ -1,7 +1,7 @@
 /* Standaardinstellingen, gedeeld door core.js (content), background.js en de instellingenpagina.
  * Eén plek bewerken is genoeg. */
 globalThis.DT_DEFAULTS = {
-  theme: { enabled: true, preset: "magister", lightPreset: "magister", darkPreset: "nacht", mode: "auto", darkStyle: "invert", accent: "#1B3A5C", density: "normal", font: "thema", fontScale: 1, radius: "thema", extra: [], recolor: true },
+  theme: { enabled: true, preset: "magister", lightPreset: "magister", darkPreset: "nacht", mode: "auto", darkStyle: "invert", accent: "#1B3A5C", density: "normal", font: "thema", fontScale: 1, radius: "thema", extra: [], recolor: true, agendaKleur: "vak" },
   compact: { enabled: false, hideSelectors: [] },
   panel: { enabled: true, position: "right", widgets: ["klok", "links", "notities", "export", "instellingen"] },
   tables: { enabled: true, alwaysAsk: false, mode: "hover" },
