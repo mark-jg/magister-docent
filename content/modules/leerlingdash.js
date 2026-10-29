@@ -188,7 +188,18 @@ DT.register({
       <div class="dt-ll-tiles">${tiles}</div>
       <div class="dt-ll-cols">
         <section class="dt-ll-sec"><h4>Rooster vandaag</h4>${lessen.length ? `<ul class="dt-ll-lessen">${lesRows}</ul>` : `<p class="dt-ll-empty">${d.afspraken ? "Geen lessen vandaag." : "Rooster niet beschikbaar."}</p>`}</section>
-        ${att && att.maanden.length ? (() => { const maxPct = Math.max(1, ...att.maanden.map((m) => m.pctAfwezigGeoorloofd + m.pctAfwezigOngeoorloofd)); const sc = 100 / maxPct; return `<section class="dt-ll-sec dt-ll-sec-maanden"><h4>Afwezig per maand</h4><div class="dt-ll-months">${att.maanden.map((m) => `<div class="dt-ll-month" title="${esc(m.label)}: ${m.lessen} lessen, ${m.afwezig} afwezig (${m.pctAfwezigGeoorloofd + m.pctAfwezigOngeoorloofd}%)${m.ongeoorloofd ? `, ${m.ongeoorloofd} ongeoorloofd` : ""}${m.teLaat ? `, ${m.teLaat}× te laat` : ""}"><div class="dt-ll-bar"><span class="dt-ll-bar-ok" style="height:${(m.pctAfwezigGeoorloofd * sc).toFixed(1)}%"></span><span class="dt-ll-bar-no" style="height:${(m.pctAfwezigOngeoorloofd * sc).toFixed(1)}%"></span></div><span class="dt-ll-month-label">${esc(m.kort)}</span><span class="dt-ll-month-val">${m.afwezig ? `${m.pctAfwezigGeoorloofd + m.pctAfwezigOngeoorloofd}%` : ""}</span></div>`).join("")}</div><div class="dt-ll-legend"><span><i class="is-no"></i>ongeoorloofd</span><span><i class="is-ok"></i>geoorloofd</span><span class="dt-ll-legend-note">percentage van de lessen die maand</span></div></section>`; })() : ""}
+        ${att && att.maanden.length ? (() => {
+      const SOORT = [["AB_NO", "absent, ongeoorloofd", "#FF3B30"], ["AB_OK", "absent, geoorloofd", "#FF9500"], ["ZK", "ziek", "#AF52DE"], ["UI", "uitgestuurd", "#A2845E"], ["VR", "vrijstelling", "#32ADE6"], ["TL", "te laat", "#FFCC00"], ["OVERIG", "overig (huiswerk, materiaal, mobiel)", "#8E8E93"]];
+      const aanwezig = SOORT.filter(([k]) => att.maanden.some((m) => m.per[k]));
+      const maxT = Math.max(1, ...att.maanden.map((m) => m.totaal));
+      const bars = att.maanden.map((m) => {
+        const segs = aanwezig.map(([k, , c]) => m.per[k] ? `<span class="dt-ll-seg" style="height:${(100 * m.per[k] / maxT).toFixed(1)}%;background:${c}"></span>` : "").join("");
+        const tip = `${m.label}: ${m.lessen} lessen, ${m.totaal} ${m.totaal === 1 ? "registratie" : "registraties"}` + aanwezig.filter(([k]) => m.per[k]).map(([k, n]) => `\n${m.per[k]}× ${n}`).join("");
+        return `<div class="dt-ll-month" title="${esc(tip)}"><div class="dt-ll-bar">${segs}</div><span class="dt-ll-month-label">${esc(m.kort)}</span><span class="dt-ll-month-val">${m.totaal || ""}</span></div>`;
+      }).join("");
+      const legend = aanwezig.map(([, n, c]) => `<span><i style="background:${c}"></i>${esc(n)}</span>`).join("");
+      return `<section class="dt-ll-sec dt-ll-sec-maanden"><h4>Registraties per maand</h4><div class="dt-ll-months">${bars}</div><div class="dt-ll-legend">${legend || "<span>geen registraties dit schooljaar</span>"}</div></section>`;
+    })() : ""}
         <section class="dt-ll-sec"><h4>Laatste logboek</h4>${lbLast ? `<a href="#" data-state="begeleiding" class="dt-ll-lb"><span class="dt-ll-lb-type">${esc(lbLast.x.formulierType?.naam || lbLast.x.formulierTypeNaam || "Logboek")}</span><span class="dt-ll-lb-date">${esc(lbLast.t.toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" }))}</span><span class="dt-ll-lb-text">${esc(lbLast.x.omschrijving || lbLast.x.titel || "")}</span></a>` : `<p class="dt-ll-empty">${d.logboek ? "Nog geen logboekformulieren." : "Logboek niet beschikbaar."}</p>`}</section>
       </div>`;
   },
@@ -227,14 +238,12 @@ DT.register({
       #dt-ll-dash .dt-ll-month { display: grid; grid-template-rows: 1fr auto auto; height: 100%; justify-items: center; gap: 3px; }
       #dt-ll-dash .dt-ll-bar { width: 100%; max-width: 28px; height: 100%; display: flex; flex-direction: column-reverse; border-radius: 6px; background: rgba(60,60,67,.07); overflow: hidden; }
       #dt-ll-dash .dt-ll-bar span { display: block; width: 100%; }
-      #dt-ll-dash .dt-ll-bar-ok { background: #FF9500; }
-      #dt-ll-dash .dt-ll-bar-no { background: #FF3B30; }
+      #dt-ll-dash .dt-ll-seg + .dt-ll-seg { border-bottom: 1px solid rgba(255,255,255,.6); }
       #dt-ll-dash .dt-ll-month-label { font: 500 .625rem/1 -apple-system, system-ui, sans-serif; color: #8e8e93; text-transform: uppercase; letter-spacing: .04em; }
       #dt-ll-dash .dt-ll-month-val { font: 600 .6875rem/1 -apple-system, system-ui, sans-serif; color: #6e6e73; min-height: .6875rem; }
       #dt-ll-dash .dt-ll-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; font: 400 .6875rem/1.2 -apple-system, system-ui, sans-serif; color: #8e8e93; }
       #dt-ll-dash .dt-ll-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: 0; }
-      #dt-ll-dash .dt-ll-legend .is-no { background: #FF3B30; } #dt-ll-dash .dt-ll-legend .is-ok { background: #FF9500; }
-      #dt-ll-dash .dt-ll-legend-note { margin-left: auto; }
+
       #dt-ll-dash .dt-ll-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 1rem; }
       #dt-ll-dash .dt-ll-sec h4 { margin: 0 0 .375rem; font: 600 .6875rem/1 -apple-system, system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: #8e8e93; }
       #dt-ll-dash .dt-ll-lessen { list-style: none; margin: 0; padding: 0; }
@@ -284,20 +293,24 @@ function aanwezigheid(items, lessenTotaal, start, now) {
       return { type, ok: r.reden?.isGeoorloofd ?? r.isGeoorloofd ?? r.geoorloofd ?? r.approved ?? true };
     });
     const key = `${begin.getFullYear()}-${begin.getMonth()}`;
-    const m = perMaand.get(key) || { y: begin.getFullYear(), m: begin.getMonth(), lessen: 0, afwezig: 0, ongeoorloofd: 0, teLaat: 0 };
+    const m = perMaand.get(key) || { y: begin.getFullYear(), m: begin.getMonth(), lessen: 0, afwezig: 0, ongeoorloofd: 0, teLaat: 0, per: {} };
     m.lessen++; lessen++;
     const abs = regs.find((r) => ABSENT.has(r.type));
     if (abs) { m.afwezig++; afwezig++; if (!abs.ok) { m.ongeoorloofd++; ongeoorloofd++; } if (abs.type === "ZK") ziek++; }
     if (regs.some((r) => r.type === "TL")) { m.teLaat++; teLaat++; }
+    /* Per type (voor de grafiek): absent gesplitst in geoorloofd/ongeoorloofd, de rest per soort. */
+    for (const r of regs) {
+      if (!r.type) continue;
+      const k = r.type === "AB" ? (r.ok ? "AB_OK" : "AB_NO") : (["ZK", "UI", "VR", "TL"].includes(r.type) ? r.type : "OVERIG");
+      m.per[k] = (m.per[k] || 0) + 1;
+    }
     perMaand.set(key, m);
   }
   if (lessenTotaal && lessenTotaal > lessen) lessen = lessenTotaal;
   if (!lessen) return null;
   const pct = Math.round(100 * (lessen - afwezig) / lessen);
   const maanden = [...perMaand.values()].sort((a, b) => a.y - b.y || a.m - b.m).map((m) => ({
-    ...m, kort: MON[m.m], label: `${MONL[m.m]} ${m.y}`,
-    pctAfwezigGeoorloofd: m.lessen ? Math.round(100 * (m.afwezig - m.ongeoorloofd) / m.lessen) : 0,
-    pctAfwezigOngeoorloofd: m.lessen ? Math.round(100 * m.ongeoorloofd / m.lessen) : 0,
+    ...m, kort: MON[m.m], label: `${MONL[m.m]} ${m.y}`, totaal: Object.values(m.per).reduce((x, y) => x + y, 0),
   }));
   return { lessen, afwezig, ongeoorloofd, teLaat, ziek, pct, maanden, registraties, onbekend: [...onbekend] };
 }

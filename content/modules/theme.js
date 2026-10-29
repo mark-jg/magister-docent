@@ -1147,7 +1147,7 @@ function leerlingkaartCss(t) {
     #dt-ll-dash .dt-ll-les.is-current { background: ${t.tint}; }
     #dt-ll-dash .dt-ll-ringwrap { color: ${t.muted}; } #dt-ll-dash .dt-ll-ringnum { color: ${t.fg}; font-family: ${t.font}; }
     #dt-ll-dash .dt-ll-bar { background: ${t.dark ? "rgba(255,255,255,.08)" : "rgba(60,60,67,.07)"}; }
-    #dt-ll-dash .dt-ll-bar-ok, #dt-ll-dash .dt-ll-legend .is-ok { background: ${t.orange}; } #dt-ll-dash .dt-ll-bar-no, #dt-ll-dash .dt-ll-legend .is-no { background: ${t.red}; }
+    #dt-ll-dash .dt-ll-seg + .dt-ll-seg { border-bottom-color: ${t.dark ? "rgba(0,0,0,.45)" : "rgba(255,255,255,.7)"}; }
     #dt-ll-dash .dt-ll-month-label, #dt-ll-dash .dt-ll-month-val, #dt-ll-dash .dt-ll-legend { color: ${t.muted}; font-family: ${t.font}; }
     #dt-ll-dash .dt-ll-tile[data-kind="aanwezig"] { --k: ${t.green}; }
     #dt-ll-dash .dt-ll-tile[data-kind="rooster"] { --k: ${t.accent}; } #dt-ll-dash .dt-ll-tile[data-kind="taken"] { --k: ${t.orange}; } #dt-ll-dash .dt-ll-tile[data-kind="terugkom"] { --k: ${t.red}; }

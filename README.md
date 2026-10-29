@@ -102,6 +102,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.13.2: de maandgrafiek op de leerlingkaart toont nu alle registraties gestapeld per type (absent geoorloofd en ongeoorloofd, ziek, uitgestuurd, vrijstelling, te laat, overig), met een legenda van de typen die voorkomen en het aantal per maand.
 - 0.13.1: aanwezigheid: Magister levert het registratietype als naam (absent, teLaat, ziek, uitgestuurd, vrijstelling) en niet als code; de ring en de maandgrafiek tellen nu goed. Onbekende types worden in de tegel genoemd.
 - 0.13.0: Leerlingoverzicht: aanwezigheid als ring (percentage aanwezig dit schooljaar, met lessen, afwezig, ongeoorloofd, te laat en ziek) en een grafiek met afwezigheid per maand (geoorloofd en ongeoorloofd als aandeel van de lessen); klikken opent Verzuim. Gebaseerd op dezelfde registraties die het scherm Verzuim toont.
 - 0.12.0: module "Leerlingoverzicht": kaart "Overzicht" bovenaan het tabblad Algemeen van de leerlingkaart, in de widgetstijl van de notificaties op Vandaag: lessen vandaag (met huidige of volgende les), ongelezen logboeken (met recent en prioriteit), open taken deze week, openstaande terugkommaatregelen en dagen tot de verjaardag, plus het rooster van vandaag en het laatste logboekformulier; tegels met logboek openen Begeleiding. Gevoed door Magisters eigen leerling-aanroepen via je sessie; eigen aanroepen van de extensie staan nu ook in het netwerkrapport (Alt+I, N). Leerlingkaart: naam en stamnummer onder de foto lopen niet meer over de klas-chip.
