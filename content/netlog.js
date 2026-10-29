@@ -87,8 +87,10 @@
     if (!(e.data && e.data.type === "dt:api:get" && trusted(e))) return;
     const { id, url, full } = e.data;
     try {
+      const t0 = performance.now();
       const res = await of(url, { method: "GET", credentials: "include", headers: { Accept: "application/json", ...(lastHeaders || {}) } });
-      let json = null; try { json = await res.clone().json(); } catch {}
+      let json = null, text = ""; try { text = await res.clone().text(); json = JSON.parse(text); } catch {}
+      try { record("GET (Docent Tools)", url, res.status, text, performance.now() - t0); } catch {}
       reply(e, { type: "dt:api:result", id, status: res.status, shape: json ? shape(json) : null, json: full ? json : undefined, hadHeaders: !!lastHeaders });
     } catch (err) { reply(e, { type: "dt:api:result", id, status: 0, error: String(err) }); }
   });

@@ -1094,6 +1094,8 @@ function leerlingkaartCss(t) {
     dna-tab-button:hover { --background: ${t.hover} !important; --_background: ${t.hover} !important; --color: ${t.fg} !important; --_color: ${t.fg} !important; }
     dna-tab-button[selected], dna-tab-button[aria-selected="true"] { --background: ${t.tint} !important; --_background: ${t.tint} !important; --color: ${t.accent} !important; --_color: ${t.accent} !important; font-weight: 600 !important; box-shadow: none !important; border-radius: 999px !important; }
     dna-tab-button { box-shadow: none !important; }
+    dk-basisgegevens-page .container:not(.employee) { grid-template-columns: minmax(0, 1fr) !important; }
+    dk-basisgegevens-page .container:not(.employee) > .wrapper, dk-basisgegevens-page .tab-content { min-width: 0; max-width: 100%; }
     /* Raster van kaarten, gelijk hoog per rij */
     dk-basisgegevens-page .page { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)) !important; gap: 1rem !important; padding: .25rem 1.5rem 1.5rem !important; align-items: stretch !important; max-width: 1480px; box-sizing: border-box; }
     dk-basisgegevens-page .page > .leerling-block, dk-basisgegevens-page .page > .contact-block, dk-basisgegevens-page .page > dk-medewerker { width: auto !important; margin: 0 !important; min-width: 0; }
@@ -1101,9 +1103,10 @@ function leerlingkaartCss(t) {
     dk-basisgegevens-page dna-card-title.button-placement dna-button { --padding-v: .2rem !important; --_padding-v: .2rem !important; --padding-h: .45rem !important; --_padding-h: .45rem !important; --border-radius: 999px !important; --_border-radius: 999px !important; }
     /* Profielkaart */
     dk-leerling dna-card { --body-padding: 1rem 1.25rem 1.25rem !important; --_body-padding: 1rem 1.25rem 1.25rem !important; text-align: center; }
-    dk-leerling .avatar { padding: .5rem 0 .5rem !important; justify-content: center !important; }
+    dk-leerling .avatar { padding: .5rem 0 .25rem !important; height: auto !important; width: 100% !important; margin: 0 !important; position: relative !important; }
+    dk-leerling .avatar dna-avatar { position: static !important; display: block; width: 100% !important; }
     dk-leerling dna-avatar.leerling-avatar { --font-size: 3rem !important; --_font-size: 3rem !important; --font-weight: 600 !important; --_font-weight: 600 !important; --background: ${t.dark ? t.tintStrong : t.tint} !important; --_background: ${t.dark ? t.tintStrong : t.tint} !important; --color: ${t.accent} !important; --_color: ${t.accent} !important; }
-    dk-leerling .upload-button { --border-radius: 999px !important; --_border-radius: 999px !important; --padding-v: .45rem !important; --_padding-v: .45rem !important; --padding-h: .45rem !important; --_padding-h: .45rem !important; margin-top: 7.4rem !important; right: 54px !important; background: ${t.accent} !important; color: #fff !important; --color: #fff !important; --_color: #fff !important; border-radius: 999px !important; outline: 3px solid ${t.surface} !important; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+    dk-leerling .upload-button { --border-radius: 999px !important; --_border-radius: 999px !important; --padding-v: .45rem !important; --_padding-v: .45rem !important; --padding-h: .45rem !important; --_padding-h: .45rem !important; margin-top: 0 !important; top: calc(.5rem + 118px) !important; left: calc(50% + 42px) !important; right: auto !important; background: ${t.accent} !important; color: #fff !important; --color: #fff !important; --_color: #fff !important; border-radius: 999px !important; outline: 3px solid ${t.surface} !important; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
     dk-leerling .upload-button dna-icon { color: #fff !important; --icon-size: 1rem; --_icon-size: 1rem; }
     dk-leerling .klas-studie { margin: .25rem 0 1rem !important; }
     dk-leerling .klasnaam { display: inline-block; padding: .25rem .8rem; border-radius: 999px; background: ${t.tint}; color: ${t.accent}; font: 600 .8125rem/1.25 ${t.font}; margin-bottom: .5rem; }
@@ -1132,6 +1135,17 @@ function leerlingkaartCss(t) {
     dk-basisgegevens-page dna-card > dna-card dna-card-title { font-size: .9375rem !important; }
     dk-basisgegevens-page dna-card > dna-card .gegevens-container { padding: .45rem 0 !important; }
     dk-basisgegevens-page dna-card > dna-card .gegevens-container:last-child { border-bottom: 0; }
+    /* Leerlingoverzicht (module leerlingdash) in themakleuren */
+    #dt-ll-dash .dt-ll-tile, #dt-ll-dash .dt-ll-lb { background: ${group} !important; color: ${t.fg}; }
+    #dt-ll-dash a.dt-ll-tile:hover, #dt-ll-dash .dt-ll-lb:hover { background: ${t.dark ? "rgba(255,255,255,.1)" : "rgba(60,60,67,.09)"} !important; transform: translateY(-1px); transition: background .12s, transform .12s; }
+    #dt-ll-dash .dt-ll-tile.is-hot { background: color-mix(in srgb, var(--k) ${t.dark ? "22%" : "12%"}, ${t.surface}) !important; }
+    #dt-ll-dash .dt-ll-tile.is-hot:hover { background: color-mix(in srgb, var(--k) ${t.dark ? "30%" : "18%"}, ${t.surface}) !important; }
+    #dt-ll-dash .dt-ll-ico { background: color-mix(in srgb, var(--k) 16%, ${t.surface}); }
+    #dt-ll-dash .dt-ll-num, #dt-ll-dash .dt-ll-label, #dt-ll-dash .dt-ll-sub, #dt-ll-dash .dt-ll-sec h4, #dt-ll-dash .dt-ll-tijd small, #dt-ll-dash .dt-ll-meta, #dt-ll-dash .dt-ll-lb-date, #dt-ll-dash .dt-ll-lb-text, #dt-ll-dash .dt-ll-empty, #dt-ll-dash .dt-ll-loading { color: ${t.muted}; font-family: ${t.font}; }
+    #dt-ll-dash .dt-ll-tile.is-hot .dt-ll-label, #dt-ll-dash .dt-ll-vak, #dt-ll-dash .dt-ll-tijd, #dt-ll-dash .dt-ll-lb-type { color: ${t.fg}; font-family: ${t.font}; }
+    #dt-ll-dash .dt-ll-tile.is-hot .dt-ll-num { color: var(--k); }
+    #dt-ll-dash .dt-ll-les.is-current { background: ${t.tint}; }
+    #dt-ll-dash .dt-ll-tile[data-kind="rooster"] { --k: ${t.accent}; } #dt-ll-dash .dt-ll-tile[data-kind="taken"] { --k: ${t.orange}; } #dt-ll-dash .dt-ll-tile[data-kind="terugkom"] { --k: ${t.red}; }
     /* Toestemmingen */
     dk-toestemmings-antwoorden .answer-entry { margin: 0 !important; padding: .5rem 0 !important; border-bottom: 1px solid ${t.sepSoft}; align-items: center !important; line-height: 1.3 !important; }
     dk-toestemmings-antwoorden .answer-entry:last-child { border-bottom: 0; }

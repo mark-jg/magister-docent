@@ -48,6 +48,7 @@
         "content/modules/melding.js",
         "content/modules/inspector.js",
         "content/modules/jarig.js",
+        "content/modules/leerlingdash.js",
         "content/boot.js"
       ],
       "css": [
