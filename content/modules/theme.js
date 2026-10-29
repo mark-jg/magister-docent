@@ -1075,7 +1075,70 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     ::-webkit-scrollbar-thumb { background: ${dark ? "rgba(255,255,255,.22)" : "rgba(0,0,0,.2)"}; border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
     ::-webkit-scrollbar-track { background: transparent; }
     :root { --dt-shadow: ${t.pop}; --dt-radius: 12px; }
-  ` + (t.glass ? glassCss(t, top) : "");
+  ` + (t.glass ? glassCss(t, top) : "") + leerlingkaartCss(t);
+}
+
+/* Leerlingkaart (de detailkaarten-app in het frame): kop zonder vlak met grote naam, tabbladen
+ * als capsules, kaarten in een gelijkmatig raster, gegevens als rustige rijen. Komt ná de
+ * glaslaag zodat de geneste kaarten (adres, contact) als groepen in de kaart vallen. */
+function leerlingkaartCss(t) {
+  const group = t.dark ? "rgba(255,255,255,.06)" : "rgba(120,120,128,.08)";
+  return `
+    /* ---- Leerlingkaart ---- */
+    dk-basisgegevens-page dna-breadcrumbs { padding: .875rem 1.5rem 0 !important; margin: 0 !important; }
+    dk-basisgegevens-page dna-page-header { background: transparent !important; margin: .25rem 1.5rem .5rem !important; --padding-block: .25rem !important; --_padding-block: .25rem !important; }
+    dk-basisgegevens-page dna-page-header dna-button { margin-right: 0 !important; }
+    dk-basisgegevens-page dna-tab-bar { background: transparent !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 1.5rem .5rem !important; --padding-inline: 0 !important; --_padding-inline: 0 !important; --margin: 0 !important; --_margin: 0 !important; --indicator-size: 0 !important; --_indicator-size: 0 !important; --spacing: .375rem !important; --_spacing: .375rem !important; --gap: .375rem !important; --_gap: .375rem !important; --border-width: 0 !important; --_border-width: 0 !important; --border: 0 !important; --_border: 0 !important; }
+    dna-tab-button { --border-radius: 999px !important; --_border-radius: 999px !important; --padding: .375rem .875rem !important; --_padding: .375rem .875rem !important; --background: transparent !important; --_background: transparent !important; --active: ${t.tint} !important; --_active: ${t.tint} !important; --color: ${t.muted} !important; --_color: ${t.muted} !important; --indicator-size: 0 !important; --_indicator-size: 0 !important; --border-width: 0 !important; --_border-width: 0 !important; --border: 0 !important; --_border: 0 !important; --width: auto !important; --_width: auto !important; --margin: 0 !important; --_margin: 0 !important; font: 500 .875rem/1.25 ${t.font} !important; letter-spacing: -.005em; }
+    dna-tab-button:hover { --background: ${t.hover} !important; --_background: ${t.hover} !important; --color: ${t.fg} !important; --_color: ${t.fg} !important; }
+    dna-tab-button[selected], dna-tab-button[aria-selected="true"] { --background: ${t.tint} !important; --_background: ${t.tint} !important; --color: ${t.accent} !important; --_color: ${t.accent} !important; font-weight: 600 !important; }
+    /* Raster van kaarten, gelijk hoog per rij */
+    dk-basisgegevens-page .page { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)) !important; gap: 1rem !important; padding: .25rem 1.5rem 1.5rem !important; align-items: stretch !important; max-width: 1480px; box-sizing: border-box; }
+    dk-basisgegevens-page .page > .leerling-block, dk-basisgegevens-page .page > .contact-block, dk-basisgegevens-page .page > dk-medewerker { width: auto !important; margin: 0 !important; min-width: 0; }
+    dk-basisgegevens-page .page dna-card { min-height: 0 !important; height: 100% !important; box-sizing: border-box; --body-padding: .25rem 1.25rem 1.25rem !important; --_body-padding: .25rem 1.25rem 1.25rem !important; --header-padding: 1.125rem 1.25rem .5rem !important; --_header-padding: 1.125rem 1.25rem .5rem !important; }
+    dk-basisgegevens-page dna-card-title.button-placement dna-button { --padding-v: .2rem !important; --_padding-v: .2rem !important; --padding-h: .45rem !important; --_padding-h: .45rem !important; --border-radius: 999px !important; --_border-radius: 999px !important; }
+    /* Profielkaart */
+    dk-leerling dna-card { --body-padding: 1rem 1.25rem 1.25rem !important; --_body-padding: 1rem 1.25rem 1.25rem !important; text-align: center; }
+    dk-leerling .avatar { padding: .5rem 0 .5rem !important; justify-content: center !important; }
+    dk-leerling dna-avatar.leerling-avatar { --size: 120px !important; --_size: 120px !important; --font-size: 2.5rem !important; --_font-size: 2.5rem !important; --font-weight: 600 !important; --_font-weight: 600 !important; --background: ${t.dark ? t.tintStrong : t.tint} !important; --_background: ${t.dark ? t.tintStrong : t.tint} !important; --color: ${t.accent} !important; --_color: ${t.accent} !important; }
+    dk-leerling .upload-button { --border-radius: 999px !important; --_border-radius: 999px !important; }
+    dk-leerling .klas-studie { margin: .25rem 0 1rem !important; }
+    dk-leerling .klasnaam { display: inline-block; padding: .25rem .8rem; border-radius: 999px; background: ${t.tint}; color: ${t.accent}; font: 600 .8125rem/1.25 ${t.font}; margin-bottom: .5rem; }
+    dk-leerling .studieprofiel { color: ${t.muted}; font: 400 .8125rem/1.35 ${t.font}; }
+    dk-leerling .mentoren { margin: 0 0 1rem !important; padding-top: .875rem; border-top: 1px solid ${t.sepSoft}; text-align: left; }
+    dk-leerling .mentoren dt { font: 600 .6875rem/1 ${t.font} !important; letter-spacing: .06em; text-transform: uppercase; color: ${t.muted} !important; margin-bottom: .5rem; }
+    dk-leerling .mentoren dd { display: flex; flex-wrap: wrap; gap: .375rem; }
+    dk-leerling dna-button.mentor { --padding-v: .25rem !important; --_padding-v: .25rem !important; --padding-h: .7rem !important; --_padding-h: .7rem !important; --border-radius: 999px !important; --_border-radius: 999px !important; background: ${group}; border-radius: 999px; --font-weight: 500 !important; --_font-weight: 500 !important; }
+    dk-leerling .comma { display: none; }
+    dk-leerling dna-button-bar { justify-content: center !important; --gap-h: .75rem !important; --_gap-h: .75rem !important; padding-top: .25rem; }
+    dk-leerling dna-button-bar dna-button { --border-radius: 999px !important; --_border-radius: 999px !important; --padding-v: .6rem !important; --_padding-v: .6rem !important; --padding-h: .6rem !important; --_padding-h: .6rem !important; background: ${t.tint}; border-radius: 999px; color: ${t.accent}; --color: ${t.accent} !important; --_color: ${t.accent} !important; }
+    /* Gegevens als rijen met inzet-scheidingslijn */
+    dk-basisgegevens-page .gegevens-container { margin: 0 !important; padding: .55rem 0 !important; border-bottom: 1px solid ${t.sepSoft}; display: flex; flex-direction: column; gap: .1rem; }
+    dk-basisgegevens-page .gegevens-container:last-child { border-bottom: 0; }
+    dk-basisgegevens-page .gegevens-container > .bold { font: 500 .75rem/1.3 ${t.font} !important; color: ${t.muted} !important; }
+    dk-basisgegevens-page .gegevens-container > :not(.bold) { font: 400 .9375rem/1.35 ${t.font}; color: ${t.fg}; }
+    dk-basisgegevens-page .gegevens-container .birthday { align-items: center; gap: .25rem; color: ${t.fg}; }
+    dk-basisgegevens-page .gegevens-container .birthday dna-icon { color: #FF2D55; }
+    dk-basisgegevens-page .address-container { flex-direction: row !important; justify-content: space-between !important; align-items: center !important; }
+    dk-basisgegevens-page .address-container > div:first-child > div { font: 400 .9375rem/1.4 ${t.font}; }
+    dk-basisgegevens-page .address-container .bold { font-weight: 600 !important; color: ${t.fg} !important; font-size: .9375rem !important; }
+    dk-basisgegevens-page .button-container dna-button { --border-radius: 999px !important; --_border-radius: 999px !important; }
+    /* Geneste kaarten (adres, contact) als groepen in de kaart */
+    dk-basisgegevens-page dna-card > dna-card { --box-shadow: none !important; --_box-shadow: none !important; --background: ${group} !important; --_background: ${group} !important; --border-radius: 14px !important; --_border-radius: 14px !important; --body-padding: 0 1rem .5rem !important; --_body-padding: 0 1rem .5rem !important; --header-padding: .75rem 1rem .25rem !important; --_header-padding: .75rem 1rem .25rem !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; height: auto !important; margin-bottom: .75rem; }
+    dk-basisgegevens-page dna-card > dna-card:last-child { margin-bottom: 0; }
+    dk-basisgegevens-page dna-card > dna-card dna-card-title { font-size: .9375rem !important; }
+    dk-basisgegevens-page dna-card > dna-card .gegevens-container { padding: .45rem 0 !important; }
+    dk-basisgegevens-page dna-card > dna-card .gegevens-container:last-child { border-bottom: 0; }
+    /* Toestemmingen */
+    dk-toestemmings-antwoorden .answer-entry { margin: 0 !important; padding: .5rem 0 !important; border-bottom: 1px solid ${t.sepSoft}; align-items: center !important; line-height: 1.3 !important; }
+    dk-toestemmings-antwoorden .answer-entry:last-child { border-bottom: 0; }
+    dk-toestemmings-antwoorden .answer-entry .granted { color: ${t.green} !important; }
+    dk-toestemmings-antwoorden .answer-entry .denied { color: ${t.red} !important; }
+    dk-toestemmings-antwoorden .answer-entry .indeterminate { color: ${t.muted} !important; }
+    dk-toestemmings-antwoorden .answer-entry .info { color: ${t.muted} !important; }
+    dk-toestemmings-antwoorden .permission-type { font: 400 .9375rem/1.35 ${t.font}; color: ${t.fg}; }
+    dk-toestemmings-antwoorden .last-modified-message { color: ${t.muted} !important; font: 400 .75rem/1.3 ${t.font} !important; margin: .75rem 0 0 !important; }
+  `;
 }
 
 /* Binnen elke shadow root: dezelfde componentvariabelen (voor dna-knoppen en tabs die in de
@@ -1091,6 +1154,16 @@ function appleShadowCss(p, dark, accent) {
     :host(dna-link-card) .arrow > * { margin: 0 !important; }
     :host(att-attendance-dashboard) .wrapper { grid-template-rows: none !important; grid-auto-rows: 1fr !important; block-size: max-content !important; align-content: start !important; align-items: stretch !important; gap: 1.25rem !important; padding-block: 1.25rem !important; }
     .dna-card, .card { background: ${t.surface}; color: ${t.fg}; }
+    /* Leerlingkiezer in de kop van de leerlingkaart: grote naam, klas eronder */
+    :host(att-dk-student-selector) .selector { gap: .875rem !important; align-items: center !important; }
+    :host(att-dk-student-selector) .name { font: 700 1.5rem/1.2 ${t.font} !important; letter-spacing: -.02em; color: ${t.fg} !important; }
+    :host(att-dk-student-selector) .subtext { font: 400 .875rem/1.3 ${t.font} !important; color: ${t.muted} !important; }
+    :host(att-dk-student-selector) dna-avatar { --size: 48px !important; --_size: 48px !important; --background: ${t.tint} !important; --_background: ${t.tint} !important; --color: ${t.accent} !important; --_color: ${t.accent} !important; --font-weight: 600 !important; --_font-weight: 600 !important; }
+    :host(dna-tab-bar) .fade { background: transparent !important; box-shadow: none !important; }
+    /* Avatar met naam en hint eronder (profielkaart) */
+    :host(dna-avatar) .outer .inner { font: 600 1.125rem/1.3 ${t.font} !important; color: ${t.fg} !important; letter-spacing: -.01em; }
+    :host(dna-avatar) .outer .content { font: 400 .8125rem/1.3 ${t.font} !important; color: ${t.muted} !important; }
+    :host(dna-avatar) .picture { box-shadow: 0 0 0 .5px rgba(0,0,0,.06); }
   `;
 }
 

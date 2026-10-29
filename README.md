@@ -102,6 +102,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.11.0: leerlingkaart (detailkaarten) in de Apple-thema's: kop zonder wit vlak met grote naam en klas, tabbladen als capsules, kaarten in een gelijkmatig raster met gelijke hoogte, profielkaart met klas-chip en ronde actieknoppen, gegevens als rustige rijen, adres en contact als groepen in de kaart, toestemmingen met gekleurde vinkjes; werkt ook in de donkere varianten.
 - 0.10.1: Jarig toont nu de klas (stamklas, per leerling opgehaald zoals op de leerlingkaart) en klikken opent de leerlingkaart via Magisters eigen routering; op Vandaag staan de Mededelingen voortaan onder de agenda, zodat de rechterkolom korter is.
 - 0.10.0: module "Jarig": kaart op Vandaag met de (aankomende) jarige leerlingen uit Magisters eigen lijst (/api/leerlingen/jarigen, via je eigen sessie), gegroepeerd op vandaag, morgen en datum, met initialen, klas en leeftijd, klikbaar naar de leerlingkaart; instelbaar hoe ver vooruit (1 week, 2 weken, 1 maand); jarigen van vandaag staan ook als chip in de samenvatting.
 - 0.9.10: startscherm: dagkoppen per dag herkend (geen dubbele "Vandaag", vrijdag niet meer gedimd), labels "gewijzigd/vervallen" niet meer afgesneden, "niet verantwoord" als oranje stip, de eerstvolgende les licht op, en onder de datum een samenvattingsregel met lessen vandaag, volgende les, wijzigingen en de meldingen die aandacht vragen.
