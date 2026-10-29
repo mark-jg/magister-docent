@@ -431,6 +431,7 @@ function applePalette(p, dark, accent) {
     bg: p.bg, surface: p.surface, surface2: p.surface2, fg: p.fg, muted: p.muted, border: p.border,
     sep: dark ? "rgba(84, 84, 88, .65)" : "rgba(60, 60, 67, .29)",
     sepSoft: dark ? "rgba(84, 84, 88, .45)" : "rgba(60, 60, 67, .16)",
+    line: dark ? "#3A3A3C" : "#E3E3E8",
     sidebar: dark ? "#1C1C1E" : "#F2F2F7",
     hover: dark ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.045)",
     tint: rgba(accent, dark ? .22 : .12),
@@ -472,9 +473,29 @@ function appleTokens(t) {
     --dna-font-family-base: ${t.font} !important; --dna-font-family-header: ${t.font} !important;
     --dna-font-size-normal: .875rem !important; --dna-line-height-normal: 1.25rem !important;
     --dna-badge-border-radius: 6px !important;
+    /* SL-ontwerpsysteem (aanwezigheid, leerlingenlijst, roosters) */
+    --sl-elevation-surface-base-default: ${t.glass ? "transparent" : t.bg} !important;
+    --sl-elevation-surface-raised-default: ${t.surface} !important; --sl-elevation-surface-raised-alternative: ${t.surface2} !important; --sl-elevation-surface-raised-sunken: ${t.surface2} !important;
+    --sl-elevation-surface-raised-primary: ${t.accent} !important; --sl-elevation-surface-raised-inverted: ${t.fg} !important;
+    --sl-elevation-shadow-sm: ${t.card} !important; --sl-elevation-shadow-md: ${t.card} !important; --sl-elevation-shadow-lg: ${t.pop} !important; --sl-elevation-shadow-overlay: ${t.pop} !important; --sl-elevation-shadow-overflow: ${t.pop} !important;
+    --sl-color-border-plain: ${t.line} !important; --sl-color-border-neutral-plain: ${t.line} !important; --sl-color-border-accent-grey-plain: ${t.line} !important; --sl-color-border-accent-grey-faint: ${t.line} !important;
+    --sl-opacity-interactive-plain-hover: ${t.dark ? ".08" : ".05"} !important; --sl-opacity-interactive-plain-active: ${t.dark ? ".14" : ".1"} !important;
+    --sl-text-new-typeset-fontWeight-semiBold: 600 !important;
   `;
   return `
     :root, body { ${body} }
+    /* Omgekeerde (blauwe) paginakop en broodkruimels: rustig, zonder vlak */
+    dna-page-header, dna-page-header[invert] { --background-color: transparent !important; --inverted-background-color: transparent !important; --color: ${t.fg} !important; position: static !important; }
+    dna-breadcrumbs, dna-breadcrumb { --background: transparent !important; --border-color: transparent !important; --color: ${t.muted} !important; --link-color: ${t.muted} !important; --separator-color: ${t.border} !important; --box-shadow: none !important; --font-weight: 500 !important; }
+    /* Tegels (aanwezigheid e.d.) */
+    dna-link-card { --border-radius: 20px !important; --border-width: 0 !important; --border: 0 !important; --box-shadow: ${t.card} !important; background-color: ${t.surface} !important;
+      --arrow-background: ${t.accent} !important; --arrow-color: #fff !important; --arrow-size: 44px !important; --arrow-position: auto .875rem .875rem auto !important; --arrow-padding: 9px 0 0 11px !important;
+      --heading-font: 600 1.0625rem/1.5rem ${t.font} !important; --description-font: .875rem/1.25rem ${t.font} !important; --padding: 1.75rem 1.5rem !important;
+      --image-primary: ${rgba(t.accent, .3)} !important; --image-secondary: ${t.accent} !important; }
+    dna-link-card p { color: ${t.muted}; }
+    /* SL-rooster: geen grijze kop, geen celvlakken, lichte lijnen */
+    sl-grid { --_header-background: transparent !important; --_cell-background: transparent !important; --_border-radius: 12px !important; }
+    sl-grid::part(header) { color: ${t.muted}; font-weight: 600; font-size: .6875rem; letter-spacing: .04em; text-transform: uppercase; }
     dna-card { --border-radius: 14px !important; --border-width: 0 !important; --border: 0 !important; --box-shadow: ${t.card} !important; --background: ${t.surface} !important; --color: ${t.fg} !important; --header-padding: .875rem 1rem !important; --body-padding: 0 1rem 1rem !important; --feature: ${t.accent} !important; }
     dna-card-title, .dna-card-title { font-weight: 600 !important; font-size: 1.0625rem !important; letter-spacing: -.01em; color: ${t.fg} !important; }
     dna-page-header { --title-color: ${t.fg} !important; --title-font-weight: 700 !important; --title-font-size: 1.75rem !important; --title-line-height: 2.125rem !important; --subtitle-color: ${t.muted} !important; --highlight: ${t.accent} !important; letter-spacing: -.02em; }
@@ -624,6 +645,20 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     table.datagrid-table tr.current td, table.datagrid-table tr:hover.current td { background: ${rgba(accent, .09)} !important; }
     th { color: ${t.muted}; }
 
+    /* ---- Leerlingenlijst (op-leerlingen, in een iframe): tabel zonder celranden, filterkaart zonder rand ---- */
+    .zoeken-page, .left-side, .result-container, .table-container, .scroll-viewport { background: transparent !important; }
+    .table-container table, ll-result-table table { border: 0 !important; border-collapse: separate !important; border-spacing: 0 !important; }
+    .table-container th, ll-result-table th, .table-container .header-cell, ll-result-table .header-cell { background: ${t.surface} !important; border: 0 !important; border-bottom: 1px solid ${t.sepSoft} !important; color: ${t.muted} !important; font-weight: 600 !important; font-size: .6875rem !important; letter-spacing: .04em; text-transform: uppercase; }
+    .table-container td, ll-result-table td { background: transparent !important; border: 0 !important; border-bottom: 1px solid ${t.sepSoft} !important; color: ${t.fg} !important; font-size: .8125rem !important; }
+    .table-container tr:hover, ll-result-table tr:hover { background: ${t.hover} !important; }
+    .table-container tr:hover td, ll-result-table tr:hover td { background: transparent !important; }
+    .table-container tbody tr:last-child td, ll-result-table tbody tr:last-child td { border-bottom: 0 !important; }
+    .right-side ll-side-widget > dna-card, .filter-container dna-card, .filter-card { border: 0 !important; }
+    .filter-card::-webkit-scrollbar-thumb { background: ${t.dark ? "rgba(255,255,255,.22)" : "rgba(0,0,0,.2)"} !important; }
+    .dna-btn-link-primary, .dna-filter-group-toggle { background: transparent !important; color: ${t.accent} !important; box-shadow: none !important; padding-left: 0 !important; font-weight: 500 !important; }
+    .dna-filter-group-option { color: ${t.fg} !important; }
+    .filters-loading dna-spinner { color: ${t.accent} !important; }
+
     /* ---- Velden en knoppen (oude schermen) ---- */
     .container input[type=email], .container input[type=number], .container input[type=password], .container input[type=search], .container input[type=tel], .container input[type=text], .container textarea, .container select, .dna-text-input, .dna-input-group {
       background: ${t.surface} !important; border: 1px solid ${t.border} !important; border-radius: 8px !important; color: ${t.fg} !important; font: 400 .8125rem/1.25rem ${t.font} !important; padding: 0 10px !important; transition: box-shadow .12s, border-color .12s;
@@ -699,6 +734,10 @@ function glassCss(t, top) {
     dna-card { --background: linear-gradient(180deg, ${t.dark ? "rgba(255,255,255,.07)" : "rgba(255,255,255,.55)"}, transparent 40%), ${t.glassBg} !important; --border-radius: 20px !important; --box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; -webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur}; }
     .widget > .content-pane, .widget > .preview-pane, .dna-card, .dna-card-list, dna-accordion-item { ${glass} background: linear-gradient(180deg, ${t.dark ? "rgba(255,255,255,.07)" : "rgba(255,255,255,.55)"}, transparent 40%), ${t.glassBg} !important; border-radius: 20px !important; }
     dna-accordion-item { --background: ${t.glassBg} !important; --border-radius: 20px !important; --box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; }
+    dna-link-card { background-color: ${t.glassBg} !important; --box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; -webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur}; }
+    dna-link-card:hover { --box-shadow: ${t.glassEdge}, 0 24px 60px rgba(31,41,61,.18) !important; }
+    .table-container th, ll-result-table th, .table-container .header-cell, ll-result-table .header-cell { background: ${t.glassStrong} !important; -webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur}; }
+    sl-grid { --_header-background: ${t.glassStrong} !important; }
     .widget > .content-pane .content, .widget > .preview-pane .content, .widget > .content-pane > .content, .widget > .preview-pane > .content, .widget > .content-pane h3, uib-accordion, .list li, .dna-card-list-item,
     table.datagrid-table th, table.datagrid-table thead th, table.datagrid-table tfoot td, table.datagrid-table td { background: transparent !important; }
     .list li:hover, table.datagrid-table tr:hover td { background: ${t.dark ? "rgba(255,255,255,.06)" : "rgba(255,255,255,.5)"} !important; }
