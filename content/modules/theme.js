@@ -31,6 +31,8 @@ DT.register({
     /* Apple: systeemkleuren en -lettertype uit de Human Interface Guidelines, zachte hoeken,
      * scheidingslijnen in plaats van randen, doorschijnende balken (look: "apple"). */
     apple:      { label: "Apple (licht)",              dark: false, accent: "#007AFF", bg: "#F2F2F7", surface: "#FFFFFF", surface2: "#F5F5F7", border: "#D1D1D6", fg: "#1D1D1F", muted: "#6E6E73", link: "#007AFF", font: "apple", radius: "10px", look: "apple" },
+    appleGlass: { label: "Apple Glass (licht)",        dark: false, accent: "#007AFF", bg: "#EEF1F8", surface: "#FFFFFF", surface2: "#F2F2F7", border: "#D1D1D6", fg: "#1D1D1F", muted: "#6E6E73", link: "#007AFF", font: "apple", radius: "14px", look: "apple", glass: true },
+    appleGlassDonker: { label: "Apple Glass (donker)", dark: true,  accent: "#0A84FF", bg: "#16161C", surface: "#2C2C2E", surface2: "#3A3A3C", border: "#48484A", fg: "#F5F5F7", muted: "#98989D", link: "#0A84FF", font: "apple", radius: "14px", look: "apple", glass: true, darkStyle: "tokens" },
     appleDonker:{ label: "Apple (donker)",             dark: true,  accent: "#0A84FF", bg: "#1C1C1E", surface: "#2C2C2E", surface2: "#3A3A3C", border: "#48484A", fg: "#F5F5F7", muted: "#98989D", link: "#0A84FF", font: "apple", radius: "10px", look: "apple", darkStyle: "tokens" },
     custom:     { label: "Eigen accentkleur",    dark: null }
   },
@@ -432,7 +434,15 @@ function applePalette(p, dark, accent) {
     gray6: dark ? "#3A3A3C" : "#E5E5EA",
     red: dark ? "#FF453A" : "#FF3B30", orange: dark ? "#FF9F0A" : "#FF9500", green: dark ? "#30D158" : "#34C759",
     focus: `0 0 0 3px ${rgba(accent, .35)}`,
-    font: FONTS.apple
+    font: FONTS.apple,
+    glass: Boolean(p.glass),
+    // Liquid Glass: doorschijnend materiaal met vervaging en een lichtrand bovenaan
+    glassBg: dark ? "rgba(44, 44, 46, .55)" : "rgba(255, 255, 255, .55)",
+    glassStrong: dark ? "rgba(44, 44, 46, .78)" : "rgba(255, 255, 255, .8)",
+    glassSide: dark ? "rgba(28, 28, 30, .55)" : "rgba(255, 255, 255, .45)",
+    glassEdge: dark ? "inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 0 .5px rgba(255,255,255,.1)" : "inset 0 1px 0 rgba(255,255,255,.85), inset 0 0 0 .5px rgba(255,255,255,.55)",
+    glassShadow: dark ? "0 12px 40px rgba(0,0,0,.45)" : "0 10px 36px rgba(31, 41, 61, .10)",
+    blur: "saturate(180%) blur(28px)"
   };
 }
 
@@ -474,7 +484,7 @@ function appleTokens(t) {
   `;
 }
 
-function appleCss(p, dark, accent) {
+function appleCss(p, dark, accent, top = (typeof window === "undefined" || window === window.top)) {
   const t = applePalette(p, dark, accent);
   return appleTokens(t) + `
     /* ---- Basis ---- */
@@ -628,7 +638,7 @@ function appleCss(p, dark, accent) {
     ::-webkit-scrollbar-thumb { background: ${dark ? "rgba(255,255,255,.22)" : "rgba(0,0,0,.2)"}; border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
     ::-webkit-scrollbar-track { background: transparent; }
     :root { --dt-shadow: ${t.pop}; --dt-radius: 12px; }
-  `;
+  ` + (t.glass ? glassCss(t, top) : "");
 }
 
 /* Binnen elke shadow root: dezelfde componentvariabelen (voor dna-knoppen en tabs die in de
@@ -638,6 +648,61 @@ function appleShadowCss(p, dark, accent) {
   return appleTokens(t).replace(":root, body {", ":host {") + `
     :host(dna-page-header) .title { letter-spacing: -.02em; }
     .dna-card, .card { background: ${t.surface}; color: ${t.fg}; }
+  `;
+}
+
+/* Liquid Glass-laag: komt ná de basisregels in de cascade en overschrijft die met !important.
+ * De achtergrond krijgt een zachte kleurwas zodat het glas iets te laten doorschijnen heeft;
+ * in iframes is de body doorzichtig, zodat de was van de hoofdpagina doorloopt. */
+function glassCss(t, top) {
+  const a = t.accent;
+  const wash = t.dark
+    ? `radial-gradient(70% 55% at 12% 0%, ${rgba(a, .28)} 0%, transparent 60%), radial-gradient(55% 45% at 95% 100%, rgba(191, 90, 242, .20) 0%, transparent 60%), radial-gradient(40% 35% at 70% 25%, rgba(48, 209, 88, .08) 0%, transparent 60%), linear-gradient(160deg, #15151b 0%, #1b1b22 100%)`
+    : `radial-gradient(70% 55% at 10% 0%, ${rgba(a, .26)} 0%, transparent 60%), radial-gradient(55% 45% at 95% 100%, rgba(175, 82, 222, .20) 0%, transparent 60%), radial-gradient(45% 40% at 70% 20%, rgba(255, 149, 0, .10) 0%, transparent 60%), radial-gradient(40% 35% at 40% 90%, rgba(48, 209, 88, .10) 0%, transparent 60%), linear-gradient(160deg, #e9eef9 0%, #f1edf8 55%, #e8f1f4 100%)`;
+  const glass = `background: ${t.glassBg} !important; -webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur}; box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; border: 0 !important;`;
+  return `
+    /* Achtergrond: kleurwas (hoofdpagina) of doorzichtig (iframe) */
+    ${top ? `html, body { background: ${wash} !important; background-attachment: fixed !important; }` : `html, body { background: transparent !important; }`}
+    .container > ui-view, ui-view[name="main"], ui-view[name="main"] > *, .strip-padding, section.main, .container, #guest-app-frame, mg-guest-app, mg-guest-app .fill-viewport { background: transparent !important; }
+    /* Zijbalk en iconenrail als glas */
+    .appbar-host, .menu-host { ${glass} border-right: 1px solid ${t.dark ? "rgba(255,255,255,.08)" : "rgba(255,255,255,.6)"} !important; background: ${t.glassSide} !important; }
+    nav.menu, .menu-host nav.menu, .container > nav.menu, .menu-container, .menu-footer, .appbar, mg-appbar, .menu-footer a { background: transparent !important; }
+    ul.main-menu > li.active > a, ul.main-menu li[class*="active"] > a, ul.main-menu li a[class*="active"], ul.main-menu li[class*="selected"] > a {
+      background: linear-gradient(180deg, ${rgba(a, .92)}, ${rgba(a, 1)}) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 6px 16px ${rgba(a, .35)} !important;
+    }
+    ul.main-menu > li > a:hover { background: ${t.dark ? "rgba(255,255,255,.08)" : "rgba(255,255,255,.55)"} !important; }
+    /* Kaarten en vlakken */
+    dna-card { --background: ${t.glassBg} !important; --border-radius: 20px !important; --box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; -webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur}; }
+    .widget > .content-pane, .widget > .preview-pane, .dna-card, .dna-card-list, dna-accordion-item { ${glass} border-radius: 20px !important; }
+    dna-accordion-item { --background: ${t.glassBg} !important; --border-radius: 20px !important; --box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; }
+    .widget > .content-pane .content, .widget > .preview-pane .content, .widget > .content-pane > .content, .widget > .preview-pane > .content, .widget > .content-pane h3, uib-accordion, .list li, .dna-card-list-item,
+    table.datagrid-table th, table.datagrid-table thead th, table.datagrid-table tfoot td, table.datagrid-table td { background: transparent !important; }
+    .list li:hover, table.datagrid-table tr:hover td { background: ${t.dark ? "rgba(255,255,255,.06)" : "rgba(255,255,255,.5)"} !important; }
+    .list li.current, table.datagrid-table tr.current td { background: ${rgba(a, .18)} !important; }
+    .list li.active, .list li.selected, .list li.current-item, table.datagrid-table tr.selected td { background: ${rgba(a, .12)} !important; }
+    /* Kopbalk van detailkaarten en popovers als glas */
+    dna-head-bar, .dna-head-bar, .head-bar { ${glass} border-radius: 16px !important; margin-bottom: .5rem; }
+    .popup-menu, .collapsed-menu .popup-menu, .appbar .popup-menu, .appbar-flyout-menu, .collapsed-menu .main-menu > li.active > ul, .dialog, .modal-content, mg-dialog .dialog {
+      background: ${t.glassStrong} !important; -webkit-backdrop-filter: saturate(180%) blur(40px); backdrop-filter: saturate(180%) blur(40px); box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; border-radius: 18px !important;
+    }
+    dna-menu, dna-overlay, dna-dialog { --background: ${t.glassStrong} !important; --box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; --border-radius: 18px !important; -webkit-backdrop-filter: saturate(180%) blur(40px); backdrop-filter: saturate(180%) blur(40px); }
+    dna-select, dna-list-box, dna-input { --background: ${t.glassStrong} !important; --box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; }
+    /* Capsules: knoppen, tabbladen, chips, velden */
+    dna-button { --border-radius: 999px !important; --padding-h: 1rem !important; }
+    .dna-btn, button[class*="primary"], .btn-primary, input[type="submit"] { border-radius: 999px !important; }
+    .dna-btn-primary, button[class*="primary"], .btn-primary, input[type="submit"] { background: linear-gradient(180deg, ${rgba(a, .9)}, ${a}) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 6px 16px ${rgba(a, .35)} !important; }
+    .dna-btn:not(.dna-btn-primary) { background: ${t.dark ? "rgba(255,255,255,.1)" : "rgba(255,255,255,.65)"} !important; box-shadow: ${t.glassEdge} !important; color: ${t.fg} !important; }
+    dna-tab-bar { background: ${t.dark ? "rgba(255,255,255,.08)" : "rgba(120,120,128,.14)"} !important; border-radius: 999px !important; padding: 3px !important; box-shadow: ${t.glassEdge} !important; }
+    dna-tab { --border-radius: 999px !important; }
+    dna-tab[selected] { --background: ${t.dark ? "rgba(90,90,96,.85)" : "rgba(255,255,255,.92)"} !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 2px 8px rgba(0,0,0,.14) !important; }
+    span.nrblock, .list li .special, .list li span.special { border-radius: 999px !important; }
+    .container input[type=email], .container input[type=number], .container input[type=password], .container input[type=search], .container input[type=tel], .container input[type=text], .container textarea, .container select, .dna-text-input, .dna-input-group {
+      background: ${t.dark ? "rgba(255,255,255,.07)" : "rgba(255,255,255,.6)"} !important; border-color: ${t.dark ? "rgba(255,255,255,.12)" : "rgba(255,255,255,.8)"} !important; border-radius: 12px !important; box-shadow: ${t.glassEdge} !important;
+    }
+    .container .search input, .search input { background: ${t.dark ? "rgba(255,255,255,.1)" : "rgba(120,120,128,.14)"} !important; border-radius: 999px !important; }
+    .dna-snack-bar { background: ${t.dark ? "rgba(58,58,60,.85)" : "rgba(29,29,31,.85)"} !important; -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border-radius: 18px !important; }
+    /* Eigen UI van de extensie */
+    :root { --dt-radius: 16px; }
   `;
 }
 
