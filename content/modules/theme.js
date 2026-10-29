@@ -582,7 +582,9 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     section.main, section.dna-main-no-subheader, ui-view[name="main"] > * > section { background: transparent !important; box-shadow: none !important; border: 0 !important; }
     .head-bar h1, ui-view[name="main"] h1 { color: ${t.fg} !important; font: 700 1.75rem/2.125rem ${t.font} !important; letter-spacing: -.02em; }
     .head-bar h1:after { background: ${t.accent} !important; }
-    .head-bar { color: ${t.fg} !important; }
+    .head-bar, .page-header, [class*="page-header"], header:not(#dt-panel *), .main-header, .detail-header, [class*="detail-header"] { box-shadow: none !important; border: 0 !important; background: transparent !important; color: ${t.fg} !important; }
+    .head-bar div a i.ico { background: ${t.tint} !important; color: ${t.accent} !important; transition: background .12s; }
+    .head-bar div a:hover i.ico { background: ${t.tintStrong} !important; }
     .head-bar .tabs li a { color: ${t.muted} !important; }
 
     /* ---- Oude widgets (Tahoma 11px) ---- */
@@ -666,7 +668,7 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     /* ---- Agenda (FullCalendar) in de stijl van Apple Agenda ---- */
     #calendar { background: ${t.surface} !important; border-radius: 14px; box-shadow: ${t.card}; overflow: hidden; }
     #calendar .fc-agenda-view, #calendar .fc-view-container, #calendar .fc-basic-view { background: ${t.surface} !important; }
-    #calendar .fc-toolbar { background: transparent !important; border-bottom: 1px solid ${t.sepSoft}; height: 44px !important; line-height: 44px !important; }
+    #calendar .fc-toolbar { background: transparent !important; border-bottom: 1px solid ${t.sepSoft}; height: 44px !important; line-height: 44px !important; margin: 0 !important; }
     .fc-toolbar button { color: ${t.muted} !important; font: 500 .8125rem/44px ${t.font} !important; height: 44px !important; }
     .fc-toolbar button:hover { color: ${t.accent} !important; }
     .fc-toolbar button.fc-next-button:after, .fc-toolbar button.fc-prev-button:before { color: ${t.accent} !important; }
@@ -682,7 +684,7 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     /* Afspraken: zachte tint met een gekleurde linkerrand, afgerond, zonder kader */
     #calendar .fc-event, #calendar .fc-time-grid-event, #calendar .fc-day-grid-event { background: ${rgba(accent, t.dark ? .22 : .13)} !important; border: 0 !important; border-left: 3px solid ${t.accent} !important; border-radius: 6px !important; color: ${t.fg} !important; box-shadow: none !important; }
     #calendar .fc-event .fc-bg { display: none; }
-    #calendar .fc-time-grid-event .fc-title, #calendar .fc-time-grid-event .event-description, #calendar .fc-time-grid-event .event-description-content, #calendar .fc-time-grid-event .event-description-content-examen, #calendar .fc-h-event .fc-content { color: ${t.fg} !important; font: 500 .75rem/1.2 ${t.font} !important; }
+    #calendar .fc-time-grid-event .fc-title, #calendar .fc-time-grid-event .event-description, #calendar .fc-time-grid-event .event-description-content, #calendar .fc-time-grid-event .event-description-content-examen, #calendar .fc-h-event .fc-content { color: ${t.dark ? mix(accent, "#ffffff", .55) : mix(accent, "#000000", .45)} !important; font: 500 .75rem/1.2 ${t.font} !important; }
     #calendar .fc-time-grid-event .fc-time { color: ${t.muted} !important; font-size: .6875rem !important; }
     #calendar .fc-time-grid-event .nrblock, #calendar .fc-time-grid-event .calendar-event .nrblock { background: ${t.accent} !important; color: #fff !important; box-shadow: none !important; border-radius: 6px !important; font: 600 .6875rem/18px ${t.font} !important; height: 18px !important; }
     .fc-day-grid-event.current-event, .fc-time-grid-event.current-event { background: ${rgba(accent, t.dark ? .38 : .26)} !important; }
@@ -696,7 +698,10 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     div.calendar table th, div[uib-datepicker] table th { color: ${t.muted} !important; font: 600 .6875rem/30px ${t.font} !important; text-transform: uppercase; letter-spacing: .04em; }
     div.calendar table tr:first-child th, div[uib-datepicker] table tr:first-child th { background: transparent !important; border: 0 !important; height: 40px !important; line-height: 40px !important; color: ${t.fg} !important; font: 600 .875rem/40px ${t.font} !important; text-transform: none; letter-spacing: 0; }
     div.calendar table td em, div[uib-datepicker] table td em { background: transparent !important; color: ${t.muted} !important; font-weight: 500 !important; font-size: .6875rem; }
-    div.calendar button, div[uib-datepicker] button { font: 500 .75rem/28px ${t.font} !important; color: ${t.fg} !important; height: 28px !important; width: 28px !important; margin: 1px auto !important; border-radius: 50% !important; transition: background .12s; }
+    div.calendar button, div[uib-datepicker] button { font: 500 .75rem/28px ${t.font} !important; color: ${t.fg} !important; transition: background .12s; }
+    div.calendar td button, div[uib-datepicker] td button { height: 28px !important; width: 28px !important; margin: 1px auto !important; border-radius: 50% !important; }
+    div.calendar th button, div[uib-datepicker] th button { height: 32px !important; line-height: 32px !important; width: 100% !important; border-radius: 8px !important; white-space: nowrap; }
+    div.calendar tr:first-child th button, div[uib-datepicker] tr:first-child th button { font: 600 .875rem/32px ${t.font} !important; color: ${t.fg} !important; }
     div.calendar button:hover, div[uib-datepicker] button:hover { background: ${t.hover} !important; }
     div.calendar button.active, div[uib-datepicker] button.active { background: ${t.accent} !important; color: #fff !important; font-weight: 600 !important; }
     div.calendar button.active + td, div[uib-datepicker] button.active + td { background: transparent !important; }
@@ -704,7 +709,7 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     div.calendar td.mg-today button.active, div[uib-datepicker] td.mg-today button.active { color: #fff !important; }
     div.calendar .mg-date-range, div[uib-datepicker] .mg-date-range { background: ${rgba(accent, .12)} !important; }
     div.calendar .text-muted, div[uib-datepicker] .text-muted, div.calendar button .text-muted { color: ${t.border} !important; }
-    div.calendar button.pull-left, div.calendar button.pull-right, div[uib-datepicker] button.pull-left, div[uib-datepicker] button.pull-right { width: 40px !important; border-radius: 8px !important; }
+    div.calendar button.pull-left, div.calendar button.pull-right, div[uib-datepicker] button.pull-left, div[uib-datepicker] button.pull-right { width: 36px !important; border-radius: 8px !important; }
     div.calendar i.glyphicon, div[uib-datepicker] i.glyphicon { background: transparent !important; border: 0 !important; color: ${t.accent} !important; }
     div.calendar + footer a, div[uib-datepicker] + footer a, footer.endlink a.left { color: ${t.accent} !important; font-weight: 500; }
     /* Keuzelijsten in het Overzicht-paneel */
