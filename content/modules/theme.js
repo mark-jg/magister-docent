@@ -212,7 +212,7 @@ DT.register({
     const p = this.preset(DT);
     const mode = p.look ? (DT.settings.theme.agendaKleur || "vak") : "geen";
     agendaColorPass(document, mode, this.isDark(DT));
-    if (p.look) agendaToolbarPass(document);
+    if (p.look) { agendaToolbarPass(document); dashboardPass(document, this.isDark(DT)); }
   },
 
   /* Themavariabelen ook binnen elke shadow root zetten (componenten die ze op :host herdefiniëren). */
@@ -490,6 +490,51 @@ function agendaToolbarPass(root) {
   }
 }
 
+/* Startscherm: notificaties als widgets. Leest aantal en tekst, kiest een soort (icoon + kleur)
+ * op trefwoorden en zet een klein svg-icoon in de rij; de CSS maakt er tegels van. */
+const DASH_KINDS = [
+  [/logboek/i, "boek", ["#007AFF", "#0A84FF"]],
+  [/verantwoord/i, "vink", ["#34C759", "#30D158"]],
+  [/ziek/i, "thermo", ["#FF9500", "#FF9F0A"]],
+  [/terug/i, "terug", ["#5856D6", "#5E5CE6"]],
+  [/toets/i, "kruis", ["#FF3B30", "#FF453A"]],
+  [/ouderavond|gesprek/i, "mensen", ["#00A99D", "#63E6E2"]],
+  [/deadline/i, "klok", ["#FF2D55", "#FF375F"]],
+  [/ingeleverd/i, "inbox", ["#AF52DE", "#BF5AF2"]],
+  [/opdracht/i, "doc", ["#5856D6", "#5E5CE6"]],
+  [/./, "stip", ["#8E8E93", "#98989D"]]
+];
+const DASH_ICON = {
+  boek: '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5V5.5M20 18v3H6.5"/>',
+  vink: '<circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/>',
+  thermo: '<path d="M10 4a2 2 0 0 1 4 0v9.5a4 4 0 1 1-4 0z"/><path d="M12 10v6"/>',
+  terug: '<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
+  kruis: '<circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/>',
+  mensen: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M16 15.5a5 5 0 0 1 5.5 4.5"/>',
+  klok: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  inbox: '<path d="M4 13V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7"/><path d="M4 13h4l2 3h4l2-3h4v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/>',
+  doc: '<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>',
+  stip: '<circle cx="12" cy="12" r="4"/>'
+};
+function dashboardPass(root, dark) {
+  const rows = root.querySelectorAll("#vandaag-notificatie .list li.item, sm-notificatie-widget2 .list li.item");
+  for (const li of rows) {
+    const a = li.querySelector("a"); if (!a) continue;
+    const cnt = (li.querySelector(".special")?.textContent || "").trim();
+    const text = [...a.querySelectorAll("span")].filter((x) => !x.classList.contains("special")).map((x) => x.textContent).join(" ").trim();
+    const [, kind, col] = DASH_KINDS.find(([re]) => re.test(text)) || DASH_KINDS[DASH_KINDS.length - 1];
+    const n = parseInt(cnt, 10);
+    li.dataset.dtN = isNaN(n) ? "" : (n > 0 ? "1" : "0");
+    li.dataset.dtKind = kind;
+    li.style.setProperty("--k", dark ? col[1] : col[0]);
+    if (!a.querySelector(".dt-dash-ico")) {
+      const ico = document.createElement("span"); ico.className = "dt-dash-ico";
+      ico.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${DASH_ICON[kind]}</svg>`;
+      a.prepend(ico);
+    }
+  }
+}
+
 /* ---------- Apple-look ----------
  * Gebouwd op Magisters eigen selectors (op-shell, magister-lvs, op-detailkaarten) en op de
  * CSS-variabelen van de dna-webcomponenten, naar de Human Interface Guidelines:
@@ -724,6 +769,21 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     span.nrblock { background: ${t.tint} !important; color: ${t.accent} !important; border-radius: 6px !important; font: 600 .75rem/20px ${t.font} !important; height: 20px !important; min-width: 20px !important; padding: 0 6px !important; }
     ag-lesblok-wijziging > span { color: ${t.muted} !important; font: 500 .6875rem/20px ${t.font} !important; background: ${t.gray6}; border-radius: 999px; padding: 0 8px; margin: 0 !important; }
     ag-lesblok-wijziging > span:empty { display: none !important; }
+    /* Notificaties als widget-raster */
+    #vandaag-notificatie .list, sm-notificatie-widget2 .list { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 2px 0 4px; }
+    #vandaag-notificatie .list li.item, sm-notificatie-widget2 .list li.item { --k: ${t.muted}; height: auto !important; line-height: 1.2 !important; border: 0 !important; border-radius: 14px !important; background: ${t.dark ? "rgba(255,255,255,.05)" : "rgba(60,60,67,.05)"} !important; white-space: normal !important; overflow: hidden; transition: background .12s, transform .12s; }
+    #vandaag-notificatie .list li.item::after, sm-notificatie-widget2 .list li.item::after { display: none !important; }
+    #vandaag-notificatie .list li.item:hover, sm-notificatie-widget2 .list li.item:hover { background: ${t.dark ? "rgba(255,255,255,.09)" : "rgba(60,60,67,.09)"} !important; transform: translateY(-1px); }
+    #vandaag-notificatie .list li.item[data-dt-n="1"], sm-notificatie-widget2 .list li.item[data-dt-n="1"] { background: color-mix(in srgb, var(--k) ${t.dark ? "22%" : "12%"}, ${t.surface}) !important; }
+    #vandaag-notificatie .list li.item[data-dt-n="1"]:hover, sm-notificatie-widget2 .list li.item[data-dt-n="1"]:hover { background: color-mix(in srgb, var(--k) ${t.dark ? "30%" : "18%"}, ${t.surface}) !important; }
+    #vandaag-notificatie .list li.item a, sm-notificatie-widget2 .list li.item a { display: grid !important; grid-template-columns: 1fr auto; grid-template-areas: "ico num" "txt txt"; align-items: start; gap: 6px 8px; padding: 12px 14px 12px !important; height: auto !important; white-space: normal !important; }
+    #vandaag-notificatie .list li.item a::after, sm-notificatie-widget2 .list li.item a::after { display: none !important; }
+    #vandaag-notificatie .list li.item .dt-dash-ico, sm-notificatie-widget2 .list li.item .dt-dash-ico { grid-area: ico; width: 30px; height: 30px; border-radius: 50%; display: inline-grid; place-items: center; background: color-mix(in srgb, var(--k) 16%, ${t.surface}); color: var(--k); }
+    #vandaag-notificatie .list li.item[data-dt-n="1"] .dt-dash-ico, sm-notificatie-widget2 .list li.item[data-dt-n="1"] .dt-dash-ico { background: var(--k); color: #fff; }
+    #vandaag-notificatie .list li.item .special, sm-notificatie-widget2 .list li.item .special, #vandaag-notificatie .list li.item span.special { grid-area: num; background: transparent !important; color: ${t.muted} !important; font: 700 1.625rem/1 ${t.font} !important; letter-spacing: -.02em; height: auto !important; min-width: 0 !important; padding: 0 !important; margin: 0 !important; justify-self: end; align-self: start; }
+    #vandaag-notificatie .list li.item[data-dt-n="1"] .special, sm-notificatie-widget2 .list li.item[data-dt-n="1"] .special { color: var(--k) !important; }
+    #vandaag-notificatie .list li.item a > span:not(.special):not(.dt-dash-ico), sm-notificatie-widget2 .list li.item a > span:not(.special):not(.dt-dash-ico) { grid-area: txt; font: 500 .75rem/1.25 ${t.font} !important; color: ${t.muted} !important; white-space: normal !important; overflow: visible !important; line-height: 1.25 !important; }
+    #vandaag-notificatie .list li.item[data-dt-n="1"] a > span:not(.special):not(.dt-dash-ico), sm-notificatie-widget2 .list li.item[data-dt-n="1"] a > span:not(.special):not(.dt-dash-ico) { color: ${t.fg} !important; }
     #vandaag-notificatie .list li a::after, vandaag-panel-content .list li a::after { content: ""; margin-left: auto; width: 7px; height: 7px; border-right: 1.5px solid ${t.border}; border-bottom: 1.5px solid ${t.border}; transform: rotate(-45deg); flex: 0 0 auto; }
     #vandaag-notificatie .list li:hover a::after, vandaag-panel-content .list li:hover a::after { border-color: ${t.muted}; }
     .list li .special, .list li span.special, ul.list div a .special { display: inline-flex !important; align-items: center; justify-content: center; float: none !important; width: auto !important; min-width: 1.5rem; height: 1.375rem !important; padding: 0 .5rem; margin: 0 .25rem 0 0 !important; border-radius: 999px; background: ${t.tint}; color: ${t.accent}; font-weight: 600; font-size: .75rem; line-height: 1 !important; text-align: center; }

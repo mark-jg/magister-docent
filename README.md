@@ -101,6 +101,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.9.8: notificaties op het startscherm als widget-raster in Apple-stijl: tegels met groot getal, icoon in een getinte cirkel en het onderwerp eronder; meldingen boven nul lichten op in een eigen kleur (logboeken blauw, verantwoorden groen, ziek oranje, terugkomen indigo, toets gemist rood, ouderavond teal, deadline roze, ingeleverd paars), nul-meldingen rustig grijs.
 - 0.9.7: menu-items met een afbeelding als icoon (Cijfers, ELO) krijgen in de Apple-thema's ook het accentblauw, wit bij het actieve item.
 - 0.9.6: agenda: de knoppen vorige/volgende staan in de titelrij naast Magisters ronde knoppen, de schaduw onder "Hele dag" is weg.
 - 0.9.5: agenda ruimer: hogere uurrijen en grotere afspraaktekst; navigatie als twee ronde pijlknoppen rechtsboven, geen lijnen rond dagkoppen en "Hele dag"; rechterpaneel als losse kaarten op de achtergrond met de segmentknop erboven.
