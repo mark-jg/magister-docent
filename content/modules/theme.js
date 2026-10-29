@@ -492,17 +492,18 @@ function appleTokens(t) {
   `;
   return `
     :root, body { ${body} }
+  ` + withPrivateTwins(`
     /* Omgekeerde (blauwe) paginakop en broodkruimels: rustig, zonder vlak */
     dna-page-header, dna-page-header[invert] { --background-color: transparent !important; --inverted-background-color: transparent !important; --color: ${t.fg} !important; position: static !important; }
     dna-breadcrumbs, dna-breadcrumb { --background: transparent !important; --border-color: transparent !important; --color: ${t.muted} !important; --link-color: ${t.muted} !important; --separator-color: ${t.border} !important; --box-shadow: none !important; --font-weight: 500 !important; }
     /* Tegels (aanwezigheid e.d.) */
     dna-link-card { --border-radius: 20px !important; --border-width: 0 !important; --border: 0 !important; --box-shadow: ${t.card} !important; background-color: ${t.surface} !important;
-      --arrow-background: ${t.accent} !important; --arrow-color: #fff !important; --arrow-size: 44px !important; --arrow-position: auto .875rem .875rem auto !important; --arrow-padding: 9px 0 0 11px !important;
-      --heading-font: 600 1.0625rem/1.5rem ${t.font} !important; --description-font: .875rem/1.25rem ${t.font} !important; --padding: 1.75rem 1.5rem !important;
+      --arrow-background: ${t.accent} !important; --arrow-color: #fff !important; --arrow-size: 40px !important; --arrow-position: auto .875rem .875rem auto !important; --arrow-padding: 8px 0 0 10px !important;
+      --heading-font: 600 1.0625rem/1.5rem ${t.font} !important; --description-font: .8125rem/1.25rem ${t.font} !important; --padding: 1.5rem 1.25rem 3.25rem !important;
       --image-primary: ${rgba(t.accent, .3)} !important; --image-secondary: ${t.accent} !important; }
     dna-link-card p { color: ${t.muted}; }
-    dna-link-card { --image-size: 3.5rem !important; transition: transform .18s ease, box-shadow .18s ease; }
-    dna-link-card:hover { transform: translateY(-2px); --box-shadow: ${t.pop} !important; }
+    dna-link-card { --image-size: 3.5rem !important; --_image-size: 3.5rem !important; aspect-ratio: auto !important; min-block-size: 13rem; transition: transform .18s ease, box-shadow .18s ease; }
+    dna-link-card:hover { transform: translateY(-2px); --box-shadow: ${t.pop} !important; --_box-shadow: ${t.pop} !important; }
     dna-link-card h1 { color: ${t.fg}; }
     /* SL-rooster: geen grijze kop, geen celvlakken, lichte lijnen */
     sl-grid { --_header-background: transparent !important; --_cell-background: transparent !important; --_border-radius: 12px !important; }
@@ -521,7 +522,14 @@ function appleTokens(t) {
     dna-dialog { --border-radius: 14px !important; --border-width: 0 !important; --border: 0 !important; --box-shadow: ${t.pop} !important; --heading-font: 600 1.0625rem/1.5rem ${t.font} !important; }
     dna-accordion-item { --border-radius: 12px !important; --border-color: transparent !important; --background: ${t.surface} !important; --box-shadow: ${t.card} !important; }
     dna-badge { --border-radius: 6px !important; }
-  `;
+  `);
+}
+
+/* Nieuwere dna-componenten (zoals die van de aanwezigheidsapp) lezen privévariabelen met een
+ * underscore (--_border-radius) in plaats van de publieke naam (--border-radius). Elke publieke
+ * variabele in de componentregels krijgt daarom een tweeling met underscore. */
+function withPrivateTwins(css) {
+  return css.replace(/(--)(?!dna-|sl-|_)([a-z0-9-]+)\s*:([^;{}]+);/g, (m, p, name, val) => `${m} --_${name}:${val};`);
 }
 
 function appleCss(p, dark, accent, top = (typeof window === "undefined" || window === window.top)) {
@@ -806,8 +814,8 @@ function glassCss(t, top) {
     dna-card { --background: linear-gradient(180deg, ${t.dark ? "rgba(255,255,255,.07)" : "rgba(255,255,255,.55)"}, transparent 40%), ${t.glassBg} !important; --border-radius: 20px !important; --box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; -webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur}; }
     .widget > .content-pane, .widget > .preview-pane, .dna-card, .dna-card-list, dna-accordion-item { ${glass} background: linear-gradient(180deg, ${t.dark ? "rgba(255,255,255,.07)" : "rgba(255,255,255,.55)"}, transparent 40%), ${t.glassBg} !important; border-radius: 20px !important; }
     dna-accordion-item { --background: ${t.glassBg} !important; --border-radius: 20px !important; --box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; }
-    dna-link-card { background-color: ${t.glassBg} !important; --box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; -webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur}; }
-    dna-link-card:hover { --box-shadow: ${t.glassEdge}, 0 24px 60px rgba(31,41,61,.18) !important; }
+    dna-link-card { background-color: ${t.glassBg} !important; --box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; --_box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; -webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur}; }
+    dna-link-card:hover { --box-shadow: ${t.glassEdge}, 0 24px 60px rgba(31,41,61,.18) !important; --_box-shadow: ${t.glassEdge}, 0 24px 60px rgba(31,41,61,.18) !important; }
     .table-container th, ll-result-table th, .table-container .header-cell, ll-result-table .header-cell { background: ${t.glassStrong} !important; -webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur}; }
     sl-grid { --_header-background: ${t.glassStrong} !important; }
     #calendar, #calendar .fc-agenda-view, #calendar .fc-view-container, #calendar .fc-basic-view, .table-container, .scroll-viewport { background: ${t.glassBg} !important; }

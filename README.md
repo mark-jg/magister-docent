@@ -101,6 +101,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.8.10: nieuwere dna-componenten (o.a. de aanwezigheidsapp) lezen privévariabelen met underscore; elke componentvariabele van het thema krijgt nu een tweeling met underscore, waardoor paginakop, broodkruimels en tegels van Aanwezigheid het thema volgen; getest op de echte aanwezigheidscomponent.
 - 0.8.9: het paginarapport (Alt+I, R) meldt nu versie, thema en of de themastijl de shadow roots bereikt (aantal roots, aantal met stijl, hoekradius van een tegel, achtergrond van de paginakop), om verschillen tussen de nabouw en de echte pagina te kunnen herleiden.
 - 0.8.8: thema bereikt nu elke shadow root: een script in de hoofdwereld (`content/shadowroots.js`) geeft elke shadow root bij het aanmaken de themastijl mee, ook gesloten roots en roots die later ontstaan (Aanwezigheid, roosters); tegels op Aanwezigheid groter, met lift bij aanwijzen.
 - 0.8.7: agenda-afwerking: geen blauwe streep meer onder de kopbalk (regel was bij 0.8.1 weggevallen), navigatiebalk in de roosterkaart, afspraaktekst donkerblauw, minikalender met maandtitel op één regel; ronde knoppen in de kopbalk in accenttint.
