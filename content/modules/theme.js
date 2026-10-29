@@ -212,6 +212,7 @@ DT.register({
     const p = this.preset(DT);
     const mode = p.look ? (DT.settings.theme.agendaKleur || "vak") : "geen";
     agendaColorPass(document, mode, this.isDark(DT));
+    if (p.look) agendaToolbarPass(document);
   },
 
   /* Themavariabelen ook binnen elke shadow root zetten (componenten die ze op :host herdefiniëren). */
@@ -470,6 +471,22 @@ function agendaColorPass(root, mode, dark) {
       const past = r.right <= todayRect.left + 1 || (nowRect && r.left >= todayRect.left - 1 && r.right <= todayRect.right + 1 && r.bottom <= nowRect.top);
       if (past) el.dataset.dtPast = "1"; else delete el.dataset.dtPast;
     }
+  }
+}
+
+/* De navigatie (vorige/volgende) van FullCalendar naar de titelrij verplaatsen, naast Magisters
+ * eigen ronde knoppen. De knoppen houden hun klik-afhandeling; bij een herbouw van de kalender
+ * komt er een nieuwe balk in het rooster en wordt de oude in de titelrij opgeruimd. */
+function agendaToolbarPass(root) {
+  const fresh = root.querySelector("#calendar > .fc-toolbar");
+  const bar = root.querySelector(".head-bar");
+  if (!bar) return;
+  if (fresh) {
+    root.querySelectorAll(".head-bar .fc-toolbar").forEach((old) => old.remove());
+    fresh.classList.add("dt-moved");
+    // Vóór de titel (floats na een blok zakken een regel), na Magisters eigen knoppen (eerste float-right staat het verst rechts).
+    const links = bar.querySelector(".head-bar-links");
+    if (links) links.after(fresh); else bar.prepend(fresh);
   }
 }
 
@@ -749,6 +766,12 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     .fc-toolbar button:hover { background: ${t.tintStrong} !important; }
     .fc-toolbar button.fc-prev-button:before, .fc-toolbar button.fc-next-button:after { color: ${t.accent} !important; font-size: 13px !important; font-weight: 600 !important; height: 32px !important; line-height: 32px !important; top: 0; left: 0; right: 0 !important; width: 32px; text-align: center; position: absolute; }
     #calendar .fc-toolbar h2 { color: ${t.fg}; font: 600 .9375rem/40px ${t.font}; margin: 0; }
+    .head-bar .fc-toolbar.dt-moved { float: right !important; height: 42px !important; line-height: 42px !important; margin: 0 10px 0 0 !important; padding: 0 !important; display: flex !important; align-items: center; gap: 8px; border: 0 !important; background: transparent !important; width: auto !important; }
+    .head-bar .fc-toolbar.dt-moved .fc-center { display: none; }
+    .head-bar .fc-toolbar.dt-moved .fc-left, .head-bar .fc-toolbar.dt-moved .fc-right { float: none !important; height: 42px; display: flex; align-items: center; margin: 0 !important; }
+    .head-bar .fc-toolbar.dt-moved button { color: ${t.accent} !important; font-size: 0 !important; width: 36px !important; height: 36px !important; line-height: 36px !important; padding: 0 !important; margin: 0 !important; border-radius: 50% !important; background: ${t.tint} !important; position: relative; float: none !important; }
+    .head-bar .fc-toolbar.dt-moved button:hover { background: ${t.tintStrong} !important; }
+    .head-bar .fc-toolbar.dt-moved button.fc-prev-button:before, .head-bar .fc-toolbar.dt-moved button.fc-next-button:after { color: ${t.accent} !important; font-size: 14px !important; font-weight: 600 !important; height: 36px !important; line-height: 36px !important; top: 0; left: 0; right: 0 !important; width: 36px; text-align: center; position: absolute; }
     #calendar .fc-head .fc-widget-header { background: transparent !important; border: 0 !important; height: 40px !important; line-height: 40px !important; }
     #calendar .fc-head td, #calendar .fc-head th { border-color: transparent !important; }
     #calendar .fc-day-header { color: ${t.muted} !important; font: 600 .75rem/40px ${t.font} !important; letter-spacing: .02em; border: 0 !important; }
@@ -759,6 +782,7 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     #calendar .fc-day-grid, #calendar .fc-day-grid .fc-row, #calendar .fc-day-grid .fc-bg, #calendar .fc-day-grid .fc-bg td, #calendar .fc-day-grid .fc-content-skeleton td, #calendar .fc-day-grid td, #calendar .fc-day-grid table { border: 0 !important; }
     #calendar .fc-day-grid .fc-bg td.fc-day { border-left: 1px solid ${t.dark ? "rgba(84,84,88,.2)" : "rgba(60,60,67,.045)"} !important; }
     #calendar .fc-day-grid .fc-axis { border: 0 !important; }
+    #calendar .fc-day-grid { box-shadow: none !important; }
     #calendar .fc-divider { display: none !important; }
     #calendar .fc-day-grid .fc-row { min-height: 2rem; }
     #calendar .fc-day-grid td.fc-axis, #calendar .fc-day-grid .fc-axis span { color: ${t.muted}; font: 500 .6875rem/1 ${t.font}; }
