@@ -17,6 +17,7 @@ DT.register({
   _card: null,
   _style: null,
   _cache: new Map(),  // leerlingId → { at, data }
+  _toest: null,       // Magisters eigen toestemmingen-kaart, verplaatst naar de bento
   _busy: null,
 
   init(DT) {
@@ -26,8 +27,15 @@ DT.register({
 
   destroy() {
     this._stop && this._stop();
+    this.toestTerug();
     this._card?.remove(); this._card = null;
     this._style?.remove(); this._style = null;
+  },
+
+  /* Magisters toestemmingen-kaart terugzetten in de pagina (voor het opnieuw tekenen). */
+  toestTerug() {
+    const page = document.querySelector("dk-algemene-gegevens .page");
+    if (this._toest && page && this._toest.parentElement !== page) page.append(this._toest);
   },
 
   leerlingId() {
@@ -217,6 +225,7 @@ DT.register({
     const lbExtra = lbLast ? `<span class="dt-ll-lb"><span class="dt-ll-lb-type">${esc(lbLast.x.formulierType?.naam || lbLast.x.formulierTypeNaam || "Logboek")}</span><span class="dt-ll-lb-date">${esc(lbLast.t.toLocaleDateString("nl-NL", { day: "numeric", month: "short" }))}</span><span class="dt-ll-lb-text">${esc(lbLast.x.omschrijving || lbLast.x.titel || "")}</span></span>` : `<p class="dt-ll-empty">${d.logboek ? "Nog geen logboekformulieren." : "Logboek niet beschikbaar."}</p>`;
     const logTile = tile("logboek", d.logboek ? lbUnread : "–", "ongelezen logboeken", d.logboek ? `${lbRecent} in de laatste 30 dagen${lbPrio ? ` · ${lbPrio} met prioriteit` : ""}` : "", { hot: lbUnread > 0 || lbPrio > 0, state: "begeleiding", cls: "dt-ll-log", err: d.logboek ? "" : d.logboekErr, extra: lbExtra });
 
+    this.toestTerug();
     body.innerHTML = `<div class="dt-ll-grid">
       ${attTile}
       ${todayTile}
@@ -224,7 +233,13 @@ DT.register({
       ${tile("taken", d.taken ? takenOpen : "–", "open taken deze week", d.taken ? `${taken.length} taken in totaal` : "", { hot: takenOpen > 0, err: d.taken ? "" : fail(d.takenErr) })}
       ${tile("terugkom", d.terugkom ? terug.length : "–", "terugkomen", d.terugkom ? (terug.length ? (terug.length === 1 ? "maatregel nog open" : "maatregelen nog open") : "geen maatregelen open") : "", { hot: terug.length > 0, err: d.terugkom ? "" : fail(d.terugkomErr) })}
       ${tile("jarig", jarig ? (jarig.days === 0 ? "🎂" : jarig.days) : "–", jarig ? (jarig.days === 0 ? `vandaag ${jarig.age} geworden` : jarig.days === 1 ? `morgen jarig, wordt ${jarig.age}` : `dagen tot verjaardag · wordt ${jarig.age}`) : "verjaardag", "", { hot: !!jarig && jarig.days <= 7, cls: "dt-ll-wide" })}
+      <div class="dt-ll-tile dt-ll-toest" data-kind="toest"><div class="dt-ll-tile-head">${head("toest", "", "toestemmingen", "gebruik van gegevens")}</div></div>
     </div>`;
+    /* Magisters eigen toestemmingen-kaart in de tegel hangen */
+    const page = document.querySelector("dk-algemene-gegevens .page");
+    const toest = this._toest?.isConnected ? this._toest : page?.querySelector(":scope > dk-toestemmings-antwoorden");
+    const slot = body.querySelector(".dt-ll-toest");
+    if (toest && slot) { this._toest = toest; slot.append(toest); } else slot?.remove();
   },
 
   css() {
@@ -232,21 +247,48 @@ DT.register({
     this._style = document.createElement("style"); this._style.id = "dt-ll-style";
     this._style.textContent = `
       dk-basisgegevens-page .container:not(.employee) { grid-template-columns: minmax(0, 1fr); }
+      /* Pagina-indeling: profielkaart links naast het overzicht, de rest eronder */
+      dk-algemene-gegevens .page:has(> #dt-ll-dash) { display: grid; grid-template-columns: 17rem repeat(2, minmax(0, 1fr)); gap: 1rem; align-items: stretch; }
+      dk-algemene-gegevens .page:has(> #dt-ll-dash) > #leerling-algemeen { grid-column: 1; grid-row: 1; }
+      dk-algemene-gegevens .page:has(> #dt-ll-dash) > #dt-ll-dash { grid-column: 2 / -1; grid-row: 1; }
+      dk-algemene-gegevens .page:has(> #dt-ll-dash) > #leerling-personalia { grid-column: 1 / 3; }
+      dk-algemene-gegevens .page:has(> #dt-ll-dash) > #leerling-contact { grid-column: 3 / -1; }
+      dk-algemene-gegevens .page:has(> #dt-ll-dash) > .leerling-block { width: auto; margin: 0; }
+      @media (max-width: 1100px) {
+        dk-algemene-gegevens .page:has(> #dt-ll-dash) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        dk-algemene-gegevens .page:has(> #dt-ll-dash) > #leerling-algemeen, dk-algemene-gegevens .page:has(> #dt-ll-dash) > #dt-ll-dash { grid-column: 1 / -1; grid-row: auto; }
+        dk-algemene-gegevens .page:has(> #dt-ll-dash) > #leerling-personalia { grid-column: 1; }
+        dk-algemene-gegevens .page:has(> #dt-ll-dash) > #leerling-contact { grid-column: 2; }
+      }
       dk-basisgegevens-page .container:not(.employee) > .wrapper, dk-basisgegevens-page .tab-content, dk-algemene-gegevens .page { min-width: 0; max-width: 100%; box-sizing: border-box; }
       #dt-ll-dash { grid-column: 1 / -1; min-width: 0; max-width: 100%; }
       #dt-ll-dash * { min-width: 0; }
-      #dt-ll-dash .dt-ll-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+      #dt-ll-dash .dt-ll-grid { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 10px; }
       #dt-ll-dash .dt-ll-tile { --k: #6e6e73; display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 16px; background: rgba(60,60,67,.05); color: inherit; text-decoration: none; min-height: 92px; box-sizing: border-box; }
       #dt-ll-dash a.dt-ll-tile { cursor: pointer; transition: background .12s, transform .12s; } #dt-ll-dash a.dt-ll-tile:hover { background: rgba(60,60,67,.09); transform: translateY(-1px); }
       #dt-ll-dash .dt-ll-tile-head { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "ico num" "label label" "sub sub"; gap: 4px 8px; align-items: start; }
-      #dt-ll-dash .dt-ll-hero, #dt-ll-dash .dt-ll-today { grid-column: span 3; grid-row: span 2; }
-      #dt-ll-dash .dt-ll-log { grid-column: span 2; }
-      #dt-ll-dash .dt-ll-wide { grid-column: span 2; }
-      @media (max-width: 980px) {
-        #dt-ll-dash .dt-ll-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        #dt-ll-dash .dt-ll-hero, #dt-ll-dash .dt-ll-today, #dt-ll-dash .dt-ll-log, #dt-ll-dash .dt-ll-wide { grid-column: span 2; grid-row: auto; }
+      #dt-ll-dash .dt-ll-tile { grid-column: span 2; }
+      #dt-ll-dash .dt-ll-hero, #dt-ll-dash .dt-ll-today { grid-column: span 4; grid-row: span 2; }
+      #dt-ll-dash .dt-ll-log, #dt-ll-dash .dt-ll-wide, #dt-ll-dash .dt-ll-toest { grid-column: span 4; }
+      @media (max-width: 1100px) {
+        #dt-ll-dash .dt-ll-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        #dt-ll-dash .dt-ll-hero, #dt-ll-dash .dt-ll-today { grid-column: span 4; grid-row: auto; }
       }
-      #dt-ll-dash .dt-ll-tile[data-kind="aanwezig"] { --k: #34C759; } #dt-ll-dash .dt-ll-tile[data-kind="rooster"] { --k: #007AFF; } #dt-ll-dash .dt-ll-tile[data-kind="logboek"] { --k: #AF52DE; } #dt-ll-dash .dt-ll-tile[data-kind="taken"] { --k: #FF9500; } #dt-ll-dash .dt-ll-tile[data-kind="terugkom"] { --k: #FF3B30; } #dt-ll-dash .dt-ll-tile[data-kind="jarig"] { --k: #FF2D55; }
+      @media (max-width: 700px) {
+        #dt-ll-dash .dt-ll-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        #dt-ll-dash .dt-ll-hero, #dt-ll-dash .dt-ll-today, #dt-ll-dash .dt-ll-log, #dt-ll-dash .dt-ll-wide, #dt-ll-dash .dt-ll-toest { grid-column: span 2; }
+      }
+      /* Toestemmingen: Magisters eigen kaart zonder kaartrand in de tegel */
+      #dt-ll-dash .dt-ll-toest .dt-ll-tile-head .dt-ll-num { display: none; }
+      #dt-ll-dash .dt-ll-toest dk-toestemmings-antwoorden { display: block; }
+      #dt-ll-dash .dt-ll-toest dna-card { --background: transparent; --_background: transparent; --box-shadow: none; --_box-shadow: none; --border: 0; --_border: 0; --border-width: 0; --_border-width: 0; --body-padding: 0; --_body-padding: 0; --header-padding: 0; --_header-padding: 0; min-height: 0; height: auto; -webkit-backdrop-filter: none; backdrop-filter: none; }
+      #dt-ll-dash .dt-ll-toest dna-card-title { display: none; }
+      #dt-ll-dash .dt-ll-toest .antwoorden-wrapper { margin-top: -4px; }
+      #dt-ll-dash .dt-ll-toest .answer-entry { margin: 0; padding: 4px 0; font: 400 .75rem/1.3 -apple-system, system-ui, sans-serif; align-items: center; width: auto; }
+      #dt-ll-dash .dt-ll-toest .permission-type { flex: 1 1 auto; min-width: 0; white-space: normal; overflow-wrap: anywhere; padding: 0 .5rem; }
+      #dt-ll-dash .dt-ll-toest .dna-card-footer { justify-content: flex-start; }
+      #dt-ll-dash .dt-ll-toest .last-modified-message { margin: 4px 0 0; font: 400 .6875rem/1.2 -apple-system, system-ui, sans-serif; color: #8e8e93; text-align: left; }
+      #dt-ll-dash .dt-ll-tile[data-kind="aanwezig"] { --k: #34C759; } #dt-ll-dash .dt-ll-tile[data-kind="rooster"] { --k: #007AFF; } #dt-ll-dash .dt-ll-tile[data-kind="logboek"] { --k: #AF52DE; } #dt-ll-dash .dt-ll-tile[data-kind="taken"] { --k: #FF9500; } #dt-ll-dash .dt-ll-tile[data-kind="terugkom"] { --k: #FF3B30; } #dt-ll-dash .dt-ll-tile[data-kind="jarig"] { --k: #FF2D55; } #dt-ll-dash .dt-ll-tile[data-kind="toest"] { --k: #5856D6; }
       #dt-ll-dash .dt-ll-tile.is-hot { background: color-mix(in srgb, var(--k) 12%, #fff); }
       #dt-ll-dash .dt-ll-tile.is-err { opacity: .6; }
       #dt-ll-dash .dt-ll-ico { grid-area: ico; width: 30px; height: 30px; border-radius: 50%; display: inline-grid; place-items: center; background: color-mix(in srgb, var(--k) 16%, #fff); color: var(--k); }
@@ -365,5 +407,6 @@ const ICON = {
   logboek: `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 0-3 3z"/><path d="M5 4v16M9 9h6M9 13h4"/></svg>`,
   taken: `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l2 2 4-4"/><rect x="4" y="4" width="16" height="16" rx="4"/></svg>`,
   terugkom: `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5M12 8v4l3 2"/></svg>`,
+  toest: `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>`,
   jarig: `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16M5 20v-7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7"/><path d="M5 15c2 1.5 4 1.5 6 0s4-1.5 6 0M12 7v4M12 3v1"/></svg>`,
 };

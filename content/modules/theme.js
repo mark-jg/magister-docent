@@ -1098,6 +1098,11 @@ function leerlingkaartCss(t) {
     dk-basisgegevens-page .container:not(.employee) > .wrapper, dk-basisgegevens-page .tab-content { min-width: 0; max-width: 100%; }
     /* Raster van kaarten, gelijk hoog per rij */
     dk-basisgegevens-page .page { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)) !important; gap: 1rem !important; padding: .25rem 1.5rem 1.5rem !important; align-items: stretch !important; max-width: 1480px; box-sizing: border-box; }
+    dk-algemene-gegevens .page:has(> #dt-ll-dash) { grid-template-columns: 17rem repeat(2, minmax(0, 1fr)) !important; }
+    @media (max-width: 1100px) { dk-algemene-gegevens .page:has(> #dt-ll-dash) { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+    #dt-ll-dash .dt-ll-toest dna-card { --background: transparent !important; --_background: transparent !important; --box-shadow: none !important; --_box-shadow: none !important; --body-padding: 0 !important; --_body-padding: 0 !important; --header-padding: 0 !important; --_header-padding: 0 !important; min-height: 0 !important; height: auto !important; }
+    #dt-ll-dash .dt-ll-toest .answer-entry, #dt-ll-dash .dt-ll-toest .permission-type { font-size: .75rem !important; color: ${t.fg}; border-bottom: 0 !important; }
+    #dt-ll-dash .dt-ll-toest .last-modified-message { color: ${t.muted} !important; font-size: .6875rem !important; margin: 4px 0 0 !important; }
     dk-basisgegevens-page .page > .leerling-block, dk-basisgegevens-page .page > .contact-block, dk-basisgegevens-page .page > dk-medewerker { width: auto !important; margin: 0 !important; min-width: 0; }
     dk-basisgegevens-page .page dna-card { min-height: 0 !important; height: 100% !important; box-sizing: border-box; --body-padding: .25rem 1.25rem 1.25rem !important; --_body-padding: .25rem 1.25rem 1.25rem !important; --header-padding: 1.125rem 1.25rem .5rem !important; --_header-padding: 1.125rem 1.25rem .5rem !important; }
     dk-basisgegevens-page dna-card-title.button-placement dna-button { --padding-v: .2rem !important; --_padding-v: .2rem !important; --padding-h: .45rem !important; --_padding-h: .45rem !important; --border-radius: 999px !important; --_border-radius: 999px !important; }
