@@ -41,6 +41,7 @@ Chrome laat een uitgepakte extensie zijn eigen map alleen beschrijven als de geb
 
 | Functie | Hoe |
 |---|---|
+| Jarig: kaart op Vandaag met (aankomende) jarige leerlingen, klikbaar naar de leerlingkaart | automatisch op het startscherm; Instellingen > Jarig voor hoe ver vooruit |
 | Thema's: 20 presets (van Magister-standaard tot Krant, Terminal, Synthwave, Apple en Apple Glass) of een eigen accentkleur; lettertype, lettergrootte, hoeken en dichtheid apart instelbaar | in het zijpaneel (Alt+D), Alt+T wisselt tussen je lichte en donkere thema |
 | Docentenpaneel: klok en weeknummer, snelle links, notities, exportknoppen | Alt+D, of klik op het handvat |
 | Tabellen: zwevend knopje "Exporteren" bij hover over een datatabel (kalenders en roosters worden overgeslagen), en een overzicht van alle tabellen in het zijpaneel. Naar Excel, CSV of klembord (plakt als cellen), sorteerbare koppen; per soort tabel instelbaar welke kolommen meegaan, kopregel, namen maskeren, lege rijen en kolommen weglaten | knoppen boven elke tabel, "Instellen" voor de opties; Alt+E exporteert alle tabellen op de pagina |
@@ -101,6 +102,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.10.0: module "Jarig": kaart op Vandaag met de (aankomende) jarige leerlingen uit Magisters eigen lijst (/api/leerlingen/jarigen, via je eigen sessie), gegroepeerd op vandaag, morgen en datum, met initialen, klas en leeftijd, klikbaar naar de leerlingkaart; instelbaar hoe ver vooruit (1 week, 2 weken, 1 maand); jarigen van vandaag staan ook als chip in de samenvatting.
 - 0.9.10: startscherm: dagkoppen per dag herkend (geen dubbele "Vandaag", vrijdag niet meer gedimd), labels "gewijzigd/vervallen" niet meer afgesneden, "niet verantwoord" als oranje stip, de eerstvolgende les licht op, en onder de datum een samenvattingsregel met lessen vandaag, volgende les, wijzigingen en de meldingen die aandacht vragen.
 - 0.9.9: startscherm: notificatietegels en dagkoppen beginnen met een hoofdletter; de agenda op Vandaag heeft per les een balkje in de vakkleur, de lopende les licht op, voorbije lessen van vandaag dimmen, vervallen lessen zijn doorgestreept, en de dagkoppen heten "Vandaag · …" en "Morgen · …".
 - 0.9.8: notificaties op het startscherm als widget-raster in Apple-stijl: tegels met groot getal, icoon in een getinte cirkel en het onderwerp eronder; meldingen boven nul lichten op in een eigen kleur (logboeken blauw, verantwoorden groen, ziek oranje, terugkomen indigo, toets gemist rood, ouderavond teal, deadline roze, ingeleverd paars), nul-meldingen rustig grijs.

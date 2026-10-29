@@ -47,6 +47,7 @@
         "content/modules/ai.js",
         "content/modules/melding.js",
         "content/modules/inspector.js",
+        "content/modules/jarig.js",
         "content/boot.js"
       ],
       "css": [

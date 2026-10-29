@@ -11,6 +11,7 @@ globalThis.DT_DEFAULTS = {
   aanwezigheid: { enabled: true },
   inspector: { enabled: true },
   updates: { check: true },
+  jarig: { enabled: true, dagen: 14 },
   melding: { enabled: true, coaches: [], to: "", cc: "", name: "", extra: true, afzender: "" },
   links: [
     { label: "Magister Web", url: "https://accounts.magister.net" },

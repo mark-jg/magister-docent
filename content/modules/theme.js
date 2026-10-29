@@ -534,6 +534,8 @@ function dashboardSummary(root, summary) {
   if (summary.next) chips.push(["next", `Volgende: ${summary.next}`]);
   else if (summary.lessen) chips.push(["done", "Geen lessen meer vandaag"]);
   if (summary.wijzigingen) chips.push(["wijz", `${summary.wijzigingen} ${summary.wijzigingen === 1 ? "wijziging" : "wijzigingen"}`]);
+  const jarig = parseInt((root.documentElement || document.documentElement).dataset.dtJarig || "0", 10);
+  if (jarig > 0) chips.push(["jarig", `${jarig} ${jarig === 1 ? "leerling" : "leerlingen"} jarig vandaag`, "#FF2D55"]);
   for (const li of root.querySelectorAll("#vandaag-notificatie .list li.item[data-dt-n='1']")) {
     const n = (li.querySelector(".special")?.textContent || "").trim();
     const txt = [...li.querySelectorAll("a > span")].filter((x) => !x.classList.contains("special") && !x.classList.contains("dt-dash-ico")).map((x) => x.textContent).join(" ").trim();
@@ -840,6 +842,22 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     .dt-summary .dt-chip-next { --k: ${t.accent}; font-weight: 600; }
     .dt-summary .dt-chip-done { --k: ${t.green}; }
     .dt-summary .dt-chip-wijz { --k: ${t.orange}; }
+    /* Kaart Jarig */
+    #dt-jarig .dt-jarig-badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: #FF2D55; color: #fff; font: 600 .75rem/1 ${t.font}; margin-left: 6px; vertical-align: 2px; }
+    #dt-jarig .dt-jarig-list { list-style: none; margin: 0; padding: 0; }
+    #dt-jarig .dt-jarig-row { position: relative; }
+    #dt-jarig .dt-jarig-row::after { content: ""; position: absolute; left: 52px; right: 0; bottom: 0; height: 1px; background: ${t.sepSoft}; }
+    #dt-jarig .dt-jarig-row:last-child::after { display: none; }
+    #dt-jarig .dt-jarig-row a { display: flex; align-items: center; gap: 12px; padding: 8px 4px; text-decoration: none; color: ${t.fg}; border-radius: 10px; }
+    #dt-jarig .dt-jarig-row a:hover { background: ${t.hover}; }
+    #dt-jarig .dt-jarig-av { width: 36px; height: 36px; border-radius: 50%; display: inline-grid; place-items: center; background: color-mix(in srgb, var(--k) 16%, ${t.surface}); color: var(--k); font: 600 .8125rem/1 ${t.font}; flex: 0 0 auto; }
+    #dt-jarig .dt-jarig-today .dt-jarig-av { background: var(--k); color: #fff; }
+    #dt-jarig .dt-jarig-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+    #dt-jarig .dt-jarig-name { font: 500 .875rem/1.2 ${t.font}; color: ${t.fg}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #dt-jarig .dt-jarig-sub { font: 400 .75rem/1.2 ${t.font}; color: ${t.muted}; }
+    #dt-jarig .dt-jarig-when { font: 500 .75rem/1 ${t.font}; color: ${t.muted}; white-space: nowrap; }
+    #dt-jarig .dt-jarig-today .dt-jarig-when { color: #FF2D55; font-weight: 600; }
+    #dt-jarig .dt-jarig-empty { color: ${t.muted}; font: 400 .8125rem/1.3 ${t.font}; padding: 2px 4px 6px; }
     ag-lesblok-wijziging > span:empty { display: none !important; }
     /* Notificaties als widget-raster */
     #vandaag-notificatie .list, sm-notificatie-widget2 .list { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 2px 0 4px; }
