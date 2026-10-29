@@ -243,9 +243,13 @@ DT.register({
       #dt-ll-dash .dt-ll-att-text { grid-area: text; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
       #dt-ll-dash .dt-ll-months { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; align-items: end; height: 92px; padding: 4px 4px 0; }
       #dt-ll-dash .dt-ll-month { display: grid; grid-template-rows: 1fr auto auto; height: 100%; justify-items: center; gap: 3px; }
-      #dt-ll-dash .dt-ll-bar { width: 100%; max-width: 28px; height: 100%; display: flex; flex-direction: column-reverse; border-radius: 6px; background: rgba(60,60,67,.07); overflow: hidden; }
-      #dt-ll-dash .dt-ll-bar span { display: block; width: 100%; }
+      #dt-ll-dash .dt-ll-bar { width: 100%; max-width: 28px; height: 100%; display: flex; flex-direction: column-reverse; background: transparent; }
+      #dt-ll-dash .dt-ll-bar span { display: block; width: 100%; min-height: 2px; }
+      #dt-ll-dash .dt-ll-seg:first-child { border-radius: 0 0 6px 6px; }
+      #dt-ll-dash .dt-ll-seg:last-child { border-radius: 6px 6px 0 0; }
+      #dt-ll-dash .dt-ll-seg:only-child { border-radius: 6px; }
       #dt-ll-dash .dt-ll-seg + .dt-ll-seg { border-bottom: 1px solid rgba(255,255,255,.6); }
+      #dt-ll-dash .dt-ll-bar:empty::before { content: ""; display: block; width: 100%; height: 2px; border-radius: 2px; background: rgba(60,60,67,.15); }
       #dt-ll-dash .dt-ll-month-label { font: 500 .625rem/1 -apple-system, system-ui, sans-serif; color: #8e8e93; text-transform: uppercase; letter-spacing: .04em; }
       #dt-ll-dash .dt-ll-month-val { font: 600 .6875rem/1 -apple-system, system-ui, sans-serif; color: #6e6e73; min-height: .6875rem; }
       #dt-ll-dash .dt-ll-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; font: 400 .6875rem/1.2 -apple-system, system-ui, sans-serif; color: #8e8e93; }
