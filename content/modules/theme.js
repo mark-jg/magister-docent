@@ -741,16 +741,14 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     /* Geen kaart om het rooster: het ligt direct op de achtergrond, alleen de afspraken zijn vlakken */
     #calendar { background: transparent !important; border-radius: 0; box-shadow: none; overflow: visible; }
     #calendar .fc-agenda-view, #calendar .fc-view-container, #calendar .fc-basic-view, #calendar .fc-view > table, #calendar .fc-scroller, #calendar .fc-bg, #calendar .fc-slats, #calendar .fc-time-grid, #calendar .fc-day-grid, #calendar .fc-head-container, #calendar .fc-widget-content { background: transparent !important; }
-    #calendar .fc-toolbar { background: transparent !important; border-bottom: 0; height: 44px !important; line-height: 44px !important; margin: 0 0 4px !important; padding: 0; }
-    .fc-toolbar .fc-left, .fc-toolbar .fc-right { height: 48px; display: flex; align-items: center; }
-    .fc-toolbar button, .fc-toolbar .fc-button { color: ${t.accent} !important; font: 500 .8125rem/28px ${t.font} !important; height: 28px !important; line-height: 28px !important; padding: 0 12px !important; margin: 0 !important; border-radius: 999px !important; background: ${t.tint} !important; transition: background .12s; position: relative; }
+    #calendar .fc-toolbar { background: transparent !important; border: 0 !important; height: 40px !important; line-height: 40px !important; margin: 0 0 6px !important; padding: 0; display: flex !important; justify-content: flex-end; align-items: center; gap: 8px; }
+    #calendar .fc-toolbar:before, #calendar .fc-toolbar:after { display: none; }
+    .fc-toolbar .fc-left, .fc-toolbar .fc-right, .fc-toolbar .fc-center { float: none !important; display: flex; align-items: center; height: 40px; }
+    .fc-toolbar .fc-center { flex: 1; order: -1; }
+    .fc-toolbar button, .fc-toolbar .fc-button { color: ${t.accent} !important; font-size: 0 !important; width: 32px !important; height: 32px !important; line-height: 32px !important; padding: 0 !important; margin: 0 !important; border-radius: 50% !important; background: ${t.tint} !important; transition: background .12s; position: relative; float: none !important; }
     .fc-toolbar button:hover { background: ${t.tintStrong} !important; }
-    .fc-toolbar button.fc-prev-button { padding-left: 26px !important; }
-    .fc-toolbar button.fc-next-button { padding-right: 26px !important; }
-    .fc-toolbar button.fc-prev-button:before, .fc-toolbar button.fc-next-button:after { color: ${t.accent} !important; font-size: 12px !important; height: 28px !important; line-height: 28px !important; top: 0; }
-    .fc-toolbar button.fc-prev-button:before { left: 10px; }
-    .fc-toolbar button.fc-next-button:after { right: 10px !important; }
-    #calendar .fc-toolbar h2 { color: ${t.fg}; font: 600 .9375rem/48px ${t.font}; }
+    .fc-toolbar button.fc-prev-button:before, .fc-toolbar button.fc-next-button:after { color: ${t.accent} !important; font-size: 13px !important; font-weight: 600 !important; height: 32px !important; line-height: 32px !important; top: 0; left: 0; right: 0 !important; width: 32px; text-align: center; position: absolute; }
+    #calendar .fc-toolbar h2 { color: ${t.fg}; font: 600 .9375rem/40px ${t.font}; margin: 0; }
     #calendar .fc-head .fc-widget-header { background: transparent !important; border: 0 !important; height: 40px !important; line-height: 40px !important; }
     #calendar .fc-head td, #calendar .fc-head th { border-color: transparent !important; }
     #calendar .fc-day-header { color: ${t.muted} !important; font: 600 .75rem/40px ${t.font} !important; letter-spacing: .02em; border: 0 !important; }
@@ -758,13 +756,14 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     #calendar .fc-divider, #calendar .fc-popover, #calendar .fc-row, #calendar tbody, #calendar td, #calendar th, #calendar thead, .fc-unthemed td, .fc-unthemed th { border-color: ${t.dark ? "rgba(84,84,88,.28)" : "rgba(60,60,67,.07)"} !important; font-size: .75rem; }
     #calendar .fc-body > tr > td, #calendar .fc-view > table, #calendar .fc-head-container { border: 0 !important; }
     #calendar .fc-bg td.fc-day { border-left-color: ${t.dark ? "rgba(84,84,88,.2)" : "rgba(60,60,67,.045)"} !important; border-right: 0 !important; }
-    #calendar .fc-day-grid .fc-row, #calendar .fc-day-grid .fc-content-skeleton td, #calendar .fc-day-grid td { border-color: ${t.dark ? "rgba(84,84,88,.2)" : "rgba(60,60,67,.045)"} !important; }
-    #calendar .fc-day-grid .fc-content-skeleton td { border: 0 !important; }
+    #calendar .fc-day-grid, #calendar .fc-day-grid .fc-row, #calendar .fc-day-grid .fc-bg, #calendar .fc-day-grid .fc-bg td, #calendar .fc-day-grid .fc-content-skeleton td, #calendar .fc-day-grid td, #calendar .fc-day-grid table { border: 0 !important; }
+    #calendar .fc-day-grid .fc-bg td.fc-day { border-left: 1px solid ${t.dark ? "rgba(84,84,88,.2)" : "rgba(60,60,67,.045)"} !important; }
+    #calendar .fc-day-grid .fc-axis { border: 0 !important; }
     #calendar .fc-divider { display: none !important; }
     #calendar .fc-day-grid .fc-row { min-height: 2rem; }
     #calendar .fc-day-grid td.fc-axis, #calendar .fc-day-grid .fc-axis span { color: ${t.muted}; font: 500 .6875rem/1 ${t.font}; }
     .fc-time-grid .fc-slats .fc-minor td { border-top: 0 !important; }
-    .fc-time-grid .fc-slats td { height: 1.75em !important; }
+    .fc-time-grid .fc-slats td { height: 2.25em !important; }
     #calendar .fc-agenda-view .fc-time-grid .fc-slats .fc-minor td.fc-axis, #calendar .fc-slats td.fc-axis, #calendar td.fc-axis { border-right: 0 !important; border-top-color: transparent !important; }
     #calendar .fc-axis { color: ${t.muted} !important; font: 500 .6875rem/1 ${t.font} !important; font-variant-numeric: tabular-nums; text-align: right !important; padding-right: 8px !important; border-left: 0 !important; }
     #calendar .fc-today, #calendar .fc-unthemed .fc-today { background: ${rgba(accent, .04)} !important; }
@@ -780,8 +779,8 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     #calendar .fc-event, #calendar .fc-time-grid-event, #calendar .fc-day-grid-event { --ev: ${t.accent}; background: color-mix(in srgb, var(--ev) ${t.dark ? "26%" : "14%"}, ${t.surface}) !important; border: 0 !important; border-radius: 8px !important; color: ${t.fg} !important; box-shadow: none !important; margin: 1px 4px 2px 1px !important; transition: opacity .15s, filter .15s; }
     #calendar .fc-time-grid-event { margin-bottom: 2px !important; }
     #calendar .fc-event .fc-bg { display: none; }
-    #calendar .fc-event .fc-content { padding: 6px 8px 6px 9px; }
-    #calendar .fc-time-grid-event .fc-title, #calendar .fc-time-grid-event .event-description, #calendar .fc-time-grid-event .event-description-content, #calendar .fc-time-grid-event .event-description-content-examen, #calendar .fc-h-event .fc-content { color: color-mix(in srgb, var(--ev) ${t.dark ? "45%, #ffffff" : "68%, #000000"}) !important; font: 500 .75rem/1.25 ${t.font} !important; padding: 0 !important; letter-spacing: -.005em; }
+    #calendar .fc-event .fc-content { padding: 7px 9px 7px 10px; }
+    #calendar .fc-time-grid-event .fc-title, #calendar .fc-time-grid-event .event-description, #calendar .fc-time-grid-event .event-description-content, #calendar .fc-time-grid-event .event-description-content-examen, #calendar .fc-h-event .fc-content { color: color-mix(in srgb, var(--ev) ${t.dark ? "45%, #ffffff" : "68%, #000000"}) !important; font: 500 .8125rem/1.3 ${t.font} !important; padding: 0 !important; letter-spacing: -.005em; }
     #calendar .fc-time-grid-event .calendar-event .event-description-content, #calendar .fc-time-grid-event .calendar-event .event-description-content-examen { padding: 0 !important; margin: 0 !important; width: 100% !important; }
     #calendar .fc-time-grid-event .calendar-event { display: block; }
     #calendar .fc-time-grid-event .calendar-event:has(.nrblock) .event-description-content, #calendar .fc-time-grid-event .calendar-event:has(.nrblock) .event-description-content-examen { width: calc(100% - 44px) !important; }
@@ -806,15 +805,22 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     .list li.vandaag-agenda-list-item span.nrblock { background: color-mix(in srgb, var(--ev) 14%, ${t.surface}) !important; color: color-mix(in srgb, var(--ev) 65%, #000000) !important; }
     #calendar .fc-highlight { background: ${rgba(accent, .12)} !important; opacity: 1 !important; }
     /* Rechterzijbalk: tabs als segmentknop, kaarten van 20px */
-    aside .head-bar { background: transparent !important; border: 0 !important; height: 44px !important; line-height: 44px !important; padding: 6px 0 0 !important; }
+    aside, aside > div, aside .content-container, aside .aside-toggle-slide { background: transparent !important; border: 0 !important; box-shadow: none !important; }
+    aside .head-bar { background: transparent !important; border: 0 !important; height: 40px !important; line-height: 40px !important; padding: 0 !important; display: flex; align-items: center; gap: 8px; }
+    aside .head-bar .toggle, aside .head-bar div.toggle { float: none !important; }
+    aside .head-bar div.toggle a, aside .head-bar .toggle a { width: 32px !important; height: 32px !important; border-radius: 50% !important; background: ${t.tint} !important; color: ${t.accent} !important; display: inline-grid !important; place-items: center; }
     aside .head-bar .tabs { background: ${t.gray6} !important; border: 0 !important; border-radius: 999px !important; padding: 3px !important; height: 32px !important; display: flex !important; float: none !important; width: calc(100% - 44px) !important; box-sizing: border-box; }
     aside .head-bar .tabs li { width: auto !important; flex: 1; height: 26px !important; }
     aside .head-bar .tabs li a { height: 26px !important; line-height: 26px !important; border-radius: 999px !important; color: ${t.muted} !important; font: 500 .8125rem/26px ${t.font} !important; box-shadow: none !important; }
     aside .head-bar .tabs li.active a, aside .head-bar .tabs li:hover a { color: ${t.fg} !important; }
     aside .head-bar .tabs li.active { border: 0 !important; }
     aside .head-bar .tabs li.active a { background: ${t.surface} !important; box-shadow: 0 1px 3px rgba(0,0,0,.14), 0 0 0 .5px rgba(0,0,0,.04) !important; font-weight: 600 !important; }
-    aside .widget { padding: 8px 0 0 !important; }
-    aside .widget > .content-pane { border-radius: 20px !important; }
+    aside .widget { padding: 12px 0 0 !important; background: transparent !important; }
+    aside .widget > .content-pane { border-radius: 20px !important; box-shadow: ${t.card} !important; }
+    aside .widget > .content-pane h3 { height: 48px !important; line-height: 48px !important; padding-left: 20px !important; font-size: 1.0625rem !important; border-bottom: 0 !important; }
+    aside .widget > .content-pane > .content { padding: 0 20px 16px !important; }
+    aside .widget > .content-pane form { padding: 0 !important; }
+    aside .widget footer.endlink { padding: 6px 20px 14px !important; }
     /* Minikalender (datepicker): geen celranden, vandaag in accent, keuze als gevulde cirkel */
     div.calendar table, div[uib-datepicker] table, .content-pane div.calendar table { border: 0 !important; border-collapse: separate !important; border-spacing: 0 2px !important; }
     div.calendar, div[uib-datepicker] { padding: 6px 8px 2px !important; max-width: none !important; }
