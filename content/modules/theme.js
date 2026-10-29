@@ -639,6 +639,9 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     ul.main-menu li a, ul.main-menu li span.caption { color: ${t.fg} !important; }
     ul.main-menu li a { height: 34px !important; margin-bottom: 2px !important; padding-left: 10px !important; border-radius: 8px !important; background: transparent !important; transition: background .12s; }
     ul.main-menu li a > dna-icon, ul.main-menu i { color: ${t.accent} !important; }
+    /* Menu-items met een witte svg-afbeelding (Cijfers, ELO): via een filter naar het accentblauw */
+    ul.main-menu li a > img.far { filter: brightness(0) saturate(100%) invert(36%) sepia(93%) saturate(3661%) hue-rotate(201deg) brightness(101%) contrast(101%); width: 20px; height: 20px; object-fit: contain; }
+    ul.main-menu > li.active > a > img.far { filter: brightness(0) invert(1); }
     ul.main-menu > li > a:hover { background: ${t.hover} !important; }
     ul.main-menu > li.active > a, ul.main-menu li[class*="active"] > a, ul.main-menu li a[class*="active"], ul.main-menu li[class*="selected"] > a { background: ${t.accent} !important; color: #fff !important; }
     ul.main-menu > li.active > a > dna-icon, ul.main-menu > li.active > a i, ul.main-menu > li.active > a .expand-direction, ul.main-menu > li.active > a span.caption { color: #fff !important; }
