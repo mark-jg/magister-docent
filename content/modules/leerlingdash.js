@@ -237,8 +237,8 @@ DT.register({
       #dt-ll-dash .dt-ll-ringwrap { grid-area: ring; position: relative; width: 56px; height: 56px; color: #6e6e73; }
       #dt-ll-dash .dt-ll-ring { width: 56px; height: 56px; }
       #dt-ll-dash .dt-ll-ring { display: block; }
-      #dt-ll-dash .dt-ll-ringnum { position: absolute; inset: 0; display: grid; place-items: center; font: 700 .9375rem/1 -apple-system, system-ui, sans-serif; letter-spacing: -.02em; color: #1D1D1F; }
-      #dt-ll-dash .dt-ll-ringnum small { font-size: .5rem; font-weight: 600; margin-left: 1px; }
+      #dt-ll-dash .dt-ll-ringnum { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; white-space: nowrap; font: 700 .9375rem/1 -apple-system, system-ui, sans-serif; letter-spacing: -.03em; color: #1D1D1F; }
+      #dt-ll-dash .dt-ll-ringnum small { font-size: .5625rem; font-weight: 600; margin-left: 1px; align-self: center; }
       #dt-ll-dash .dt-ll-att-text { grid-area: text; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
       #dt-ll-dash .dt-ll-hrows { display: flex; flex-direction: column; gap: 7px; padding: 2px 0; }
       #dt-ll-dash .dt-ll-hrow { display: grid; grid-template-columns: 2.25rem 1fr 2.75rem; align-items: center; gap: 8px; }
