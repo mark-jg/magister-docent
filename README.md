@@ -101,6 +101,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.9.10: startscherm: dagkoppen per dag herkend (geen dubbele "Vandaag", vrijdag niet meer gedimd), labels "gewijzigd/vervallen" niet meer afgesneden, "niet verantwoord" als oranje stip, de eerstvolgende les licht op, en onder de datum een samenvattingsregel met lessen vandaag, volgende les, wijzigingen en de meldingen die aandacht vragen.
 - 0.9.9: startscherm: notificatietegels en dagkoppen beginnen met een hoofdletter; de agenda op Vandaag heeft per les een balkje in de vakkleur, de lopende les licht op, voorbije lessen van vandaag dimmen, vervallen lessen zijn doorgestreept, en de dagkoppen heten "Vandaag · …" en "Morgen · …".
 - 0.9.8: notificaties op het startscherm als widget-raster in Apple-stijl: tegels met groot getal, icoon in een getinte cirkel en het onderwerp eronder; meldingen boven nul lichten op in een eigen kleur (logboeken blauw, verantwoorden groen, ziek oranje, terugkomen indigo, toets gemist rood, ouderavond teal, deadline roze, ingeleverd paars), nul-meldingen rustig grijs.
 - 0.9.7: menu-items met een afbeelding als icoon (Cijfers, ELO) krijgen in de Apple-thema's ook het accentblauw, wit bij het actieve item.
