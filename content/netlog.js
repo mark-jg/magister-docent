@@ -92,6 +92,19 @@
       reply(e, { type: "dt:api:result", id, status: res.status, shape: json ? shape(json) : null, json: full ? json : undefined, hadHeaders: !!lastHeaders });
     } catch (err) { reply(e, { type: "dt:api:result", id, status: 0, error: String(err) }); }
   });
+  /* Op verzoek van de extensie naar een Magister-scherm gaan zoals Magister dat zelf doet
+   * ($state.go), bijvoorbeeld de leerlingkaart. Antwoord ok=false als dat niet lukt. */
+  window.addEventListener("message", (e) => {
+    if (!(e.data && e.data.type === "dt:state:go" && trusted(e))) return;
+    let ok = false, error = "";
+    try {
+      const inj = window.angular && window.angular.element(document.body).injector();
+      const $state = inj && inj.get("$state");
+      if ($state) { $state.go(e.data.name, e.data.params || {}); ok = true; }
+      else error = "geen AngularJS-injector";
+    } catch (err) { error = String(err); }
+    reply(e, { type: "dt:state:result", id: e.data.id, ok, error });
+  });
   window.addEventListener("message", (e) => {
     if (e.data && e.data.type === "dt:netlog:get" && e.source) {
       try { e.source.postMessage({ type: "dt:netlog:data", frame: (window === window.top ? "hoofdpagina" : location.host + location.pathname.replace(/\d{3,}/g, "{id}")), log }, "*"); } catch {}
