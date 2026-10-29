@@ -101,6 +101,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.9.1: agenda rustiger: uurlijnen licht, halve uren bijna onzichtbaar, geen streep onder de dagkoppen en geen kader om de "Hele dag"-rij, geen lijn naast de tijdas, lesuur-chips als lichte tint, dunnere schuifbalk.
 - 0.9.0: agenda en startscherm op het niveau van Aanwezigheid, gebouwd op een nabouw met de echte kalendercomponent (FullCalendar) en Magisters stylesheet: ronde navigatieknoppen, geen arcering buiten werktijd, rustige dag- en uurlabels, rode nu-lijn met stip, afspraken met meer lucht en geweigerde afspraken in rood, zijbalk met segmentknop en kaarten van 20px; startscherm met kaarten van 20px, capsules voor "nieuw / gewijzigd / vervallen" en een onthullingspijl op notificaties.
 - 0.8.14: geen fouten meer in frames zonder body (sessie-iframe); de kleurvertaler slaat bij de Apple-thema's over (scheelt werk elke 2,5 s); het netwerkrapport (Alt+I, N) toont per API-call de duur, grootte en eventuele fout, zodat trage schermen te herleiden zijn; grote antwoorden worden niet meer geparsed; skelet-tegels met 20px hoeken.
 - 0.8.13: pijl op de Aanwezigheid-tegels staat midden in de cirkel.

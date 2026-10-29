@@ -705,17 +705,22 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     .fc-toolbar button.fc-next-button:after { right: 10px !important; }
     #calendar .fc-toolbar h2 { color: ${t.fg}; font: 600 .9375rem/48px ${t.font}; }
     #calendar .fc-head .fc-widget-header { background: transparent !important; border: 0 !important; height: 40px !important; line-height: 40px !important; }
-    #calendar .fc-day-header { color: ${t.muted} !important; font: 600 .75rem/40px ${t.font} !important; letter-spacing: .02em; border-bottom: 1px solid ${t.sepSoft} !important; border-left-color: transparent !important; border-right-color: transparent !important; }
+    #calendar .fc-head td, #calendar .fc-head th { border-color: transparent !important; }
+    #calendar .fc-day-header { color: ${t.muted} !important; font: 600 .75rem/40px ${t.font} !important; letter-spacing: .02em; border: 0 !important; }
     #calendar .fc-day-header.fc-today { color: ${t.accent} !important; }
-    #calendar .fc-divider, #calendar .fc-popover, #calendar .fc-row, #calendar tbody, #calendar td, #calendar th, #calendar thead, .fc-unthemed td, .fc-unthemed th { border-color: ${t.sepSoft} !important; font-size: .75rem; }
+    #calendar .fc-divider, #calendar .fc-popover, #calendar .fc-row, #calendar tbody, #calendar td, #calendar th, #calendar thead, .fc-unthemed td, .fc-unthemed th { border-color: ${t.dark ? "rgba(84,84,88,.35)" : "rgba(60,60,67,.09)"} !important; font-size: .75rem; }
+    #calendar .fc-body > tr > td, #calendar .fc-view > table { border: 0 !important; }
+    #calendar .fc-day-grid .fc-row, #calendar .fc-day-grid .fc-content-skeleton td { border-color: ${t.dark ? "rgba(84,84,88,.35)" : "rgba(60,60,67,.09)"} !important; }
     #calendar .fc-divider { display: none !important; }
     #calendar .fc-day-grid .fc-row { min-height: 2rem; }
     #calendar .fc-day-grid td.fc-axis, #calendar .fc-day-grid .fc-axis span { color: ${t.muted}; font: 500 .6875rem/1 ${t.font}; }
-    .fc-time-grid .fc-slats .fc-minor td { border-top-style: solid !important; border-color: ${t.dark ? "rgba(84,84,88,.25)" : "rgba(60,60,67,.06)"} !important; }
+    .fc-time-grid .fc-slats .fc-minor td { border-top-style: solid !important; border-color: ${t.dark ? "rgba(84,84,88,.18)" : "rgba(60,60,67,.04)"} !important; }
     .fc-time-grid .fc-slats td { height: 1.75em !important; }
-    #calendar .fc-agenda-view .fc-time-grid .fc-slats .fc-minor td.fc-axis { border-right-color: ${t.sepSoft} !important; }
+    #calendar .fc-agenda-view .fc-time-grid .fc-slats .fc-minor td.fc-axis, #calendar .fc-slats td.fc-axis, #calendar td.fc-axis { border-right: 0 !important; border-top-color: transparent !important; }
     #calendar .fc-axis { color: ${t.muted} !important; font: 500 .6875rem/1 ${t.font} !important; font-variant-numeric: tabular-nums; text-align: right !important; padding-right: 8px !important; border-left: 0 !important; }
-    #calendar .fc-today, #calendar .fc-unthemed .fc-today { background: ${rgba(accent, .035)} !important; }
+    #calendar .fc-today, #calendar .fc-unthemed .fc-today { background: ${rgba(accent, .05)} !important; }
+    #calendar ::-webkit-scrollbar { width: 8px; height: 8px; }
+    #calendar ::-webkit-scrollbar-thumb { background: ${t.dark ? "rgba(255,255,255,.18)" : "rgba(0,0,0,.14)"}; }
     #calendar .fc-nonbusiness, #calendar .fc-bgevent.fc-nonbusiness { display: none !important; }
     .fc-now-indicator { border-color: ${t.red} !important; }
     .fc-time-grid .fc-now-indicator-line { border-top-width: 2px !important; }
@@ -729,7 +734,7 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     #calendar .fc-time-grid-event .calendar-event .event-description-content, #calendar .fc-time-grid-event .calendar-event .event-description-content-examen { padding: 2px 0 0 !important; width: 100% !important; }
     #calendar .fc-time-grid-event .calendar-event:has(.nrblock) .event-description-content, #calendar .fc-time-grid-event .calendar-event:has(.nrblock) .event-description-content-examen { width: calc(100% - 44px) !important; }
     #calendar .fc-time-grid-event .fc-time { color: ${t.muted} !important; font-size: .6875rem !important; }
-    #calendar .fc-time-grid-event .nrblock, #calendar .fc-time-grid-event .calendar-event .nrblock { background: ${t.accent} !important; color: #fff !important; box-shadow: none !important; border-radius: 6px !important; font: 600 .6875rem/18px ${t.font} !important; height: 18px !important; right: 4px !important; top: 3px !important; }
+    #calendar .fc-time-grid-event .nrblock, #calendar .fc-time-grid-event .calendar-event .nrblock { background: ${rgba(accent, t.dark ? .3 : .16)} !important; color: ${t.dark ? mix(accent, "#ffffff", .5) : mix(accent, "#000000", .3)} !important; box-shadow: none !important; border-radius: 6px !important; font: 600 .6875rem/18px ${t.font} !important; height: 18px !important; right: 4px !important; top: 3px !important; }
     .fc-day-grid-event.current-event, .fc-time-grid-event.current-event { background: ${rgba(accent, t.dark ? .38 : .24)} !important; }
     .fc-day-grid-event.active-event, .fc-time-grid-event.active-event { background: ${rgba(accent, t.dark ? .32 : .2)} !important; box-shadow: 0 0 0 2px ${t.accent} !important; }
     #calendar .fc-time-grid-event.current-event .nrblock, #calendar .fc-time-grid-event.active-event .nrblock { box-shadow: none !important; }
