@@ -168,11 +168,11 @@ DT.register({
     const lesSub = current ? `Nu: ${current.vak}${current.lokaal ? " · " + current.lokaal : ""}` : next ? `Volgende ${hhmm(next.start)}: ${next.vak}` : lessen.length ? "Lessen zijn voorbij" : "Geen lessen vandaag";
     const ring = (pct, color) => { const r = 20, c = 2 * Math.PI * r, p = Math.max(0, Math.min(100, pct)); return `<svg class="dt-ll-ring" viewBox="0 0 48 48" width="48" height="48" aria-hidden="true"><circle cx="24" cy="24" r="${r}" fill="none" stroke="currentColor" stroke-opacity=".15" stroke-width="5"/><circle cx="24" cy="24" r="${r}" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${(c * p / 100).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 24 24)"/></svg>`; };
     const attTile = att ? `
-      <a href="#" data-state="AttVerzuim" class="dt-ll-tile dt-ll-att${att.ongeoorloofd > 0 ? " is-hot" : ""}" data-kind="aanwezig" title="Open Verzuim">
+      <a href="#" data-state="AttVerzuim" class="dt-ll-tile dt-ll-att${att.ongeoorloofd > 0 ? " is-hot" : ""}" data-kind="aanwezig" title="${att.onbekend.length ? esc(`Onbekend registratietype: ${att.onbekend.join(", ")} (meld dit)`) : "Open Verzuim"}">
         <span class="dt-ll-ringwrap">${ring(att.pct, att.pct >= 90 ? "#34C759" : att.pct >= 80 ? "#FF9500" : "#FF3B30")}<span class="dt-ll-ringnum">${att.pct}<small>%</small></span></span>
         <span class="dt-ll-att-text">
           <span class="dt-ll-label">aanwezig dit schooljaar</span>
-          <span class="dt-ll-sub">${esc(att.lessen)} lessen · ${esc(att.afwezig)} afwezig${att.ongeoorloofd ? ` (${att.ongeoorloofd} ongeoorloofd)` : ""}${att.teLaat ? ` · ${att.teLaat}× te laat` : ""}${att.ziek ? ` · ${att.ziek}× ziek` : ""}</span>
+          <span class="dt-ll-sub">${esc(att.lessen)} lessen · ${esc(att.afwezig)} afwezig${att.ongeoorloofd ? ` (${att.ongeoorloofd} ongeoorloofd)` : ""}${att.teLaat ? ` · ${att.teLaat}× te laat` : ""}${att.ziek ? ` · ${att.ziek}× ziek` : ""}${att.onbekend.length ? ` · ${esc(att.onbekend.length)} onbekend type` : ""}</span>
         </span>
       </a>` : tile("aanwezig", "–", "aanwezigheid", d.verantw ? "geen lessen in deze periode" : "", { state: "AttVerzuim", err: d.verantw ? "" : fail(d.verantwErr) });
     const tiles = [
@@ -264,6 +264,10 @@ DT.register({
 function aanwezigheid(items, lessenTotaal, start, now) {
   if (!items) return null;
   const ABSENT = new Set(["AB", "ZK", "UI", "VR"]);
+  /* Magister levert het type als naam (absent, teLaat, ziek, uitgestuurd, vrijstelling, …) of als code. */
+  const TYPE = { absent: "AB", ab: "AB", absentie: "AB", telaat: "TL", tl: "TL", ziek: "ZK", zk: "ZK", uitgestuurd: "UI", ui: "UI", vrijstelling: "VR", vr: "VR", boekenvergeten: "MV", materiaalvergeten: "MV", mv: "MV", huiswerkvergeten: "HV", hv: "HV", mobielinklas: "MK", mk: "MK", onbekend: "ON", on: "ON", present: "", aanwezig: "" };
+  const norm = (v) => { const k = String(v ?? "").replace(/[\s_-]/g, "").toLowerCase(); return k in TYPE ? TYPE[k] : String(v ?? "").toUpperCase(); };
+  const onbekend = new Set(); let registraties = 0;
   const MON = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
   const MONL = ["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december"];
   const perMaand = new Map();
@@ -272,10 +276,13 @@ function aanwezigheid(items, lessenTotaal, start, now) {
     const a = it.afspraak || it.appointment || it;
     const begin = new Date(a.begin || a.start || a.startDateTime || it.begin);
     if (isNaN(begin) || begin > now) continue;
-    const regs = (it.verantwoordingen || it.registraties || it.registrations || []).map((r) => ({
-      type: String(r.reden?.verantwoordingType ?? r.verantwoordingType ?? r.attendanceTypeCode ?? r.code ?? "").toUpperCase(),
-      ok: r.reden?.isGeoorloofd ?? r.isGeoorloofd ?? r.geoorloofd ?? r.approved ?? true,
-    }));
+    const raw = it.verantwoordingen || it.registraties || it.registrations || (it.verantwoording ? [it.verantwoording] : []);
+    const regs = raw.map((r) => {
+      const v = r.reden?.verantwoordingType ?? r.verantwoordingType ?? r.reden?.code ?? r.attendanceTypeCode ?? r.code ?? r.type ?? "";
+      const type = norm(v); registraties++;
+      if (!["AB", "TL", "ZK", "UI", "VR", "MV", "HV", "MK", "ON", ""].includes(type)) onbekend.add(String(v));
+      return { type, ok: r.reden?.isGeoorloofd ?? r.isGeoorloofd ?? r.geoorloofd ?? r.approved ?? true };
+    });
     const key = `${begin.getFullYear()}-${begin.getMonth()}`;
     const m = perMaand.get(key) || { y: begin.getFullYear(), m: begin.getMonth(), lessen: 0, afwezig: 0, ongeoorloofd: 0, teLaat: 0 };
     m.lessen++; lessen++;
@@ -292,7 +299,7 @@ function aanwezigheid(items, lessenTotaal, start, now) {
     pctAfwezigGeoorloofd: m.lessen ? Math.round(100 * (m.afwezig - m.ongeoorloofd) / m.lessen) : 0,
     pctAfwezigOngeoorloofd: m.lessen ? Math.round(100 * m.ongeoorloofd / m.lessen) : 0,
   }));
-  return { lessen, afwezig, ongeoorloofd, teLaat, ziek, pct, maanden };
+  return { lessen, afwezig, ongeoorloofd, teLaat, ziek, pct, maanden, registraties, onbekend: [...onbekend] };
 }
 
 const ICON = {
