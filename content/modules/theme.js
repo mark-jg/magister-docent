@@ -137,6 +137,7 @@ DT.register({
       root.setProperty("--sl-color-background-selected-bold", accent);
     }
     css += this.extraCss(DT, p, dark, accent, ink);
+    if (p.look === "apple" && (!dark || this.darkStyle(DT) !== "invert")) css += appleShellCss(p, dark, accent);
     this._style.textContent = css;
     this.applyExtraInline(DT);
     if (this._stopObs) { this.injectShadow(DT, this._vars); this.recolor(DT); }
@@ -429,6 +430,7 @@ function applePalette(p, dark, accent) {
     accent, dark,
     bg: p.bg, surface: p.surface, surface2: p.surface2, fg: p.fg, muted: p.muted, border: p.border,
     sep: dark ? "rgba(84, 84, 88, .65)" : "rgba(60, 60, 67, .29)",
+    sepSoft: dark ? "rgba(84, 84, 88, .45)" : "rgba(60, 60, 67, .16)",
     sidebar: dark ? "#1C1C1E" : "#F2F2F7",
     hover: dark ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.045)",
     tint: rgba(accent, dark ? .22 : .12),
@@ -577,24 +579,30 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     .dna-card-list-item + .dna-card-list-item { border-top: 1px solid ${t.sep} !important; }
     .dna-card-list-selectable .dna-card-list-item:hover { background: ${t.hover} !important; }
 
-    /* ---- Lijsten (agenda, notificaties, berichten) ---- */
-    uib-accordion { background: transparent !important; }
-    uib-accordion .panel-heading { background: transparent !important; border-bottom: 1px solid ${t.sep} !important; color: ${t.muted} !important; height: 32px !important; }
-    uib-accordion .panel-heading a { color: ${t.muted} !important; font: 600 .75rem/32px ${t.font} !important; letter-spacing: .04em; text-transform: uppercase; padding-left: 14px !important; box-shadow: none !important; }
+    /* ---- Lijsten (agenda, notificaties, berichten): de rustige inset-stijl van Apple ----
+       geen kader, dagkoppen als groepskopje met ruimte in plaats van een lijn, scheidingslijnen
+       die bij de tekst beginnen en niet tot de rand lopen, zachte markering van de lopende les */
+    uib-accordion, .panel, .panel-default, .panel-group, .panel-collapse, .panel-body { background: transparent !important; border: 0 !important; box-shadow: none !important; }
+    uib-accordion .panel-heading, .panel-heading { background: transparent !important; border: 0 !important; box-shadow: none !important; color: ${t.muted} !important; height: 36px !important; line-height: 36px !important; }
+    .panel-group + .panel-group .panel-heading, .panel-group ~ .panel-group .panel-heading { margin-top: .625rem !important; }
+    uib-accordion .panel-heading a, .panel-heading a { color: ${t.muted} !important; font: 600 .6875rem/36px ${t.font} !important; letter-spacing: .06em; text-transform: uppercase; padding-left: 14px !important; box-shadow: none !important; border: 0 !important; }
+    uib-accordion .panel-heading a dna-icon { color: ${t.muted} !important; opacity: .7; }
+    uib-accordion .panel-title span { color: ${t.muted} !important; font-size: inherit !important; }
     .agenda-widget-content { border: 0 !important; }
-    uib-accordion .panel-heading a dna-icon { color: ${t.muted} !important; }
-    .list li { background: ${t.surface} !important; border-bottom: 1px solid ${t.sep} !important; color: ${t.fg} !important; height: 44px !important; line-height: 44px !important; }
+    .list, ul.list { border: 0 !important; }
+    .list li { background: transparent !important; border: 0 !important; color: ${t.fg} !important; height: 44px !important; line-height: 44px !important; }
+    .list li::after { content: ""; position: absolute; left: 14px; right: 0; bottom: 0; height: 1px; background: ${t.sepSoft}; pointer-events: none; }
+    .list li:last-child::after { display: none; }
     .list li.double-line { height: auto !important; min-height: 48px !important; line-height: 18px !important; }
     .list li a { display: flex !important; align-items: center; gap: .5rem; padding: 0 12px 0 14px !important; }
     .list li a > span { line-height: 1.25rem; }
-    .list li:last-child { border-bottom: 0 !important; }
     .list li a, .list li.double-line > span { color: ${t.fg} !important; }
     .list li span.list-head { color: ${t.fg} !important; }
     .list li span.list-head ~ span { color: ${t.muted} !important; }
     .list li:hover { background: ${t.hover} !important; }
-    .list li.active, .list li.selected, .list li.current-item { background: ${t.tint} !important; }
-    .list li.current { background: ${t.tintStrong} !important; }
-    .list li.alert:before, .list li.alert-info:before, .list li.alert-danger:before { width: 3px !important; border-radius: 2px; top: 8px !important; bottom: 8px !important; left: 5px !important; }
+    .list li.active, .list li.selected, .list li.current-item { background: ${rgba(accent, .12)} !important; }
+    .list li.current { background: ${rgba(accent, .09)} !important; }
+    .list li.alert:before, .list li.alert-info:before, .list li.alert-danger:before { width: 3px !important; border-radius: 2px; top: 10px !important; bottom: 10px !important; left: 6px !important; }
     .list li.alert-info:before, .list li.alert:before { background: ${t.accent} !important; }
     .list li.alert-danger:before { background: ${t.red} !important; }
     li.vandaag-agenda-list-item { height: 2.75rem !important; }
@@ -606,12 +614,14 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
 
     /* ---- Tabellen ---- */
     table.datagrid-table { border-left: 0 !important; }
-    table.datagrid-table th, table.datagrid-table thead th, table.datagrid-table tfoot td { background: ${t.surface} !important; border: 0 !important; border-bottom: 1px solid ${t.sep} !important; color: ${t.muted} !important; font: 600 .75rem/36px ${t.font} !important; height: 36px !important; }
-    table.datagrid-table td { background: ${t.surface} !important; border-right: 0 !important; border-bottom: 1px solid ${t.sep} !important; color: ${t.fg} !important; font-size: .8125rem !important; height: 40px !important; }
+    table.datagrid-table th, table.datagrid-table thead th, table.datagrid-table tfoot td { background: transparent !important; border: 0 !important; border-bottom: 1px solid ${t.sepSoft} !important; color: ${t.muted} !important; font: 600 .6875rem/36px ${t.font} !important; letter-spacing: .04em; text-transform: uppercase; height: 36px !important; }
+    table.datagrid-table td { background: transparent !important; border: 0 !important; border-bottom: 1px solid ${t.sepSoft} !important; color: ${t.fg} !important; font-size: .8125rem !important; height: 40px !important; }
+    table.datagrid-table tbody tr:last-child td { border-bottom: 0 !important; }
+    table.datagrid-table th:first-child, table.datagrid-table td:first-child { padding-left: 14px !important; }
     table.datagrid-table thead + tbody tr:first-child td { box-shadow: none !important; }
     table.datagrid-table tr:hover td, table.datagrid-table tr.hover td { background: ${t.hover} !important; }
-    table.datagrid-table tr.selected td, table.datagrid-table tr.selected:hover td { background: ${t.tint} !important; }
-    table.datagrid-table tr.current td, table.datagrid-table tr:hover.current td { background: ${t.tintStrong} !important; }
+    table.datagrid-table tr.selected td, table.datagrid-table tr.selected:hover td { background: ${rgba(accent, .12)} !important; }
+    table.datagrid-table tr.current td, table.datagrid-table tr:hover.current td { background: ${rgba(accent, .09)} !important; }
     th { color: ${t.muted}; }
 
     /* ---- Velden en knoppen (oude schermen) ---- */
@@ -692,8 +702,8 @@ function glassCss(t, top) {
     .widget > .content-pane .content, .widget > .preview-pane .content, .widget > .content-pane > .content, .widget > .preview-pane > .content, .widget > .content-pane h3, uib-accordion, .list li, .dna-card-list-item,
     table.datagrid-table th, table.datagrid-table thead th, table.datagrid-table tfoot td, table.datagrid-table td { background: transparent !important; }
     .list li:hover, table.datagrid-table tr:hover td { background: ${t.dark ? "rgba(255,255,255,.06)" : "rgba(255,255,255,.5)"} !important; }
-    .list li.current, table.datagrid-table tr.current td { background: ${rgba(a, .18)} !important; }
-    .list li.active, .list li.selected, .list li.current-item, table.datagrid-table tr.selected td { background: ${rgba(a, .12)} !important; }
+    .list li.current, table.datagrid-table tr.current td { background: ${rgba(a, .10)} !important; }
+    .list li.active, .list li.selected, .list li.current-item, table.datagrid-table tr.selected td { background: ${rgba(a, .14)} !important; }
     /* Kopbalk van detailkaarten en popovers als glas */
     dna-head-bar, .dna-head-bar, .head-bar { ${glass} border-radius: 16px !important; margin-bottom: .5rem; }
     .collapsed-menu .popup-menu, .appbar .popup-menu, .appbar-flyout-menu, .collapsed-menu .main-menu > li.active > ul, .dialog, .modal-content, mg-dialog .dialog {
@@ -717,6 +727,21 @@ function glassCss(t, top) {
     .dna-snack-bar { background: ${t.dark ? "rgba(58,58,60,.85)" : "rgba(29,29,31,.85)"} !important; -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border-radius: 18px !important; }
     /* Eigen UI van de extensie */
     :root { --dt-radius: 16px; }
+  `;
+}
+
+/* De schil (iconenrail, zijbalk, menu) als allerlaatste in de cascade: wint van Magister, van de
+ * basisregels van het thema en van eigen aanvullingen uit de Inspector. */
+function appleShellCss(p, dark, accent) {
+  const t = applePalette(p, dark, accent);
+  const bg = t.glass ? t.glassSide : t.sidebar;
+  const blur = t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : "";
+  return `
+    html body .container > .appbar-host, html body .container > .menu-host { background: ${bg} !important; background-color: ${bg} !important; background-image: none !important; ${blur} }
+    html body .appbar-host mg-appbar, html body .appbar-host .appbar, html body .menu-host nav.menu, html body .menu-host .menu-container, html body .menu-host .menu-footer, html body .menu-host .menu-footer a { background: transparent !important; background-color: transparent !important; background-image: none !important; }
+    html body .appbar > div > a, html body .appbar .menu-button button, html body a.appbar-button { background: transparent !important; background-color: transparent !important; color: ${t.muted} !important; }
+    html body .appbar > div > a:hover, html body .appbar .menu-button button:hover { background: ${t.hover} !important; background-color: ${t.hover} !important; color: ${t.fg} !important; }
+    html body .appbar-icon, html body .appbar > div > a i, html body .appbar .menu-button > button > i, html body .appbar dna-icon { color: inherit !important; }
   `;
 }
 
