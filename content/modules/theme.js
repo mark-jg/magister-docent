@@ -498,12 +498,14 @@ function appleTokens(t) {
     dna-breadcrumbs, dna-breadcrumb { --background: transparent !important; --border-color: transparent !important; --color: ${t.muted} !important; --link-color: ${t.muted} !important; --separator-color: ${t.border} !important; --box-shadow: none !important; --font-weight: 500 !important; }
     /* Tegels (aanwezigheid e.d.) */
     dna-link-card { --border-radius: 20px !important; --border-width: 0 !important; --border: 0 !important; --box-shadow: ${t.card} !important; background-color: ${t.surface} !important;
-      --arrow-background: ${t.accent} !important; --arrow-color: #fff !important; --arrow-size: 40px !important; --arrow-position: auto .875rem .875rem auto !important; --arrow-padding: 8px 0 0 10px !important;
-      --heading-font: 600 1.0625rem/1.5rem ${t.font} !important; --description-font: .8125rem/1.25rem ${t.font} !important; --padding: 1.5rem 1.25rem 3.25rem !important;
+      --arrow-background: ${t.tint} !important; --arrow-color: ${t.accent} !important; --arrow-size: 36px !important; --arrow-position: auto 1rem 1rem auto !important; --arrow-padding: 6px 0 0 8px !important;
+      --heading-font: 600 1.0625rem/1.4 ${t.font} !important; --description-font: .8125rem/1.35 ${t.font} !important; --padding: 1.25rem 1.25rem 3.5rem !important; --heading-margin: .75rem 0 .25rem !important;
       --image-primary: ${rgba(t.accent, .3)} !important; --image-secondary: ${t.accent} !important; }
     dna-link-card p { color: ${t.muted}; }
-    dna-link-card { --image-size: 3.5rem !important; --_image-size: 3.5rem !important; aspect-ratio: auto !important; min-block-size: 13rem; transition: transform .18s ease, box-shadow .18s ease; }
-    dna-link-card:hover { transform: translateY(-2px); --box-shadow: ${t.pop} !important; --_box-shadow: ${t.pop} !important; }
+    dna-link-card { --image-size: 2.25rem !important; --_image-size: 2.25rem !important; --width: 17rem !important; --_width: 17rem !important; aspect-ratio: auto !important; min-block-size: 12.5rem; transition: transform .18s ease, box-shadow .18s ease; }
+    dna-link-card:hover { transform: translateY(-2px); --box-shadow: ${t.pop} !important; --_box-shadow: ${t.pop} !important; --arrow-background: ${t.accent} !important; --_arrow-background: ${t.accent} !important; --arrow-color: #fff !important; --_arrow-color: #fff !important; }
+    /* Icoon in een zacht afgerond vlak, zoals app-iconen in Apples instellingen */
+    dna-link-card > dna-icon { display: inline-grid !important; place-items: center; inline-size: 3.75rem !important; block-size: 3.75rem !important; padding: 0 !important; border-radius: 16px !important; background: ${t.tint} !important; --icon-size: 2.25rem !important; --_icon-size: 2.25rem !important; }
     dna-link-card h1 { color: ${t.fg}; }
     /* SL-rooster: geen grijze kop, geen celvlakken, lichte lijnen */
     sl-grid { --_header-background: transparent !important; --_cell-background: transparent !important; --_border-radius: 12px !important; }
@@ -786,6 +788,10 @@ function appleShadowCss(p, dark, accent) {
   const t = applePalette(p, dark, accent);
   return appleTokens(t).replace(":root, body {", ":host {") + `
     :host(dna-page-header) .title { letter-spacing: -.02em; }
+    :host(dna-link-card) a, :host(dna-link-card) .wrapper { align-items: flex-start !important; justify-content: flex-start !important; text-align: start !important; }
+    :host(dna-link-card) h1 { text-align: start !important; color: ${t.fg} !important; letter-spacing: -.01em; }
+    :host(dna-link-card) p { text-align: start !important; color: ${t.muted} !important; }
+    :host(att-attendance-dashboard) .wrapper { grid-template-rows: none !important; grid-auto-rows: auto !important; align-content: start !important; align-items: start !important; gap: 1.25rem !important; padding-block: 1.25rem !important; }
     .dna-card, .card { background: ${t.surface}; color: ${t.fg}; }
   `;
 }
