@@ -1063,8 +1063,8 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     .dna-head-bar-aside { background: transparent !important; }
     .dna-head-bar-aside .dna-head-bar-item:after { background: ${t.accent} !important; height: 2px !important; }
     .tabs, ul.tabs, .page-nav, [role=tablist] { background: transparent !important; border: 0 !important; border-bottom: 1px solid ${t.sep} !important; }
-    .tabs li a, ul.tabs li a, [role=tablist] > [role=tab]:not(.panel-heading) { border: 0 !important; color: ${t.muted} !important; }
-    .tabs li.active a, ul.tabs li.active a, [role=tablist] > [role=tab][aria-selected=true]:not(.panel-heading) { color: ${t.accent} !important; box-shadow: inset 0 -2px 0 ${t.accent} !important; font-weight: 600; }
+    .tabs li a, ul.tabs li a, [role=tablist] > [role=tab]:not(.panel-heading):not(dna-tab-button) { border: 0 !important; color: ${t.muted} !important; }
+    .tabs li.active a, ul.tabs li.active a, [role=tablist] > [role=tab][aria-selected=true]:not(.panel-heading):not(dna-tab-button) { color: ${t.accent} !important; box-shadow: inset 0 -2px 0 ${t.accent} !important; font-weight: 600; }
 
     /* ---- Meldingen en dialogen ---- */
     .dna-snack-bar { background: ${dark ? "#3A3A3C" : "#1D1D1F"} !important; color: #fff !important; border-radius: 12px !important; box-shadow: ${t.pop} !important; }
@@ -1090,8 +1090,10 @@ function leerlingkaartCss(t) {
     dk-basisgegevens-page dna-page-header dna-button { margin-right: 0 !important; }
     dk-basisgegevens-page dna-tab-bar { background: transparent !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 1.5rem .5rem !important; --padding-inline: 0 !important; --_padding-inline: 0 !important; --margin: 0 !important; --_margin: 0 !important; --indicator-size: 0 !important; --_indicator-size: 0 !important; --spacing: .375rem !important; --_spacing: .375rem !important; --gap: .375rem !important; --_gap: .375rem !important; --border-width: 0 !important; --_border-width: 0 !important; --border: 0 !important; --_border: 0 !important; }
     dna-tab-button { --border-radius: 999px !important; --_border-radius: 999px !important; --padding: .375rem .875rem !important; --_padding: .375rem .875rem !important; --background: transparent !important; --_background: transparent !important; --active: ${t.tint} !important; --_active: ${t.tint} !important; --color: ${t.muted} !important; --_color: ${t.muted} !important; --indicator-size: 0 !important; --_indicator-size: 0 !important; --border-width: 0 !important; --_border-width: 0 !important; --border: 0 !important; --_border: 0 !important; --width: auto !important; --_width: auto !important; --margin: 0 !important; --_margin: 0 !important; font: 500 .875rem/1.25 ${t.font} !important; letter-spacing: -.005em; }
+    dna-tab-button:focus-visible, dna-tab-button[selected]:focus-visible { box-shadow: none !important; --border-color: transparent !important; --_border-color: transparent !important; --box-shadow-spread: 0 !important; --_box-shadow-spread: 0 !important; }
     dna-tab-button:hover { --background: ${t.hover} !important; --_background: ${t.hover} !important; --color: ${t.fg} !important; --_color: ${t.fg} !important; }
-    dna-tab-button[selected], dna-tab-button[aria-selected="true"] { --background: ${t.tint} !important; --_background: ${t.tint} !important; --color: ${t.accent} !important; --_color: ${t.accent} !important; font-weight: 600 !important; }
+    dna-tab-button[selected], dna-tab-button[aria-selected="true"] { --background: ${t.tint} !important; --_background: ${t.tint} !important; --color: ${t.accent} !important; --_color: ${t.accent} !important; font-weight: 600 !important; box-shadow: none !important; border-radius: 999px !important; }
+    dna-tab-button { box-shadow: none !important; }
     /* Raster van kaarten, gelijk hoog per rij */
     dk-basisgegevens-page .page { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)) !important; gap: 1rem !important; padding: .25rem 1.5rem 1.5rem !important; align-items: stretch !important; max-width: 1480px; box-sizing: border-box; }
     dk-basisgegevens-page .page > .leerling-block, dk-basisgegevens-page .page > .contact-block, dk-basisgegevens-page .page > dk-medewerker { width: auto !important; margin: 0 !important; min-width: 0; }
@@ -1100,8 +1102,9 @@ function leerlingkaartCss(t) {
     /* Profielkaart */
     dk-leerling dna-card { --body-padding: 1rem 1.25rem 1.25rem !important; --_body-padding: 1rem 1.25rem 1.25rem !important; text-align: center; }
     dk-leerling .avatar { padding: .5rem 0 .5rem !important; justify-content: center !important; }
-    dk-leerling dna-avatar.leerling-avatar { --size: 120px !important; --_size: 120px !important; --font-size: 2.5rem !important; --_font-size: 2.5rem !important; --font-weight: 600 !important; --_font-weight: 600 !important; --background: ${t.dark ? t.tintStrong : t.tint} !important; --_background: ${t.dark ? t.tintStrong : t.tint} !important; --color: ${t.accent} !important; --_color: ${t.accent} !important; }
-    dk-leerling .upload-button { --border-radius: 999px !important; --_border-radius: 999px !important; }
+    dk-leerling dna-avatar.leerling-avatar { --font-size: 3rem !important; --_font-size: 3rem !important; --font-weight: 600 !important; --_font-weight: 600 !important; --background: ${t.dark ? t.tintStrong : t.tint} !important; --_background: ${t.dark ? t.tintStrong : t.tint} !important; --color: ${t.accent} !important; --_color: ${t.accent} !important; }
+    dk-leerling .upload-button { --border-radius: 999px !important; --_border-radius: 999px !important; --padding-v: .45rem !important; --_padding-v: .45rem !important; --padding-h: .45rem !important; --_padding-h: .45rem !important; margin-top: 7.4rem !important; right: 54px !important; background: ${t.accent} !important; color: #fff !important; --color: #fff !important; --_color: #fff !important; border-radius: 999px !important; outline: 3px solid ${t.surface} !important; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+    dk-leerling .upload-button dna-icon { color: #fff !important; --icon-size: 1rem; --_icon-size: 1rem; }
     dk-leerling .klas-studie { margin: .25rem 0 1rem !important; }
     dk-leerling .klasnaam { display: inline-block; padding: .25rem .8rem; border-radius: 999px; background: ${t.tint}; color: ${t.accent}; font: 600 .8125rem/1.25 ${t.font}; margin-bottom: .5rem; }
     dk-leerling .studieprofiel { color: ${t.muted}; font: 400 .8125rem/1.35 ${t.font}; }
@@ -1160,6 +1163,9 @@ function appleShadowCss(p, dark, accent) {
     :host(att-dk-student-selector) .subtext { font: 400 .875rem/1.3 ${t.font} !important; color: ${t.muted} !important; }
     :host(att-dk-student-selector) dna-avatar { --size: 48px !important; --_size: 48px !important; --background: ${t.tint} !important; --_background: ${t.tint} !important; --color: ${t.accent} !important; --_color: ${t.accent} !important; --font-weight: 600 !important; --_font-weight: 600 !important; }
     :host(dna-tab-bar) .fade { background: transparent !important; box-shadow: none !important; }
+    :host(dna-tab-bar) .indicator { display: none !important; }
+    :host(dna-tab-bar) .wrapper { padding-block-end: var(--_spacing, 2px) !important; }
+    :host(dna-button.upload-button) button, :host(dna-button.upload-button) .button, :host(dna-button.upload-button) a { border: 0 !important; background: transparent !important; color: #fff !important; padding: 0 !important; }
     /* Avatar met naam en hint eronder (profielkaart) */
     :host(dna-avatar) .outer .inner { font: 600 1.125rem/1.3 ${t.font} !important; color: ${t.fg} !important; letter-spacing: -.01em; }
     :host(dna-avatar) .outer .content { font: 400 .8125rem/1.3 ${t.font} !important; color: ${t.muted} !important; }
