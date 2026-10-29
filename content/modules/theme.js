@@ -513,7 +513,7 @@ function appleTokens(t) {
     /* SL-rooster: geen grijze kop, geen celvlakken, lichte lijnen */
     sl-grid { --_header-background: transparent !important; --_cell-background: transparent !important; --_border-radius: 12px !important; }
     sl-grid::part(header) { color: ${t.muted}; font-weight: 600; font-size: .6875rem; letter-spacing: .04em; text-transform: uppercase; }
-    dna-card { --border-radius: 14px !important; --border-width: 0 !important; --border: 0 !important; --box-shadow: ${t.card} !important; --background: ${t.surface} !important; --color: ${t.fg} !important; --header-padding: .875rem 1rem !important; --body-padding: 0 1rem 1rem !important; --feature: ${t.accent} !important; }
+    dna-card { --border-radius: 20px !important; --border-width: 0 !important; --border: 0 !important; --box-shadow: ${t.card} !important; --background: ${t.surface} !important; --color: ${t.fg} !important; --header-padding: 1rem 1.25rem .5rem !important; --body-padding: 0 1.25rem 1.25rem !important; --feature: ${t.accent} !important; }
     dna-card-title, .dna-card-title { font-weight: 600 !important; font-size: 1.0625rem !important; letter-spacing: -.01em; color: ${t.fg} !important; }
     dna-page-header { --title-color: ${t.fg} !important; --title-font-weight: 700 !important; --title-font-size: 1.75rem !important; --title-line-height: 2.125rem !important; --subtitle-color: ${t.muted} !important; --highlight: ${t.accent} !important; letter-spacing: -.02em; }
     dna-button { --border-radius: 10px !important; --font-weight: 500 !important; --padding-v: .5rem !important; --padding-h: .875rem !important; --box-shadow-spread: 3px !important; }
@@ -612,7 +612,7 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
 
     /* ---- Oude widgets (Tahoma 11px) ---- */
     .widget { font-family: ${t.font} !important; font-size: .8125rem !important; }
-    .widget > .content-pane, .widget > .preview-pane { background: ${t.surface} !important; border: 0 !important; border-radius: 14px !important; box-shadow: ${t.card} !important; overflow: hidden; }
+    .widget > .content-pane, .widget > .preview-pane { background: ${t.surface} !important; border: 0 !important; border-radius: 20px !important; box-shadow: ${t.card} !important; overflow: hidden; }
     .widget > .content-pane h3, .widget > .preview-pane h3 { background: transparent !important; color: ${t.fg} !important; font: 600 .9375rem/44px ${t.font} !important; height: 44px !important; padding-left: 16px !important; border-bottom: 1px solid ${t.sep} !important; box-shadow: none !important; }
     .widget > .content-pane h3 a, .widget > .preview-pane h3 a { color: ${t.accent} !important; }
     .widget > .content-pane h3 a.fold-toggle, .widget > .preview-pane h3 a.fold-toggle { color: ${t.muted} !important; }
@@ -620,7 +620,7 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     .widget > .content-pane .content, .widget > .preview-pane .content, .widget > .content-pane > .content, .widget > .preview-pane > .content { background: ${t.surface} !important; font-family: ${t.font} !important; font-size: .8125rem !important; color: ${t.fg} !important; }
     .widget .content-pane .filterbar ~ .content, .widget .preview-pane .filterbar ~ .content { box-shadow: none !important; }
     .tight-fit .main .content-pane { border-radius: 0 !important; }
-    .dna-card { background: ${t.surface} !important; color: ${t.fg} !important; border-radius: 14px !important; box-shadow: ${t.card} !important; }
+    .dna-card { background: ${t.surface} !important; color: ${t.fg} !important; border-radius: 20px !important; box-shadow: ${t.card} !important; }
     .dna-card-list, .dna-card-list-item { border-radius: 14px; box-shadow: none; }
     .dna-card-list { box-shadow: ${t.card} !important; }
     .dna-card-list-item { background: ${t.surface} !important; }
@@ -656,7 +656,10 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     li.vandaag-agenda-list-item { height: 2.75rem !important; }
     .vandaag-agenda-item-lesblok-tijd { color: ${t.muted} !important; font-variant-numeric: tabular-nums; margin-left: .875rem !important; }
     span.nrblock { background: ${t.tint} !important; color: ${t.accent} !important; border-radius: 6px !important; font: 600 .75rem/20px ${t.font} !important; height: 20px !important; min-width: 20px !important; padding: 0 6px !important; }
-    ag-lesblok-wijziging > span { color: ${t.muted} !important; font-size: .75rem; }
+    ag-lesblok-wijziging > span { color: ${t.muted} !important; font: 500 .6875rem/20px ${t.font} !important; background: ${t.gray6}; border-radius: 999px; padding: 0 8px; margin: 0 !important; }
+    ag-lesblok-wijziging > span:empty { display: none !important; }
+    #vandaag-notificatie .list li a::after, vandaag-panel-content .list li a::after { content: ""; margin-left: auto; width: 7px; height: 7px; border-right: 1.5px solid ${t.border}; border-bottom: 1.5px solid ${t.border}; transform: rotate(-45deg); flex: 0 0 auto; }
+    #vandaag-notificatie .list li:hover a::after, vandaag-panel-content .list li:hover a::after { border-color: ${t.muted}; }
     .list li .special, .list li span.special, ul.list div a .special { display: inline-flex !important; align-items: center; justify-content: center; float: none !important; width: auto !important; min-width: 1.5rem; height: 1.375rem !important; padding: 0 .5rem; margin: 0 .25rem 0 0 !important; border-radius: 999px; background: ${t.tint}; color: ${t.accent}; font-weight: 600; font-size: .75rem; line-height: 1 !important; text-align: center; }
     .geen-afspraken-tekst, .geen-mededelingen-tekst { color: ${t.muted} !important; }
 
@@ -689,34 +692,65 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     .filters-loading dna-spinner { color: ${t.accent} !important; }
 
     /* ---- Agenda (FullCalendar) in de stijl van Apple Agenda ---- */
-    #calendar { background: ${t.surface} !important; border-radius: 14px; box-shadow: ${t.card}; overflow: hidden; }
-    #calendar .fc-agenda-view, #calendar .fc-view-container, #calendar .fc-basic-view { background: ${t.surface} !important; }
-    #calendar .fc-toolbar { background: transparent !important; border-bottom: 1px solid ${t.sepSoft}; height: 44px !important; line-height: 44px !important; margin: 0 !important; }
-    .fc-toolbar button { color: ${t.muted} !important; font: 500 .8125rem/44px ${t.font} !important; height: 44px !important; }
-    .fc-toolbar button:hover { color: ${t.accent} !important; }
-    .fc-toolbar button.fc-next-button:after, .fc-toolbar button.fc-prev-button:before { color: ${t.accent} !important; }
+    #calendar { background: ${t.surface} !important; border-radius: 20px; box-shadow: ${t.card}; overflow: hidden; }
+    #calendar .fc-agenda-view, #calendar .fc-view-container, #calendar .fc-basic-view, #calendar .fc-view > table { background: ${t.surface} !important; }
+    #calendar .fc-toolbar { background: transparent !important; border-bottom: 1px solid ${t.sepSoft}; height: 48px !important; line-height: 48px !important; margin: 0 !important; padding: 0 8px; }
+    .fc-toolbar .fc-left, .fc-toolbar .fc-right { height: 48px; display: flex; align-items: center; }
+    .fc-toolbar button, .fc-toolbar .fc-button { color: ${t.accent} !important; font: 500 .8125rem/28px ${t.font} !important; height: 28px !important; line-height: 28px !important; padding: 0 12px !important; margin: 0 !important; border-radius: 999px !important; background: ${t.tint} !important; transition: background .12s; position: relative; }
+    .fc-toolbar button:hover { background: ${t.tintStrong} !important; }
+    .fc-toolbar button.fc-prev-button { padding-left: 26px !important; }
+    .fc-toolbar button.fc-next-button { padding-right: 26px !important; }
+    .fc-toolbar button.fc-prev-button:before, .fc-toolbar button.fc-next-button:after { color: ${t.accent} !important; font-size: 12px !important; height: 28px !important; line-height: 28px !important; top: 0; }
+    .fc-toolbar button.fc-prev-button:before { left: 10px; }
+    .fc-toolbar button.fc-next-button:after { right: 10px !important; }
+    #calendar .fc-toolbar h2 { color: ${t.fg}; font: 600 .9375rem/48px ${t.font}; }
     #calendar .fc-head .fc-widget-header { background: transparent !important; border: 0 !important; height: 40px !important; line-height: 40px !important; }
-    #calendar .fc-day-header { color: ${t.muted} !important; font: 600 .75rem/40px ${t.font} !important; letter-spacing: .02em; border-bottom: 1px solid ${t.sepSoft} !important; }
+    #calendar .fc-day-header { color: ${t.muted} !important; font: 600 .75rem/40px ${t.font} !important; letter-spacing: .02em; border-bottom: 1px solid ${t.sepSoft} !important; border-left-color: transparent !important; border-right-color: transparent !important; }
     #calendar .fc-day-header.fc-today { color: ${t.accent} !important; }
     #calendar .fc-divider, #calendar .fc-popover, #calendar .fc-row, #calendar tbody, #calendar td, #calendar th, #calendar thead, .fc-unthemed td, .fc-unthemed th { border-color: ${t.sepSoft} !important; font-size: .75rem; }
-    .fc-time-grid .fc-slats .fc-minor td { border-top-style: solid !important; border-color: ${t.dark ? "rgba(84,84,88,.25)" : "rgba(60,60,67,.07)"} !important; }
+    #calendar .fc-divider { display: none !important; }
+    #calendar .fc-day-grid .fc-row { min-height: 2rem; }
+    #calendar .fc-day-grid td.fc-axis, #calendar .fc-day-grid .fc-axis span { color: ${t.muted}; font: 500 .6875rem/1 ${t.font}; }
+    .fc-time-grid .fc-slats .fc-minor td { border-top-style: solid !important; border-color: ${t.dark ? "rgba(84,84,88,.25)" : "rgba(60,60,67,.06)"} !important; }
+    .fc-time-grid .fc-slats td { height: 1.75em !important; }
     #calendar .fc-agenda-view .fc-time-grid .fc-slats .fc-minor td.fc-axis { border-right-color: ${t.sepSoft} !important; }
-    #calendar .fc-axis { color: ${t.muted} !important; font: 500 .6875rem/1 ${t.font} !important; font-variant-numeric: tabular-nums; text-align: right !important; padding-right: 8px !important; }
-    #calendar .fc-today, #calendar .fc-unthemed .fc-today { background: ${rgba(accent, .04)} !important; }
+    #calendar .fc-axis { color: ${t.muted} !important; font: 500 .6875rem/1 ${t.font} !important; font-variant-numeric: tabular-nums; text-align: right !important; padding-right: 8px !important; border-left: 0 !important; }
+    #calendar .fc-today, #calendar .fc-unthemed .fc-today { background: ${rgba(accent, .035)} !important; }
+    #calendar .fc-nonbusiness, #calendar .fc-bgevent.fc-nonbusiness { display: none !important; }
     .fc-now-indicator { border-color: ${t.red} !important; }
+    .fc-time-grid .fc-now-indicator-line { border-top-width: 2px !important; }
+    .fc-time-grid .fc-now-indicator-arrow { border-width: 0 !important; width: 10px; height: 10px; border-radius: 50%; background: ${t.red}; margin-top: -5px !important; margin-left: -5px; left: 100%; }
     /* Afspraken: zachte tint met een gekleurde linkerrand, afgerond, zonder kader */
-    #calendar .fc-event, #calendar .fc-time-grid-event, #calendar .fc-day-grid-event { background: ${rgba(accent, t.dark ? .22 : .13)} !important; border: 0 !important; border-left: 3px solid ${t.accent} !important; border-radius: 6px !important; color: ${t.fg} !important; box-shadow: none !important; }
+    #calendar .fc-event, #calendar .fc-time-grid-event, #calendar .fc-day-grid-event { background: ${rgba(accent, t.dark ? .22 : .12)} !important; border: 0 !important; border-left: 3px solid ${t.accent} !important; border-radius: 6px !important; color: ${t.fg} !important; box-shadow: none !important; margin-right: 2px; }
+    #calendar .fc-time-grid-event { margin-bottom: 1px; }
     #calendar .fc-event .fc-bg { display: none; }
-    #calendar .fc-time-grid-event .fc-title, #calendar .fc-time-grid-event .event-description, #calendar .fc-time-grid-event .event-description-content, #calendar .fc-time-grid-event .event-description-content-examen, #calendar .fc-h-event .fc-content { color: ${t.dark ? mix(accent, "#ffffff", .55) : mix(accent, "#000000", .45)} !important; font: 500 .75rem/1.2 ${t.font} !important; }
+    #calendar .fc-event .fc-content { padding: 3px 4px 3px 6px; }
+    #calendar .fc-time-grid-event .fc-title, #calendar .fc-time-grid-event .event-description, #calendar .fc-time-grid-event .event-description-content, #calendar .fc-time-grid-event .event-description-content-examen, #calendar .fc-h-event .fc-content { color: ${t.dark ? mix(accent, "#ffffff", .55) : mix(accent, "#000000", .45)} !important; font: 500 .75rem/1.25 ${t.font} !important; padding: 0 !important; }
+    #calendar .fc-time-grid-event .calendar-event .event-description-content, #calendar .fc-time-grid-event .calendar-event .event-description-content-examen { padding: 2px 0 0 !important; width: 100% !important; }
+    #calendar .fc-time-grid-event .calendar-event:has(.nrblock) .event-description-content, #calendar .fc-time-grid-event .calendar-event:has(.nrblock) .event-description-content-examen { width: calc(100% - 44px) !important; }
     #calendar .fc-time-grid-event .fc-time { color: ${t.muted} !important; font-size: .6875rem !important; }
-    #calendar .fc-time-grid-event .nrblock, #calendar .fc-time-grid-event .calendar-event .nrblock { background: ${t.accent} !important; color: #fff !important; box-shadow: none !important; border-radius: 6px !important; font: 600 .6875rem/18px ${t.font} !important; height: 18px !important; }
-    .fc-day-grid-event.current-event, .fc-time-grid-event.current-event { background: ${rgba(accent, t.dark ? .38 : .26)} !important; }
+    #calendar .fc-time-grid-event .nrblock, #calendar .fc-time-grid-event .calendar-event .nrblock { background: ${t.accent} !important; color: #fff !important; box-shadow: none !important; border-radius: 6px !important; font: 600 .6875rem/18px ${t.font} !important; height: 18px !important; right: 4px !important; top: 3px !important; }
+    .fc-day-grid-event.current-event, .fc-time-grid-event.current-event { background: ${rgba(accent, t.dark ? .38 : .24)} !important; }
     .fc-day-grid-event.active-event, .fc-time-grid-event.active-event { background: ${rgba(accent, t.dark ? .32 : .2)} !important; box-shadow: 0 0 0 2px ${t.accent} !important; }
     #calendar .fc-time-grid-event.current-event .nrblock, #calendar .fc-time-grid-event.active-event .nrblock { box-shadow: none !important; }
-    .calendar-event.info:before { background: ${t.red} !important; border-radius: 2px; }
-    #calendar .fc-event:hover { filter: brightness(.97); }
+    #calendar .fc-event:has(.calendar-event.info) { border-left-color: ${t.red} !important; background: ${rgba(t.red === "#FF3B30" ? "#FF3B30" : "#FF453A", .1)} !important; }
+    .calendar-event.info:before { display: none !important; }
+    #calendar .fc-event:has(.calendar-event.info) .event-description-content { color: ${t.red} !important; }
+    #calendar .fc-event:hover { filter: brightness(.96); }
+    #calendar .fc-highlight { background: ${rgba(accent, .12)} !important; opacity: 1 !important; }
+    /* Rechterzijbalk: tabs als segmentknop, kaarten van 20px */
+    aside .head-bar { background: transparent !important; border: 0 !important; height: 44px !important; line-height: 44px !important; padding: 6px 0 0 !important; }
+    aside .head-bar .tabs { background: ${t.gray6} !important; border: 0 !important; border-radius: 999px !important; padding: 3px !important; height: 32px !important; display: flex !important; float: none !important; width: calc(100% - 44px) !important; box-sizing: border-box; }
+    aside .head-bar .tabs li { width: auto !important; flex: 1; height: 26px !important; }
+    aside .head-bar .tabs li a { height: 26px !important; line-height: 26px !important; border-radius: 999px !important; color: ${t.muted} !important; font: 500 .8125rem/26px ${t.font} !important; box-shadow: none !important; }
+    aside .head-bar .tabs li.active a, aside .head-bar .tabs li:hover a { color: ${t.fg} !important; }
+    aside .head-bar .tabs li.active { border: 0 !important; }
+    aside .head-bar .tabs li.active a { background: ${t.surface} !important; box-shadow: 0 1px 3px rgba(0,0,0,.14), 0 0 0 .5px rgba(0,0,0,.04) !important; font-weight: 600 !important; }
+    aside .widget { padding: 8px 0 0 !important; }
+    aside .widget > .content-pane { border-radius: 20px !important; }
     /* Minikalender (datepicker): geen celranden, vandaag in accent, keuze als gevulde cirkel */
     div.calendar table, div[uib-datepicker] table, .content-pane div.calendar table { border: 0 !important; border-collapse: separate !important; border-spacing: 0 2px !important; }
+    div.calendar, div[uib-datepicker] { padding: 6px 8px 2px !important; max-width: none !important; }
     div.calendar table td, div.calendar table th, div[uib-datepicker] table td, div[uib-datepicker] table th { border: 0 !important; height: 30px !important; line-height: 30px !important; background: transparent !important; font-size: .75rem !important; }
     div.calendar table th, div[uib-datepicker] table th { color: ${t.muted} !important; font: 600 .6875rem/30px ${t.font} !important; text-transform: uppercase; letter-spacing: .04em; }
     div.calendar table tr:first-child th, div[uib-datepicker] table tr:first-child th { background: transparent !important; border: 0 !important; height: 40px !important; line-height: 40px !important; color: ${t.fg} !important; font: 600 .875rem/40px ${t.font} !important; text-transform: none; letter-spacing: 0; }
