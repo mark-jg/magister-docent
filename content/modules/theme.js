@@ -738,9 +738,10 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     .filters-loading dna-spinner { color: ${t.accent} !important; }
 
     /* ---- Agenda (FullCalendar) in de stijl van Apple Agenda ---- */
-    #calendar { background: ${t.surface} !important; border-radius: 20px; box-shadow: ${t.card}; overflow: hidden; }
-    #calendar .fc-agenda-view, #calendar .fc-view-container, #calendar .fc-basic-view, #calendar .fc-view > table { background: ${t.surface} !important; }
-    #calendar .fc-toolbar { background: transparent !important; border-bottom: 1px solid ${t.sepSoft}; height: 48px !important; line-height: 48px !important; margin: 0 !important; padding: 0 8px; }
+    /* Geen kaart om het rooster: het ligt direct op de achtergrond, alleen de afspraken zijn vlakken */
+    #calendar { background: transparent !important; border-radius: 0; box-shadow: none; overflow: visible; }
+    #calendar .fc-agenda-view, #calendar .fc-view-container, #calendar .fc-basic-view, #calendar .fc-view > table, #calendar .fc-scroller, #calendar .fc-bg, #calendar .fc-slats, #calendar .fc-time-grid, #calendar .fc-day-grid, #calendar .fc-head-container, #calendar .fc-widget-content { background: transparent !important; }
+    #calendar .fc-toolbar { background: transparent !important; border-bottom: 0; height: 44px !important; line-height: 44px !important; margin: 0 0 4px !important; padding: 0; }
     .fc-toolbar .fc-left, .fc-toolbar .fc-right { height: 48px; display: flex; align-items: center; }
     .fc-toolbar button, .fc-toolbar .fc-button { color: ${t.accent} !important; font: 500 .8125rem/28px ${t.font} !important; height: 28px !important; line-height: 28px !important; padding: 0 12px !important; margin: 0 !important; border-radius: 999px !important; background: ${t.tint} !important; transition: background .12s; position: relative; }
     .fc-toolbar button:hover { background: ${t.tintStrong} !important; }
@@ -754,18 +755,21 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     #calendar .fc-head td, #calendar .fc-head th { border-color: transparent !important; }
     #calendar .fc-day-header { color: ${t.muted} !important; font: 600 .75rem/40px ${t.font} !important; letter-spacing: .02em; border: 0 !important; }
     #calendar .fc-day-header.fc-today { color: ${t.accent} !important; }
-    #calendar .fc-divider, #calendar .fc-popover, #calendar .fc-row, #calendar tbody, #calendar td, #calendar th, #calendar thead, .fc-unthemed td, .fc-unthemed th { border-color: ${t.dark ? "rgba(84,84,88,.35)" : "rgba(60,60,67,.09)"} !important; font-size: .75rem; }
-    #calendar .fc-body > tr > td, #calendar .fc-view > table { border: 0 !important; }
-    #calendar .fc-day-grid .fc-row, #calendar .fc-day-grid .fc-content-skeleton td { border-color: ${t.dark ? "rgba(84,84,88,.35)" : "rgba(60,60,67,.09)"} !important; }
+    #calendar .fc-divider, #calendar .fc-popover, #calendar .fc-row, #calendar tbody, #calendar td, #calendar th, #calendar thead, .fc-unthemed td, .fc-unthemed th { border-color: ${t.dark ? "rgba(84,84,88,.28)" : "rgba(60,60,67,.07)"} !important; font-size: .75rem; }
+    #calendar .fc-body > tr > td, #calendar .fc-view > table, #calendar .fc-head-container { border: 0 !important; }
+    #calendar .fc-bg td.fc-day { border-left-color: ${t.dark ? "rgba(84,84,88,.2)" : "rgba(60,60,67,.045)"} !important; border-right: 0 !important; }
+    #calendar .fc-day-grid .fc-row, #calendar .fc-day-grid .fc-content-skeleton td, #calendar .fc-day-grid td { border-color: ${t.dark ? "rgba(84,84,88,.2)" : "rgba(60,60,67,.045)"} !important; }
+    #calendar .fc-day-grid .fc-content-skeleton td { border: 0 !important; }
     #calendar .fc-divider { display: none !important; }
     #calendar .fc-day-grid .fc-row { min-height: 2rem; }
     #calendar .fc-day-grid td.fc-axis, #calendar .fc-day-grid .fc-axis span { color: ${t.muted}; font: 500 .6875rem/1 ${t.font}; }
-    .fc-time-grid .fc-slats .fc-minor td { border-top-style: solid !important; border-color: ${t.dark ? "rgba(84,84,88,.18)" : "rgba(60,60,67,.04)"} !important; }
+    .fc-time-grid .fc-slats .fc-minor td { border-top: 0 !important; }
     .fc-time-grid .fc-slats td { height: 1.75em !important; }
     #calendar .fc-agenda-view .fc-time-grid .fc-slats .fc-minor td.fc-axis, #calendar .fc-slats td.fc-axis, #calendar td.fc-axis { border-right: 0 !important; border-top-color: transparent !important; }
     #calendar .fc-axis { color: ${t.muted} !important; font: 500 .6875rem/1 ${t.font} !important; font-variant-numeric: tabular-nums; text-align: right !important; padding-right: 8px !important; border-left: 0 !important; }
-    #calendar .fc-today, #calendar .fc-unthemed .fc-today { background: ${rgba(accent, .05)} !important; }
-    #calendar ::-webkit-scrollbar { width: 8px; height: 8px; }
+    #calendar .fc-today, #calendar .fc-unthemed .fc-today { background: ${rgba(accent, .04)} !important; }
+    #calendar .fc-time-grid .fc-slats td.fc-widget-content { border-top-color: ${t.dark ? "rgba(84,84,88,.28)" : "rgba(60,60,67,.07)"} !important; }
+    #calendar ::-webkit-scrollbar { width: 6px; height: 6px; }
     #calendar ::-webkit-scrollbar-thumb { background: ${t.dark ? "rgba(255,255,255,.18)" : "rgba(0,0,0,.14)"}; }
     #calendar .fc-nonbusiness, #calendar .fc-bgevent.fc-nonbusiness { display: none !important; }
     .fc-now-indicator { border-color: ${t.red} !important; }
@@ -926,8 +930,7 @@ function glassCss(t, top) {
     dna-link-card:hover { --box-shadow: ${t.glassEdge}, 0 24px 60px rgba(31,41,61,.18) !important; --_box-shadow: ${t.glassEdge}, 0 24px 60px rgba(31,41,61,.18) !important; }
     .table-container th, ll-result-table th, .table-container .header-cell, ll-result-table .header-cell { background: ${t.glassStrong} !important; -webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur}; }
     sl-grid { --_header-background: ${t.glassStrong} !important; }
-    #calendar, #calendar .fc-agenda-view, #calendar .fc-view-container, #calendar .fc-basic-view, .table-container, .scroll-viewport { background: ${t.glassBg} !important; }
-    #calendar { ${glass} border-radius: 20px !important; }
+    .table-container, .scroll-viewport { background: ${t.glassBg} !important; }
     .table-container { ${glass} border-radius: 20px !important; }
     .widget > .content-pane .content, .widget > .preview-pane .content, .widget > .content-pane > .content, .widget > .preview-pane > .content, .widget > .content-pane h3, uib-accordion, .list li, .dna-card-list-item,
     table.datagrid-table th, table.datagrid-table thead th, table.datagrid-table tfoot td, table.datagrid-table td { background: transparent !important; }
