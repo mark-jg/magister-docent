@@ -462,6 +462,25 @@ function agendaColorPass(root, mode, dark) {
   const keys = [...new Set(items.map(keyOf).filter(Boolean))].sort();
   const colorOf = new Map(); const used = new Set();
   for (const k of keys) { let i = hash(k) % pal.length; if (used.size < pal.length) while (used.has(i)) i = (i + 1) % pal.length; used.add(i); colorOf.set(k, pal[i]); }
+  // Startscherm: dagkoppen herkennen (vandaag, morgen) en voorbije lessen van vandaag dimmen.
+  const MONTHS = ["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december"];
+  const now = new Date();
+  const dayKey = (d) => `${d.getDate()}-${d.getMonth()}`;
+  const tomorrow = new Date(now); tomorrow.setDate(now.getDate() + 1);
+  for (const group of root.querySelectorAll("#vandaag-agenda .panel-group, sm-agenda-widget .panel-group")) {
+    const head = group.querySelector(".panel-heading a span, .panel-heading span");
+    const m = head && head.textContent.toLowerCase().match(/(\d{1,2})\s+([a-z]+)/);
+    const idx = m ? MONTHS.indexOf(m[2]) : -1;
+    const key = idx >= 0 ? `${parseInt(m[1], 10)}-${idx}` : "";
+    group.dataset.dtDay = key === dayKey(now) ? "vandaag" : key === dayKey(tomorrow) ? "morgen" : "";
+    if (group.dataset.dtDay === "vandaag") {
+      for (const li of group.querySelectorAll("li.vandaag-agenda-list-item")) {
+        const t = (li.querySelector(".vandaag-agenda-item-lesblok-tijd") || li).textContent.match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
+        const past = t && (parseInt(t[3], 10) * 60 + parseInt(t[4], 10)) <= now.getHours() * 60 + now.getMinutes();
+        if (past) li.dataset.dtPast = "1"; else delete li.dataset.dtPast;
+      }
+    }
+  }
   for (const el of items) {
     const key = keyOf(el);
     if (key) { el.style.setProperty("--ev", colorOf.get(key)); el.dataset.dtEv = key; }
@@ -744,7 +763,11 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     uib-accordion, .panel, .panel-default, .panel-group, .panel-collapse, .panel-body { background: transparent !important; border: 0 !important; box-shadow: none !important; }
     uib-accordion .panel-heading, .panel-heading { background: transparent !important; border: 0 !important; box-shadow: none !important; color: ${t.muted} !important; height: 36px !important; line-height: 36px !important; }
     .panel-group + .panel-group .panel-heading, .panel-group ~ .panel-group .panel-heading { margin-top: .625rem !important; }
-    uib-accordion .panel-heading a, .panel-heading a { color: ${t.muted} !important; font: 600 .6875rem/36px ${t.font} !important; letter-spacing: .06em; text-transform: uppercase; padding-left: 14px !important; box-shadow: none !important; border: 0 !important; }
+    uib-accordion .panel-heading a, .panel-heading a { color: ${t.fg} !important; font: 600 .8125rem/36px ${t.font} !important; letter-spacing: -.005em; text-transform: none; padding-left: 14px !important; box-shadow: none !important; border: 0 !important; }
+    uib-accordion .panel-heading a span { display: inline-block; }
+    uib-accordion .panel-heading a span::first-letter { text-transform: uppercase; }
+    .panel-group[data-dt-day="vandaag"] .panel-heading a span::before { content: "Vandaag · "; color: ${t.accent}; }
+    .panel-group[data-dt-day="morgen"] .panel-heading a span::before { content: "Morgen · "; color: ${t.muted}; }
     uib-accordion .panel-heading a dna-icon { color: ${t.muted} !important; opacity: .7; }
     uib-accordion .panel-title span { color: ${t.muted} !important; font-size: inherit !important; }
     .agenda-widget-content { border: 0 !important; }
@@ -784,6 +807,7 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     #vandaag-notificatie .list li.item[data-dt-n="1"] .special, sm-notificatie-widget2 .list li.item[data-dt-n="1"] .special { color: var(--k) !important; }
     #vandaag-notificatie .list li.item a > span:not(.special):not(.dt-dash-ico), sm-notificatie-widget2 .list li.item a > span:not(.special):not(.dt-dash-ico) { grid-area: txt; font: 500 .75rem/1.25 ${t.font} !important; color: ${t.muted} !important; white-space: normal !important; overflow: visible !important; line-height: 1.25 !important; }
     #vandaag-notificatie .list li.item[data-dt-n="1"] a > span:not(.special):not(.dt-dash-ico), sm-notificatie-widget2 .list li.item[data-dt-n="1"] a > span:not(.special):not(.dt-dash-ico) { color: ${t.fg} !important; }
+    #vandaag-notificatie .list li.item a > span:not(.special):not(.dt-dash-ico)::first-letter, sm-notificatie-widget2 .list li.item a > span:not(.special):not(.dt-dash-ico)::first-letter { text-transform: uppercase; }
     #vandaag-notificatie .list li a::after, vandaag-panel-content .list li a::after { content: ""; margin-left: auto; width: 7px; height: 7px; border-right: 1.5px solid ${t.border}; border-bottom: 1.5px solid ${t.border}; transform: rotate(-45deg); flex: 0 0 auto; }
     #vandaag-notificatie .list li:hover a::after, vandaag-panel-content .list li:hover a::after { border-color: ${t.muted}; }
     .list li .special, .list li span.special, ul.list div a .special { display: inline-flex !important; align-items: center; justify-content: center; float: none !important; width: auto !important; min-width: 1.5rem; height: 1.375rem !important; padding: 0 .5rem; margin: 0 .25rem 0 0 !important; border-radius: 999px; background: ${t.tint}; color: ${t.accent}; font-weight: 600; font-size: .75rem; line-height: 1 !important; text-align: center; }
@@ -887,8 +911,15 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     #calendar .icons-block.week-view dna-icon, #calendar .icons-block dna-icon { --icon-size: .75rem !important; --_icon-size: .75rem !important; --dna-icon-size: .75rem !important; color: var(--ev) !important; }
     #calendar .icons-block dna-icon.niet-verantwoord, #calendar .icons-block .niet-verantwoord { width: 16px; height: 16px; border-radius: 50%; background: ${t.orange} !important; color: #fff !important; --icon-size: .5625rem !important; --_icon-size: .5625rem !important; --dna-icon-size: .5625rem !important; display: inline-grid !important; place-items: center; }
     /* Startscherm-agenda: zelfde kleur per vak/klas op het balkje en de chip */
-    .list li.vandaag-agenda-list-item { --ev: ${t.accent}; }
+    .list li.vandaag-agenda-list-item { --ev: ${t.accent}; transition: opacity .15s; }
+    .list li.vandaag-agenda-list-item:before { content: ""; position: absolute; left: 6px; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; background: var(--ev); z-index: 9; }
     .list li.vandaag-agenda-list-item.alert-info:before, .list li.vandaag-agenda-list-item.alert:before { background: var(--ev) !important; }
+    .list li.vandaag-agenda-list-item.alert-danger:before { background: ${t.red} !important; }
+    .list li.vandaag-agenda-list-item.alert-danger .classroom { text-decoration: line-through; color: ${t.muted} !important; }
+    .list li.vandaag-agenda-list-item.current { background: color-mix(in srgb, var(--ev) ${t.dark ? "22%" : "10%"}, ${t.surface}) !important; }
+    .list li.vandaag-agenda-list-item[data-dt-past] { opacity: .5; }
+    .list li.vandaag-agenda-list-item[data-dt-past]:hover { opacity: .85; }
+    .vandaag-agenda-item-lesblok-info .classroom { color: ${t.fg}; font-weight: 500; }
     .list li.vandaag-agenda-list-item span.nrblock { background: color-mix(in srgb, var(--ev) 14%, ${t.surface}) !important; color: color-mix(in srgb, var(--ev) 65%, #000000) !important; }
     #calendar .fc-highlight { background: ${rgba(accent, .12)} !important; opacity: 1 !important; }
     /* Rechterzijbalk: tabs als segmentknop, kaarten van 20px */
