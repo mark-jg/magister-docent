@@ -151,6 +151,18 @@ DT.register({
     out.push(`Titel: ${document.title}`);
     out.push(`Datum: ${new Date().toISOString().slice(0, 10)}`);
     out.push(`Frame: ${DT.isTop ? "hoofdpagina" : "iframe (" + location.host + location.pathname + ")"}`);
+    // Staat van de extensie zelf: versie, thema en of de themastijl de shadow roots bereikt.
+    try {
+      const th = DT.settings?.theme || {};
+      const src = document.getElementById("dt-shadow-src");
+      let roots = 0, injected = 0;
+      const walk = (root) => { root.querySelectorAll("*").forEach((e) => { if (e.shadowRoot) { roots++; if (e.shadowRoot.getElementById("dt-shadow-tokens")) injected++; walk(e.shadowRoot); } }); };
+      walk(document);
+      const card = DT.deepQuery("dna-link-card"), head = DT.deepQuery("dna-page-header");
+      const cs = (el, prop) => el ? getComputedStyle(el).getPropertyValue(prop).trim() : "-";
+      out.push(`Docent Tools: versie ${DT.version}, thema ${th.preset || "?"} (donkere stijl ${th.darkStyle || "invert"}), shadow-bron ${src ? src.textContent.length + " tekens" : "ontbreekt"}, shadow roots ${roots} waarvan ${injected} met themastijl` +
+        (card ? `, tegel hoekradius ${cs(card, "border-radius")} (var ${cs(card, "--border-radius") || "-"})` : "") + (head ? `, paginakop achtergrond ${cs(head, "background-color")}` : ""));
+    } catch (e) { out.push(`Docent Tools: diagnose mislukt (${e.message})`); }
     const frames = [...document.querySelectorAll("iframe")].map((f) => `${f.id ? "#" + f.id : "iframe"} → ${(f.src || "").replace(/\d{3,}/g, "{id}") || "(geen src)"}`);
     if (frames.length) out.push(`Iframes op deze pagina: ${frames.join("; ")} (klik eerst in het frame en druk dan op Alt+I, R voor een rapport van de inhoud)`);
     // Bovenliggende frames (zelfde domein): handig om te zien in welke schil een pagina zit.

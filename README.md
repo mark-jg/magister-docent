@@ -101,6 +101,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.8.9: het paginarapport (Alt+I, R) meldt nu versie, thema en of de themastijl de shadow roots bereikt (aantal roots, aantal met stijl, hoekradius van een tegel, achtergrond van de paginakop), om verschillen tussen de nabouw en de echte pagina te kunnen herleiden.
 - 0.8.8: thema bereikt nu elke shadow root: een script in de hoofdwereld (`content/shadowroots.js`) geeft elke shadow root bij het aanmaken de themastijl mee, ook gesloten roots en roots die later ontstaan (Aanwezigheid, roosters); tegels op Aanwezigheid groter, met lift bij aanwijzen.
 - 0.8.7: agenda-afwerking: geen blauwe streep meer onder de kopbalk (regel was bij 0.8.1 weggevallen), navigatiebalk in de roosterkaart, afspraaktekst donkerblauw, minikalender met maandtitel op één regel; ronde knoppen in de kopbalk in accenttint.
 - 0.8.6: agenda in de stijl van Apple Agenda (kaart zonder kaders, lichte hairlines, afspraken als zachte tint met gekleurde linkerrand, rode nu-lijn, minikalender met vandaag in accent en keuze als gevulde cirkel, keuzelijsten met ronde hoeken); leerlingenlijst als kaart; de kleurvertaler blijft bij de Apple-thema's uit alle componenten weg, zodat tegels en paginakoppen (Aanwezigheid) nu wél het thema volgen.
