@@ -166,13 +166,20 @@ DT.register({
     const fail = (status) => status == null || status === 200 ? "" : (status === 0 ? "geen antwoord" : `Magister antwoordde ${status}`);
 
     const lesSub = current ? `Nu: ${current.vak}${current.lokaal ? " · " + current.lokaal : ""}` : next ? `Volgende ${hhmm(next.start)}: ${next.vak}` : lessen.length ? "Lessen zijn voorbij" : "Geen lessen vandaag";
-    const ring = (pct, color) => { const r = 20, c = 2 * Math.PI * r, p = Math.max(0, Math.min(100, pct)); return `<svg class="dt-ll-ring" viewBox="0 0 48 48" width="48" height="48" aria-hidden="true"><circle cx="24" cy="24" r="${r}" fill="none" stroke="currentColor" stroke-opacity=".15" stroke-width="5"/><circle cx="24" cy="24" r="${r}" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${(c * p / 100).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 24 24)"/></svg>`; };
+    /* Donut: aanwezig in groen, de afwezige lessen per type in de kleuren van de grafiek. */
+    const donut = (att) => {
+      const r = 20, c = 2 * Math.PI * r, L = Math.max(1, att.lessen);
+      const parts = [["ZK", "#AF52DE"], ["AB_OK", "#FF9500"], ["AB_NO", "#FF3B30"], ["UI", "#A2845E"], ["VR", "#32ADE6"]].map(([k, col]) => [Math.min(att.perType[k] || 0, L), col]).filter(([n]) => n > 0);
+      const absN = parts.reduce((x, [n]) => x + n, 0), present = Math.max(0, L - absN);
+      let off = 0; const seg = (n, col) => { const len = c * n / L; const out = `<circle cx="24" cy="24" r="${r}" fill="none" stroke="${col}" stroke-width="5" stroke-dasharray="${len.toFixed(2)} ${c.toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 24 24)"/>`; off += len; return out; };
+      return `<svg class="dt-ll-ring" viewBox="0 0 48 48" width="48" height="48" aria-hidden="true"><circle cx="24" cy="24" r="${r}" fill="none" stroke="currentColor" stroke-opacity=".12" stroke-width="5"/>${seg(present, "#34C759")}${parts.map(([n, col]) => seg(n, col)).join("")}</svg>`;
+    };
     const attTile = att ? `
-      <a href="#" data-state="AttVerzuim" class="dt-ll-tile dt-ll-att${att.ongeoorloofd > 0 ? " is-hot" : ""}" data-kind="aanwezig" title="${att.onbekend.length ? esc(`Onbekend registratietype: ${att.onbekend.join(", ")} (meld dit)`) : "Open Verzuim"}">
-        <span class="dt-ll-ringwrap">${ring(att.pct, att.pct >= 90 ? "#34C759" : att.pct >= 80 ? "#FF9500" : "#FF3B30")}<span class="dt-ll-ringnum">${att.pct}<small>%</small></span></span>
+      <a href="#" data-state="AttVerzuim" class="dt-ll-tile dt-ll-att" data-kind="aanwezig" title="${att.onbekend.length ? esc(`Onbekend registratietype: ${att.onbekend.join(", ")} (meld dit)`) : "Open Verzuim"}">
+        <span class="dt-ll-ringwrap">${donut(att)}<span class="dt-ll-ringnum">${att.pct}<small>%</small></span></span>
         <span class="dt-ll-att-text">
           <span class="dt-ll-label">aanwezig dit schooljaar</span>
-          <span class="dt-ll-sub">${esc(att.lessen)} lessen · ${esc(att.afwezig)} afwezig${att.ongeoorloofd ? ` (${att.ongeoorloofd} ongeoorloofd)` : ""}${att.teLaat ? ` · ${att.teLaat}× te laat` : ""}${att.ziek ? ` · ${att.ziek}× ziek` : ""}${att.onbekend.length ? ` · ${esc(att.onbekend.length)} onbekend type` : ""}</span>
+          <span class="dt-ll-sub">${esc(att.lessen - att.afwezig)} van ${esc(att.lessen)} lessen aanwezig${att.afwezig ? ` · ${att.ziek ? `${att.ziek}× ziek` : ""}${att.ziek && att.afwezig - att.ziek ? ", " : ""}${att.afwezig - att.ziek ? `${att.afwezig - att.ziek}× afwezig${att.ongeoorloofd ? ` (${att.ongeoorloofd} ongeoorloofd)` : ""}` : ""}` : ""}${att.teLaat ? ` · ${att.teLaat}× te laat` : ""}${att.onbekend.length ? ` · ${esc(att.onbekend.length)} onbekend type` : ""}</span>
         </span>
       </a>` : tile("aanwezig", "–", "aanwezigheid", d.verantw ? "geen lessen in deze periode" : "", { state: "AttVerzuim", err: d.verantw ? "" : fail(d.verantwErr) });
     const tiles = [
@@ -231,7 +238,7 @@ DT.register({
       #dt-ll-dash .dt-ll-ringwrap { grid-area: ring; position: relative; width: 56px; height: 56px; color: #6e6e73; }
       #dt-ll-dash .dt-ll-ring { width: 56px; height: 56px; }
       #dt-ll-dash .dt-ll-ring { display: block; }
-      #dt-ll-dash .dt-ll-ringnum { position: absolute; inset: 0; display: grid; place-items: center; font: 700 .9375rem/1 -apple-system, system-ui, sans-serif; letter-spacing: -.02em; }
+      #dt-ll-dash .dt-ll-ringnum { position: absolute; inset: 0; display: grid; place-items: center; font: 700 .9375rem/1 -apple-system, system-ui, sans-serif; letter-spacing: -.02em; color: #1D1D1F; }
       #dt-ll-dash .dt-ll-ringnum small { font-size: .5rem; font-weight: 600; margin-left: 1px; }
       #dt-ll-dash .dt-ll-att-text { grid-area: text; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
       #dt-ll-dash .dt-ll-months { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; align-items: end; height: 92px; padding: 4px 4px 0; }
@@ -306,13 +313,15 @@ function aanwezigheid(items, lessenTotaal, start, now) {
     }
     perMaand.set(key, m);
   }
+  const perType = {};
+  for (const m of perMaand.values()) for (const [k, v] of Object.entries(m.per)) perType[k] = (perType[k] || 0) + v;
   if (lessenTotaal && lessenTotaal > lessen) lessen = lessenTotaal;
   if (!lessen) return null;
   const pct = Math.round(100 * (lessen - afwezig) / lessen);
   const maanden = [...perMaand.values()].sort((a, b) => a.y - b.y || a.m - b.m).map((m) => ({
     ...m, kort: MON[m.m], label: `${MONL[m.m]} ${m.y}`, totaal: Object.values(m.per).reduce((x, y) => x + y, 0),
   }));
-  return { lessen, afwezig, ongeoorloofd, teLaat, ziek, pct, maanden, registraties, onbekend: [...onbekend] };
+  return { lessen, afwezig, ongeoorloofd, teLaat, ziek, pct, maanden, registraties, onbekend: [...onbekend], perType };
 }
 
 const ICON = {

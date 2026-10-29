@@ -102,6 +102,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.13.3: aanwezigheidstegel: donut met de aanwezigheid in groen en de afwezige lessen per type in de kleuren van de grafiek (ziek, absent geoorloofd en ongeoorloofd, uitgestuurd, vrijstelling); tekst begint met het aantal aanwezige lessen; de tegel kleurt niet meer rood of groen.
 - 0.13.2: de maandgrafiek op de leerlingkaart toont nu alle registraties gestapeld per type (absent geoorloofd en ongeoorloofd, ziek, uitgestuurd, vrijstelling, te laat, overig), met een legenda van de typen die voorkomen en het aantal per maand.
 - 0.13.1: aanwezigheid: Magister levert het registratietype als naam (absent, teLaat, ziek, uitgestuurd, vrijstelling) en niet als code; de ring en de maandgrafiek tellen nu goed. Onbekende types worden in de tegel genoemd.
 - 0.13.0: Leerlingoverzicht: aanwezigheid als ring (percentage aanwezig dit schooljaar, met lessen, afwezig, ongeoorloofd, te laat en ziek) en een grafiek met afwezigheid per maand (geoorloofd en ongeoorloofd als aandeel van de lessen); klikken opent Verzuim. Gebaseerd op dezelfde registraties die het scherm Verzuim toont.
