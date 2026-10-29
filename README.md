@@ -101,6 +101,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.9.4: afspraken in de agenda zonder zijlijn, als één getint vlak met meer ruimte rondom de tekst en een kleine marge ertussen.
 - 0.9.3: agenda zonder kaart: het rooster ligt direct op de achtergrond, alleen de afspraken zijn vlakken; uurlijnen heel licht, halve uren weg, kolomlijnen nog lichter.
 - 0.9.2: agenda in de taal van Apple Agenda: kleur per vak of klas uit Apples agendapalet (instelling "Agendakleur": per vak, per klas, uit), ook op het startscherm; voorbije afspraken gedimd; tekst en chips in de donkere variant van de afspraakkleur; markeringen (toets, huiswerk, niet verantwoord) klein rechtsonder, "niet verantwoord" als oranje stip.
 - 0.9.1: agenda rustiger: uurlijnen licht, halve uren bijna onzichtbaar, geen streep onder de dagkoppen en geen kader om de "Hele dag"-rij, geen lijn naast de tijdas, lesuur-chips als lichte tint, dunnere schuifbalk.

@@ -777,15 +777,16 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     .fc-time-grid .fc-now-indicator-arrow { border-width: 0 !important; width: 10px; height: 10px; border-radius: 50%; background: ${t.red}; margin-top: -5px !important; margin-left: -5px; left: 100%; }
     /* Afspraken: kleur per vak/klas (--ev, gezet door agendaColorPass; standaard het accent), zachte tint,
        gekleurde linkerrand, tekst in de donkere variant van de kleur, voorbije afspraken gedimd */
-    #calendar .fc-event, #calendar .fc-time-grid-event, #calendar .fc-day-grid-event { --ev: ${t.accent}; background: color-mix(in srgb, var(--ev) ${t.dark ? "24%" : "13%"}, ${t.surface}) !important; border: 0 !important; border-left: 3px solid var(--ev) !important; border-radius: 7px !important; color: ${t.fg} !important; box-shadow: none !important; margin-right: 2px; transition: opacity .15s, filter .15s; }
-    #calendar .fc-time-grid-event { margin-bottom: 1px; }
+    #calendar .fc-event, #calendar .fc-time-grid-event, #calendar .fc-day-grid-event { --ev: ${t.accent}; background: color-mix(in srgb, var(--ev) ${t.dark ? "26%" : "14%"}, ${t.surface}) !important; border: 0 !important; border-radius: 8px !important; color: ${t.fg} !important; box-shadow: none !important; margin: 1px 4px 2px 1px !important; transition: opacity .15s, filter .15s; }
+    #calendar .fc-time-grid-event { margin-bottom: 2px !important; }
     #calendar .fc-event .fc-bg { display: none; }
-    #calendar .fc-event .fc-content { padding: 4px 4px 4px 7px; }
+    #calendar .fc-event .fc-content { padding: 6px 8px 6px 9px; }
     #calendar .fc-time-grid-event .fc-title, #calendar .fc-time-grid-event .event-description, #calendar .fc-time-grid-event .event-description-content, #calendar .fc-time-grid-event .event-description-content-examen, #calendar .fc-h-event .fc-content { color: color-mix(in srgb, var(--ev) ${t.dark ? "45%, #ffffff" : "68%, #000000"}) !important; font: 500 .75rem/1.25 ${t.font} !important; padding: 0 !important; letter-spacing: -.005em; }
-    #calendar .fc-time-grid-event .calendar-event .event-description-content, #calendar .fc-time-grid-event .calendar-event .event-description-content-examen { padding: 1px 0 0 !important; width: 100% !important; }
+    #calendar .fc-time-grid-event .calendar-event .event-description-content, #calendar .fc-time-grid-event .calendar-event .event-description-content-examen { padding: 0 !important; margin: 0 !important; width: 100% !important; }
+    #calendar .fc-time-grid-event .calendar-event { display: block; }
     #calendar .fc-time-grid-event .calendar-event:has(.nrblock) .event-description-content, #calendar .fc-time-grid-event .calendar-event:has(.nrblock) .event-description-content-examen { width: calc(100% - 44px) !important; }
     #calendar .fc-time-grid-event .fc-time { color: ${t.muted} !important; font-size: .6875rem !important; }
-    #calendar .fc-time-grid-event .nrblock, #calendar .fc-time-grid-event .calendar-event .nrblock { background: color-mix(in srgb, var(--ev) ${t.dark ? "34%" : "18%"}, ${t.surface}) !important; color: color-mix(in srgb, var(--ev) ${t.dark ? "55%, #ffffff" : "62%, #000000"}) !important; box-shadow: none !important; border-radius: 6px !important; font: 600 .6875rem/18px ${t.font} !important; height: 18px !important; right: 5px !important; top: 4px !important; }
+    #calendar .fc-time-grid-event .nrblock, #calendar .fc-time-grid-event .calendar-event .nrblock { background: color-mix(in srgb, var(--ev) ${t.dark ? "34%" : "18%"}, ${t.surface}) !important; color: color-mix(in srgb, var(--ev) ${t.dark ? "55%, #ffffff" : "62%, #000000"}) !important; box-shadow: none !important; border-radius: 6px !important; font: 600 .6875rem/18px ${t.font} !important; height: 18px !important; right: 7px !important; top: 6px !important; }
     .fc-day-grid-event.current-event, .fc-time-grid-event.current-event { background: color-mix(in srgb, var(--ev) ${t.dark ? "40%" : "24%"}, ${t.surface}) !important; }
     .fc-day-grid-event.active-event, .fc-time-grid-event.active-event { background: color-mix(in srgb, var(--ev) ${t.dark ? "36%" : "20%"}, ${t.surface}) !important; box-shadow: 0 0 0 2px var(--ev) !important; }
     #calendar .fc-event[data-dt-past] { opacity: .55; }
@@ -795,7 +796,7 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     .calendar-event.info:before { display: none !important; }
     #calendar .fc-event:hover { filter: brightness(.96); }
     /* Markeringen in de afspraak: klein en rustig, rechtsonder; "niet verantwoord" als oranje stip */
-    #calendar .fc-time-grid-event .icons-block.week-view, #calendar .fc-time-grid-event ag-lesblok-iconen > .icons-block { position: absolute !important; right: 5px; bottom: 4px; display: flex !important; gap: 3px; align-items: center; margin: 0 !important; padding: 0 !important; text-align: right; }
+    #calendar .fc-time-grid-event .icons-block.week-view, #calendar .fc-time-grid-event ag-lesblok-iconen > .icons-block { position: absolute !important; right: 7px; bottom: 6px; display: flex !important; gap: 3px; align-items: center; margin: 0 !important; padding: 0 !important; text-align: right; }
     #calendar .icons-block.week-view .dna-badge, #calendar .icons-block .dna-badge { font: 600 .625rem/16px ${t.font} !important; padding: 0 5px !important; border-radius: 5px !important; background: color-mix(in srgb, var(--ev) 18%, ${t.surface}) !important; color: color-mix(in srgb, var(--ev) 62%, #000000) !important; border: 0 !important; height: 16px; }
     #calendar .icons-block.week-view dna-icon, #calendar .icons-block dna-icon { --icon-size: .75rem !important; --_icon-size: .75rem !important; --dna-icon-size: .75rem !important; color: var(--ev) !important; }
     #calendar .icons-block dna-icon.niet-verantwoord, #calendar .icons-block .niet-verantwoord { width: 16px; height: 16px; border-radius: 50%; background: ${t.orange} !important; color: #fff !important; --icon-size: .5625rem !important; --_icon-size: .5625rem !important; --dna-icon-size: .5625rem !important; display: inline-grid !important; place-items: center; }
