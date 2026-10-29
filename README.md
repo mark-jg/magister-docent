@@ -1,4 +1,4 @@
-# Docent Tools voor Magister (v0.13.4)
+# Docent Tools voor Magister (v0.14.0)
 
 Chrome-extensie voor Magister (docenten/personeel). Alles draait lokaal in je browser: er wordt niets naar een server gestuurd.
 
