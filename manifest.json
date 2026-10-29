@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Docent Tools voor Magister",
-  "version": "0.8.7",
+  "version": "0.8.8",
   "description": "Verbeteringen voor Magister (docenten/personeel): thema, overzichtspaneel, tabelexport naar Excel, snelle invoer, AI-hulp en een concept-mail naar de begeleidingscoach bij een Melding Expertisecentrum. Draait volledig lokaal.",
   "icons": {
     "16": "icons/icon16.png",
