@@ -338,7 +338,7 @@ function tokenMap(p) {
   const m = {
     "--primary-background": p.accent, "--secondary-background": accent2, "--background-1": p.accent, "--background-10": accent2,
     "--background-11": mix(p.accent, p.surface, .85), "--background-12": mix(p.accent, p.surface, .7),
-    "--background-4": p.dark ? p.surface2 : mix(p.fg, p.surface, .25), "--background-6": p.dark ? p.surface2 : mix(p.fg, p.surface, .2),
+    "--background-4": p.dark ? mix(p.fg, p.surface, .35) : mix(p.fg, p.surface, .25), "--background-6": p.dark ? p.fg : mix(p.fg, p.surface, .2),
     "--chrome-background": p.bg, "--background-2": p.surface, "--background-5": p.bg, "--background-7": p.surface2, "--background-3": p.border, "--background-8": p.border,
     "--secondary-text-color": p.fg, "--primary-text-color": p.link, "--tertiary-text-color": p.link, "--quaternary-text-color": p.link,
     "--sl-color-white": p.surface, "--sl-color-black": p.fg,
@@ -408,104 +408,236 @@ function tokenCss(p, dark) {
 }
 
 /* ---------- Apple-look ----------
- * Naar de Human Interface Guidelines: systeemlettertype (SF Pro), systeemblauw als enige accent,
- * gegroepeerde grijze achtergrond met witte vlakken, hairline-scheidingslijnen in plaats van randen,
- * zachte hoeken (10px knoppen en velden, 14px kaarten), doorschijnende balken (materiaal),
- * een lichte zijbalk met een blauwe selectie en een focusring van 3px in het accent. */
+ * Gebouwd op Magisters eigen selectors (op-shell, magister-lvs, op-detailkaarten) en op de
+ * CSS-variabelen van de dna-webcomponenten, naar de Human Interface Guidelines:
+ * één accent (systeemblauw), SF Pro, gegroepeerde grijze achtergrond met witte vlakken,
+ * hairlines in plaats van randen, 10px/14px hoeken, een lichte zijbalk met blauwe selectie,
+ * doorschijnende balken, een focusring van 3px in het accent en tabbladen als segmentknop. */
 function rgba(hex, a) { const { r, g, b } = hex2rgb(hex); return `rgba(${r}, ${g}, ${b}, ${a})`; }
+function hslParts(hex) { const { h, s, l } = toHsl(hex2rgb(hex)); return { h: Math.round(h), s: `${Math.round(s * 100)}%`, l: `${Math.round(l * 100)}%` }; }
 
-function appleCss(p, dark, accent) {
-  const sep = dark ? "rgba(84, 84, 88, .65)" : "rgba(60, 60, 67, .29)";
-  const hair = `0 0 0 .5px ${dark ? "rgba(255,255,255,.08)" : "rgba(0,0,0,.06)"}`;
-  const cardShadow = dark ? `${hair}, 0 1px 3px rgba(0,0,0,.4)` : `${hair}, 0 1px 3px rgba(0,0,0,.06)`;
-  const sidebar = dark ? "#1C1C1E" : "#F5F5F7";
-  const material = dark ? "rgba(28, 28, 30, .72)" : "rgba(255, 255, 255, .72)";
-  const hover = dark ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.04)";
-  const focus = `0 0 0 3px ${rgba(accent, .35)}`;
+function applePalette(p, dark, accent) {
+  return {
+    accent, dark,
+    bg: p.bg, surface: p.surface, surface2: p.surface2, fg: p.fg, muted: p.muted, border: p.border,
+    sep: dark ? "rgba(84, 84, 88, .65)" : "rgba(60, 60, 67, .29)",
+    sidebar: dark ? "#1C1C1E" : "#F2F2F7",
+    hover: dark ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.045)",
+    tint: rgba(accent, dark ? .22 : .12),
+    tintStrong: rgba(accent, dark ? .32 : .18),
+    hair: `0 0 0 .5px ${dark ? "rgba(255,255,255,.09)" : "rgba(0,0,0,.07)"}`,
+    card: dark ? "0 0 0 .5px rgba(255,255,255,.09), 0 1px 3px rgba(0,0,0,.45)" : "0 0 0 .5px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.06)",
+    pop: dark ? "0 0 0 .5px rgba(255,255,255,.1), 0 16px 48px rgba(0,0,0,.6)" : "0 0 0 .5px rgba(0,0,0,.08), 0 16px 48px rgba(0,0,0,.16)",
+    material: dark ? "rgba(28, 28, 30, .75)" : "rgba(242, 242, 247, .78)",
+    gray6: dark ? "#3A3A3C" : "#E5E5EA",
+    red: dark ? "#FF453A" : "#FF3B30", orange: dark ? "#FF9F0A" : "#FF9500", green: dark ? "#30D158" : "#34C759",
+    focus: `0 0 0 3px ${rgba(accent, .35)}`,
+    font: FONTS.apple
+  };
+}
+
+/* Variabelen van Magisters designsysteem (body) en van de dna-componenten (host). Deze regels
+ * worden zowel in het document als in elke shadow root gezet. */
+function appleTokens(t) {
+  const h = hslParts(t.accent);
+  const body = `
+    --dna-color-scheme: ${t.dark ? "dark" : "light"} !important;
+    --dna-primary-hue: ${h.h} !important; --dna-primary-sat: ${h.s} !important; --dna-primary-lum: ${h.l} !important;
+    --dna-primary: ${t.accent} !important; --dna-primary-text: #ffffff !important;
+    --dna-secondary: ${t.orange} !important; --dna-secondary-hue: 35 !important; --dna-secondary-sat: 100% !important; --dna-secondary-lum: 50% !important;
+    --dna-danger: ${t.red} !important; --dna-danger-hue: 3 !important; --dna-danger-sat: 100% !important; --dna-danger-lum: 59% !important;
+    --dna-success: ${t.green} !important; --dna-warning: ${t.orange} !important;
+    --dna-text-color: ${t.fg} !important; --dna-text-color-dark: ${t.fg} !important; --dna-text-color-light: #ffffff !important;
+    --dna-background: ${t.bg} !important; --dna-foreground: ${t.surface} !important;
+    --dna-control-background: ${t.surface} !important; --dna-control-border: ${t.border} !important; --dna-control-foreground: ${t.border} !important;
+    --dna-radius-small: 8px !important; --dna-button-border-radius: 10px !important; --dna-button-border-width: 1px !important;
+    --dna-font-family-base: ${t.font} !important; --dna-font-family-header: ${t.font} !important;
+    --dna-font-size-normal: .875rem !important; --dna-line-height-normal: 1.25rem !important;
+    --dna-badge-border-radius: 6px !important;
+  `;
   return `
-    html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
-    h1, h2, h3, .page-title, dna-page-header { font-weight: 600 !important; letter-spacing: -0.02em; }
-    h1, ui-view[name="main"] h1 { color: ${p.fg} !important; }
-    a { text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    ::selection { background: ${rgba(accent, .25)}; }
-    /* Zijbalk: licht materiaal, donkere tekst, blauwe selectie als afgerond vlak */
-    .menu-host, nav.menu, .menu-container { background: ${sidebar} !important; border-right: 1px solid ${sep} !important; box-shadow: none !important; }
-    .menu-footer, .menu-footer a { background: ${sidebar} !important; color: ${p.muted} !important; border-top: 1px solid ${sep} !important; }
-    ul.main-menu li a, ul.main-menu li span.caption { color: ${p.fg} !important; border-radius: 8px; }
-    ul.main-menu li a { margin: 1px 8px !important; transition: background .12s; }
-    ul.main-menu li a:hover { background: ${hover} !important; }
-    ul.main-menu li.active > a, ul.main-menu li[class*="active"] > a, ul.main-menu li a[class*="active"], ul.main-menu li[class*="selected"] > a {
-      background: ${accent} !important; color: #ffffff !important;
-    }
-    ul.main-menu li.active > a *, ul.main-menu li[class*="active"] > a * { color: #ffffff !important; }
-    /* Bovenbalk en kopbalken: doorschijnend materiaal met hairline, geen gekleurde streep */
-    .appbar-host, mg-appbar, div.appbar {
-      background: ${material} !important; color: ${p.fg} !important;
-      -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
-      border-bottom: 1px solid ${sep} !important; box-shadow: none !important;
-    }
-    .appbar-host *, mg-appbar *, div.appbar * { color: ${p.fg}; }
-    .head-bar, .page-header, [class*="page-header"], header:not(#dt-panel *), .main-header, .detail-header, [class*="detail-header"] {
-      box-shadow: none !important; border-bottom: 1px solid ${sep} !important; background: ${p.surface} !important;
-    }
-    /* Vlakken en kaarten: geen rand, hairline plus zachte schaduw, 14px hoeken */
-    .widget, .mg-panel, .content-pane, section.main, .card, [class*="card"]:not([class*="card-"]):not(dna-card-title) {
-      border: 0 !important; border-radius: 14px !important; box-shadow: ${cardShadow} !important; background: ${p.surface} !important;
-    }
-    .widget-header, .panel-heading, .mg-panel > header { background: transparent !important; border-bottom: 1px solid ${sep} !important; font-weight: 600; }
-    /* Velden: hairline-rand, 10px hoeken, focusring in het accent */
-    input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=submit]):not([type=button]), select, textarea, .form-control {
-      border: 1px solid ${dark ? "#48484A" : "#D1D1D6"} !important; border-radius: 10px !important; background: ${dark ? "#1C1C1E" : "#FFFFFF"} !important;
-      color: ${p.fg} !important; box-shadow: none !important; transition: box-shadow .12s, border-color .12s;
-    }
-    input:not([type=checkbox]):not([type=radio]):focus, select:focus, textarea:focus, .form-control:focus {
-      border-color: ${accent} !important; box-shadow: ${focus} !important; outline: none !important;
-    }
-    :focus-visible { outline: 3px solid ${rgba(accent, .35)} !important; outline-offset: 1px; }
-    input[type=checkbox], input[type=radio] { accent-color: ${accent}; }
-    /* Knoppen: gevuld accent zonder rand, of lichtgrijs vlak; 10px hoeken, medium gewicht */
-    button, .btn, [class*="button"] { border-radius: 10px !important; font-weight: 500; letter-spacing: -0.01em; box-shadow: none !important; }
-    button[class*="primary"], .btn-primary, [class*="button--primary"], input[type="submit"] { border: 0 !important; font-weight: 600 !important; }
-    button[class*="primary"]:hover, .btn-primary:hover, input[type="submit"]:hover { filter: brightness(1.06); }
-    .btn-default, button.btn:not([class*="primary"]):not(.btn-link), .btn-secondary { background: ${dark ? "#3A3A3C" : "#E9E9EB"} !important; border: 0 !important; color: ${p.fg} !important; }
-    /* Tabellen: alleen horizontale scheidingslijnen, koppen in secundaire kleur */
-    table, .ui-grid, .table { border: 0 !important; border-collapse: separate !important; border-spacing: 0; }
-    th, .ui-grid-header-cell { font-weight: 600 !important; color: ${p.muted} !important; font-size: .8125rem !important; background: ${p.surface} !important; border-left: 0 !important; border-right: 0 !important; border-bottom: 1px solid ${sep} !important; }
-    td, .ui-grid-cell { border-left: 0 !important; border-right: 0 !important; border-top: 0 !important; border-bottom: 1px solid ${sep} !important; }
-    .ui-grid-row:nth-child(even) .ui-grid-cell, tr:nth-child(even) td { background: ${p.surface} !important; }
-    tbody tr:hover td, .ui-grid-row:hover .ui-grid-cell { background: ${hover} !important; }
-    /* Tabbladen: onderstreping in het accent, geen kaders */
-    .tabs, ul.tabs, .page-nav, [role=tablist] { border: 0 !important; border-bottom: 1px solid ${sep} !important; background: transparent !important; }
-    .tabs li a, ul.tabs li a, [role=tab] { border: 0 !important; color: ${p.muted} !important; border-radius: 0 !important; }
-    .tabs li.active a, ul.tabs li.active a, [role=tab][aria-selected=true] { color: ${accent} !important; box-shadow: inset 0 -2px 0 ${accent} !important; font-weight: 600; }
-    /* Schuifbalken */
-    ::-webkit-scrollbar { width: 10px; height: 10px; }
-    ::-webkit-scrollbar-thumb { background: ${dark ? "rgba(255,255,255,.22)" : "rgba(0,0,0,.22)"}; border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    /* Eigen UI van de extensie */
-    :root { --dt-shadow: ${dark ? "0 12px 40px rgba(0,0,0,.5)" : "0 12px 40px rgba(0,0,0,.14)"}; }
+    :root, body { ${body} }
+    dna-card { --border-radius: 14px !important; --border-width: 0 !important; --border: 0 !important; --box-shadow: ${t.card} !important; --background: ${t.surface} !important; --color: ${t.fg} !important; --header-padding: .875rem 1rem !important; --body-padding: 0 1rem 1rem !important; --feature: ${t.accent} !important; }
+    dna-card-title, .dna-card-title { font-weight: 600 !important; font-size: 1.0625rem !important; letter-spacing: -.01em; color: ${t.fg} !important; }
+    dna-page-header { --title-color: ${t.fg} !important; --title-font-weight: 700 !important; --title-font-size: 1.75rem !important; --title-line-height: 2.125rem !important; --subtitle-color: ${t.muted} !important; --highlight: ${t.accent} !important; letter-spacing: -.02em; }
+    dna-button { --border-radius: 10px !important; --font-weight: 500 !important; --padding-v: .5rem !important; --padding-h: .875rem !important; --box-shadow-spread: 3px !important; }
+    dna-button-bar { --gap-h: .5rem !important; }
+    dna-tab-bar { background: ${t.gray6} !important; border-radius: 9px !important; padding: 2px !important; --padding-inline: 0 !important; --indicator-size: 0 !important; --border-width: 0 !important; --border: 0 !important; }
+    dna-tab { --border-radius: 7px !important; --padding: .3rem .875rem !important; --active: ${t.hover} !important; --color: ${t.fg} !important; --spacing: .25rem !important; font-weight: 500; }
+    dna-tab[selected] { --background: ${t.surface} !important; --color: ${t.fg} !important; box-shadow: 0 1px 3px rgba(0,0,0,.14), 0 0 0 .5px rgba(0,0,0,.04) !important; font-weight: 600; }
+    dna-select, dna-input, dna-list-box, dna-datepicker, dna-textarea { --border-radius: 8px !important; --box-shadow: ${t.pop} !important; --highlight: ${t.accent} !important; }
+    dna-menu, dna-overlay { --border-radius: 12px !important; --border: 0 !important; --box-shadow: ${t.pop} !important; --background: ${t.surface} !important; }
+    dna-menu-item { --padding: .4rem .75rem !important; --icon-width: 2.25rem !important; }
+    dna-dialog { --border-radius: 14px !important; --border-width: 0 !important; --border: 0 !important; --box-shadow: ${t.pop} !important; --heading-font: 600 1.0625rem/1.5rem ${t.font} !important; }
+    dna-accordion-item { --border-radius: 12px !important; --border-color: transparent !important; --background: ${t.surface} !important; --box-shadow: ${t.card} !important; }
+    dna-badge { --border-radius: 6px !important; }
   `;
 }
 
-/* Binnen Magisters shadow-DOM-componenten (dna-*): zelfde taal via :host-regels. */
-function appleShadowCss(p, dark, accent) {
-  const sep = dark ? "rgba(84, 84, 88, .65)" : "rgba(60, 60, 67, .29)";
-  const hair = `0 0 0 .5px ${dark ? "rgba(255,255,255,.08)" : "rgba(0,0,0,.06)"}`;
-  const cardShadow = dark ? `${hair}, 0 1px 3px rgba(0,0,0,.4)` : `${hair}, 0 1px 3px rgba(0,0,0,.06)`;
-  return `
-    :host { --dna-button-border-radius: 10px !important; --dna-button-border-width: 1px !important; --dna-radius-small: 6px !important; --dna-font-family-header: var(--dna-font-family-base) !important; }
-    :host(dna-card) { border-radius: 14px !important; box-shadow: ${cardShadow} !important; border: 0 !important; background: ${p.surface} !important; }
-    :host(dna-button) button { border-radius: 10px !important; font-weight: 500 !important; letter-spacing: -0.01em; }
-    :host(dna-button) button:focus-visible { outline: 3px solid ${rgba(accent, .35)} !important; outline-offset: 1px; }
-    :host(dna-tabs) .tabs, :host(dna-tabs) [role=tablist] { border-bottom: 1px solid ${sep} !important; }
-    :host(dna-select) .dna-select-control, :host(dna-input) input, :host(dna-textarea) textarea, :host(dna-datepicker) input {
-      border-radius: 10px !important; border: 1px solid ${dark ? "#48484A" : "#D1D1D6"} !important; background: ${dark ? "#1C1C1E" : "#FFFFFF"} !important; box-shadow: none !important;
+function appleCss(p, dark, accent) {
+  const t = applePalette(p, dark, accent);
+  return appleTokens(t) + `
+    /* ---- Basis ---- */
+    html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+    body { background: ${t.bg} !important; color: ${t.fg} !important; }
+    a { color: ${t.accent}; text-decoration: none; }
+    ::selection { background: ${rgba(accent, .25)}; }
+    :focus-visible { outline: 3px solid ${rgba(accent, .35)} !important; outline-offset: 1px; }
+    h1, h2, h3 { letter-spacing: -.02em; }
+
+    /* ---- Zijbalk: iconenrail en menu als één licht materiaal ---- */
+    .appbar-host, .menu-host, nav.menu, .menu-host nav.menu, .container > nav.menu, .menu-container, .menu-footer, .appbar, mg-appbar { background: ${t.sidebar} !important; }
+    .menu-host { border-right: 1px solid ${t.sep} !important; }
+    .appbar-host { border-right: 1px solid ${t.sep} !important; }
+    nav.menu, .container > nav.menu { font: 500 .875rem/1.25rem ${t.font} !important; }
+    .appbar > div > a, .appbar .menu-button button, a.appbar-button { background: transparent !important; color: ${t.muted} !important; border-radius: 8px !important; transition: background .12s, color .12s; }
+    .appbar > div > a:hover, .appbar .menu-button button:hover, a.appbar-button:hover { background: ${t.hover} !important; color: ${t.fg} !important; }
+    .appbar-icon, .appbar > div > a i, .appbar .menu-button > button > i, .appbar dna-icon { color: inherit !important; font-size: 17px !important; }
+    .appbar .fa-layers-counter { background: ${t.red} !important; color: #fff !important; border-radius: 999px; font: 600 10px/14px ${t.font} !important; min-width: 14px; padding: 0 4px; }
+    .appbar > .gripper > i { background: ${t.muted} !important; opacity: .55; }
+    .appbar > .gripper > i:first-child { background: ${t.accent} !important; opacity: 1; }
+    .appbar .menu-button > a:hover > span, .appbar .menu-button > button:hover > span, .collapsed-menu li:hover span, .collapsed-menu #faux-label {
+      background: ${dark ? "#48484A" : "#1D1D1F"} !important; color: #fff !important; border: 0 !important; border-radius: 6px !important; box-shadow: 0 4px 12px rgba(0,0,0,.2) !important;
+      font: 500 12px/1 ${t.font} !important; text-transform: none !important; padding: 6px 8px !important;
     }
-    :host(dna-select) .dna-select-control:focus-within, :host(dna-input) input:focus, :host(dna-textarea) textarea:focus { border-color: ${accent} !important; box-shadow: 0 0 0 3px ${rgba(accent, .35)} !important; }
-    :host(dna-checkbox) input, :host(dna-radio) input { accent-color: ${accent}; }
-    :host(dna-page-header) h1, :host(dna-page-header) h2 { font-weight: 600 !important; letter-spacing: -0.02em; color: ${p.fg} !important; }
-    :host(dna-overlay-container) .overlay, :host(dna-menu) { border-radius: 12px !important; box-shadow: ${dark ? "0 12px 40px rgba(0,0,0,.6)" : "0 12px 40px rgba(0,0,0,.16)"}, ${hair} !important; }
+    .appbar .menu-button > a:hover > span:after, .appbar .menu-button > button:hover > span:after, .collapsed-menu li:hover span:after { border-right-color: ${dark ? "#48484A" : "#1D1D1F"} !important; }
+    /* Logo: Magisters witte svg vervangen door woordmerk in het systeemlettertype */
+    .menu-host .logo img { display: none !important; }
+    .menu-host .logo a::before { content: "Magister"; font: 700 1.5rem/1 ${t.font}; letter-spacing: -.03em; color: ${t.fg}; }
+    .menu-host .logo a::after { content: ""; width: .4rem; height: .4rem; border-radius: 50%; background: ${t.accent}; margin: .9rem 0 0 .2rem; }
+    .collapsed-menu .logo a::before { content: "M"; }
+    .collapsed-menu .logo a::after { display: none; }
+    /* Menu-items (specificiteit boven Magister en boven de basisregels van het thema) */
+    ul.main-menu { margin: 0 10px !important; }
+    ul.main-menu li a, ul.main-menu li span.caption { color: ${t.fg} !important; }
+    ul.main-menu li a { height: 34px !important; margin-bottom: 2px !important; padding-left: 10px !important; border-radius: 8px !important; background: transparent !important; transition: background .12s; }
+    ul.main-menu li a > dna-icon, ul.main-menu i { color: ${t.accent} !important; }
+    ul.main-menu > li > a:hover { background: ${t.hover} !important; }
+    ul.main-menu > li.active > a, ul.main-menu li[class*="active"] > a, ul.main-menu li a[class*="active"], ul.main-menu li[class*="selected"] > a { background: ${t.accent} !important; color: #fff !important; }
+    ul.main-menu > li.active > a > dna-icon, ul.main-menu > li.active > a i, ul.main-menu > li.active > a .expand-direction, ul.main-menu > li.active > a span.caption { color: #fff !important; }
+    ul.main-menu span.caption { margin-left: 10px !important; }
+    ul.main-menu .dot { background: ${t.red} !important; }
+    .menu-footer { border-top: 1px solid ${t.sep} !important; }
+    .menu-footer a, .menu-footer > a > dna-icon { color: ${t.muted} !important; background: transparent !important; }
+    .menu-footer a:hover { color: ${t.fg} !important; }
+    /* Uitklapmenu's en flyouts */
+    .popup-menu, .collapsed-menu .popup-menu, .appbar .popup-menu, .appbar-flyout-menu, .collapsed-menu .main-menu > li.active > ul {
+      background: ${t.surface} !important; color: ${t.fg} !important; border: 0 !important; border-radius: 12px !important; box-shadow: ${t.pop} !important; padding: 4px !important;
+    }
+    .popup-menu:after, .appbar .popup-menu:after, .collapsed-menu .popup-menu:after, .collapsed-menu .main-menu > li.active > ul:after { display: none !important; }
+    .popup-menu h3, .appbar .popup-menu h3, .collapsed-menu .popup-menu h3 { color: ${t.muted} !important; font: 600 11px/28px ${t.font} !important; letter-spacing: .04em; }
+    .popup-menu ul li a, .appbar .popup-menu ul li a, .collapsed-menu .popup-menu ul li a, .appbar .user-menu a, .collapsed-menu .main-menu > li.active > ul a { color: ${t.fg} !important; border-radius: 7px !important; font: 400 13px/32px ${t.font} !important; height: 32px !important; }
+    .popup-menu ul li a:hover, .appbar .popup-menu ul li a:hover, .collapsed-menu .popup-menu ul li a:hover, .collapsed-menu .main-menu > li.active > ul > li a:hover { background: ${t.accent} !important; color: #fff !important; }
+    .appbar .popup-menu footer { border-top: 1px solid ${t.sep} !important; }
+    .appbar .profile { border-bottom: 1px solid ${t.sep} !important; }
+
+    /* ---- Hoofdvlak ---- */
+    .container > ui-view, ui-view[name="main"], ui-view[name="main"] > *, .strip-padding { background: ${t.bg} !important; }
+    /* Het grote vlak onder de paginakop doorzichtig: kaarten liggen los op de gegroepeerde achtergrond */
+    section.main, section.dna-main-no-subheader, ui-view[name="main"] > * > section { background: transparent !important; box-shadow: none !important; border: 0 !important; }
+    .head-bar h1, ui-view[name="main"] h1 { color: ${t.fg} !important; font: 700 1.75rem/2.125rem ${t.font} !important; letter-spacing: -.02em; }
+    .head-bar h1:after { background: ${t.accent} !important; }
+    .head-bar { color: ${t.fg} !important; }
+    .head-bar .tabs li a { color: ${t.muted} !important; }
+
+    /* ---- Oude widgets (Tahoma 11px) ---- */
+    .widget { font-family: ${t.font} !important; font-size: .8125rem !important; }
+    .widget > .content-pane, .widget > .preview-pane { background: ${t.surface} !important; border: 0 !important; border-radius: 14px !important; box-shadow: ${t.card} !important; overflow: hidden; }
+    .widget > .content-pane h3, .widget > .preview-pane h3 { background: transparent !important; color: ${t.fg} !important; font: 600 .9375rem/44px ${t.font} !important; height: 44px !important; padding-left: 16px !important; border-bottom: 1px solid ${t.sep} !important; box-shadow: none !important; }
+    .widget > .content-pane h3 a, .widget > .preview-pane h3 a { color: ${t.accent} !important; }
+    .widget > .content-pane h3 a.fold-toggle, .widget > .preview-pane h3 a.fold-toggle { color: ${t.muted} !important; }
+    .widget > .content-pane h4, .widget > .preview-pane h4 { background: transparent !important; color: ${t.muted} !important; border-bottom: 1px solid ${t.sep} !important; font: 600 11px/32px ${t.font} !important; letter-spacing: .04em; text-transform: uppercase; }
+    .widget > .content-pane .content, .widget > .preview-pane .content, .widget > .content-pane > .content, .widget > .preview-pane > .content { background: ${t.surface} !important; font-family: ${t.font} !important; font-size: .8125rem !important; color: ${t.fg} !important; }
+    .widget .content-pane .filterbar ~ .content, .widget .preview-pane .filterbar ~ .content { box-shadow: none !important; }
+    .tight-fit .main .content-pane { border-radius: 0 !important; }
+    .dna-card { background: ${t.surface} !important; color: ${t.fg} !important; border-radius: 14px !important; box-shadow: ${t.card} !important; }
+    .dna-card-list, .dna-card-list-item { border-radius: 14px; box-shadow: none; }
+    .dna-card-list { box-shadow: ${t.card} !important; }
+    .dna-card-list-item { background: ${t.surface} !important; }
+    .dna-card-list-item + .dna-card-list-item { border-top: 1px solid ${t.sep} !important; }
+    .dna-card-list-selectable .dna-card-list-item:hover { background: ${t.hover} !important; }
+
+    /* ---- Lijsten (agenda, notificaties, berichten) ---- */
+    uib-accordion { background: transparent !important; }
+    uib-accordion .panel-heading { background: transparent !important; border-bottom: 1px solid ${t.sep} !important; color: ${t.muted} !important; height: 32px !important; }
+    uib-accordion .panel-heading a { color: ${t.muted} !important; font: 600 .75rem/32px ${t.font} !important; letter-spacing: .04em; text-transform: uppercase; padding-left: 12px !important; }
+    uib-accordion .panel-heading a dna-icon { color: ${t.muted} !important; }
+    .list li { background: ${t.surface} !important; border-bottom: 1px solid ${t.sep} !important; color: ${t.fg} !important; }
+    .list li:last-child { border-bottom: 0 !important; }
+    .list li a, .list li.double-line > span { color: ${t.fg} !important; }
+    .list li span.list-head { color: ${t.fg} !important; }
+    .list li span.list-head ~ span { color: ${t.muted} !important; }
+    .list li:hover { background: ${t.hover} !important; }
+    .list li.active, .list li.selected, .list li.current-item { background: ${t.tint} !important; }
+    .list li.current { background: ${t.tintStrong} !important; }
+    .list li.alert:before, .list li.alert-info:before, .list li.alert-danger:before { width: 3px !important; border-radius: 2px; top: 8px !important; bottom: 8px !important; left: 5px !important; }
+    .list li.alert-info:before, .list li.alert:before { background: ${t.accent} !important; }
+    .list li.alert-danger:before { background: ${t.red} !important; }
+    li.vandaag-agenda-list-item { height: 2.5rem !important; }
+    .vandaag-agenda-item-lesblok-tijd { color: ${t.muted} !important; font-variant-numeric: tabular-nums; margin-left: .875rem !important; }
+    span.nrblock { background: ${t.tint} !important; color: ${t.accent} !important; border-radius: 6px !important; font: 600 .75rem/20px ${t.font} !important; height: 20px !important; min-width: 20px !important; padding: 0 6px !important; }
+    ag-lesblok-wijziging > span { color: ${t.muted} !important; font-size: .75rem; }
+    .list li .special, .list li span.special { display: inline-block; min-width: 1.5rem; padding: 0 .5rem; margin-right: .5rem; border-radius: 999px; background: ${t.tint}; color: ${t.accent}; font-weight: 600; line-height: 1.375rem; text-align: center; }
+    .geen-afspraken-tekst, .geen-mededelingen-tekst { color: ${t.muted} !important; }
+
+    /* ---- Tabellen ---- */
+    table.datagrid-table { border-left: 0 !important; }
+    table.datagrid-table th, table.datagrid-table thead th, table.datagrid-table tfoot td { background: ${t.surface} !important; border: 0 !important; border-bottom: 1px solid ${t.sep} !important; color: ${t.muted} !important; font: 600 .75rem/36px ${t.font} !important; height: 36px !important; }
+    table.datagrid-table td { background: ${t.surface} !important; border-right: 0 !important; border-bottom: 1px solid ${t.sep} !important; color: ${t.fg} !important; font-size: .8125rem !important; height: 40px !important; }
+    table.datagrid-table thead + tbody tr:first-child td { box-shadow: none !important; }
+    table.datagrid-table tr:hover td, table.datagrid-table tr.hover td { background: ${t.hover} !important; }
+    table.datagrid-table tr.selected td, table.datagrid-table tr.selected:hover td { background: ${t.tint} !important; }
+    table.datagrid-table tr.current td, table.datagrid-table tr:hover.current td { background: ${t.tintStrong} !important; }
+    th { color: ${t.muted}; }
+
+    /* ---- Velden en knoppen (oude schermen) ---- */
+    .container input[type=email], .container input[type=number], .container input[type=password], .container input[type=search], .container input[type=tel], .container input[type=text], .container textarea, .container select, .dna-text-input, .dna-input-group {
+      background: ${t.surface} !important; border: 1px solid ${t.border} !important; border-radius: 8px !important; color: ${t.fg} !important; font: 400 .8125rem/1.25rem ${t.font} !important; padding: 0 10px !important; transition: box-shadow .12s, border-color .12s;
+    }
+    .container input:hover { background: ${t.surface} !important; }
+    .container input:focus, .container textarea:focus, .container select:focus, .dna-text-input:focus, .dna-input-group:focus-within { background: ${t.surface} !important; border-color: ${t.accent} !important; box-shadow: ${t.focus} !important; outline: none !important; }
+    .container input[disabled] { background: ${t.surface2} !important; color: ${t.muted} !important; }
+    .container .search input, .search input { background: ${t.gray6} !important; border: 0 !important; border-radius: 8px !important; color: ${t.fg} !important; }
+    input[type=checkbox], input[type=radio] { accent-color: ${t.accent}; }
+    .dna-btn { border-radius: 10px !important; font: 500 .8125rem/1rem ${t.font} !important; }
+    .dna-btn-primary { background: ${t.accent} !important; color: #fff !important; }
+    .dna-btn-primary:hover { background: ${mix(accent, dark ? "#ffffff" : "#000000", .08)} !important; }
+    .dna-btn-primary:focus { box-shadow: ${t.focus} !important; }
+    button[class*="primary"], .btn-primary, [class*="button--primary"], input[type="submit"] { border: 0 !important; border-radius: 10px !important; font-weight: 600 !important; }
+    .dna-badge-outline { border-color: ${t.accent} !important; color: ${t.accent} !important; }
+    .dna-badge-primary { background: ${t.accent} !important; }
+
+    /* ---- Kopbalk en tabbladen van detailkaarten ---- */
+    dna-head-bar, .dna-head-bar { background: ${t.surface} !important; color: ${t.fg} !important; border-bottom: 1px solid ${t.sep} !important; }
+    .dna-head-bar-title { font: 600 1rem/1.5rem ${t.font} !important; }
+    .dna-head-bar-item { color: ${t.muted} !important; font: 500 .875rem/1.5rem ${t.font} !important; border-radius: 8px !important; transition: background .12s, color .12s; }
+    a.dna-head-bar-item:hover:not(:disabled), button.dna-head-bar-item:hover:not(:disabled), a.dna-head-bar-item:focus, button.dna-head-bar-item:focus { background: ${t.hover} !important; color: ${t.fg} !important; }
+    .dna-head-bar-item-active, .dna-head-bar-aside .dna-head-bar-item-active { background: transparent !important; color: ${t.accent} !important; box-shadow: inset 0 -2px 0 ${t.accent} !important; border-radius: 0 !important; }
+    .dna-head-bar-aside { background: transparent !important; }
+    .dna-head-bar-aside .dna-head-bar-item:after { background: ${t.accent} !important; height: 2px !important; }
+    .tabs, ul.tabs, .page-nav, [role=tablist] { background: transparent !important; border: 0 !important; border-bottom: 1px solid ${t.sep} !important; }
+    .tabs li a, ul.tabs li a, [role=tab] { border: 0 !important; color: ${t.muted} !important; }
+    .tabs li.active a, ul.tabs li.active a, [role=tab][aria-selected=true] { color: ${t.accent} !important; box-shadow: inset 0 -2px 0 ${t.accent} !important; font-weight: 600; }
+
+    /* ---- Meldingen en dialogen ---- */
+    .dna-snack-bar { background: ${dark ? "#3A3A3C" : "#1D1D1F"} !important; color: #fff !important; border-radius: 12px !important; box-shadow: ${t.pop} !important; }
+    .dialog, .modal-content, mg-dialog .dialog { background: ${t.surface} !important; color: ${t.fg} !important; border: 0 !important; border-radius: 14px !important; box-shadow: ${t.pop} !important; }
+
+    /* ---- Schuifbalken en de eigen UI van de extensie ---- */
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: ${dark ? "rgba(255,255,255,.22)" : "rgba(0,0,0,.2)"}; border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    :root { --dt-shadow: ${t.pop}; --dt-radius: 12px; }
+  `;
+}
+
+/* Binnen elke shadow root: dezelfde componentvariabelen (voor dna-knoppen en tabs die in de
+ * schaduw van een ander component zitten) plus de weinige klassen die daar vast zijn. */
+function appleShadowCss(p, dark, accent) {
+  const t = applePalette(p, dark, accent);
+  return appleTokens(t).replace(":root, body {", ":host {") + `
+    :host(dna-page-header) .title { letter-spacing: -.02em; }
+    .dna-card, .card { background: ${t.surface}; color: ${t.fg}; }
   `;
 }
 

@@ -101,6 +101,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.8.1: Apple-thema opnieuw opgebouwd op Magisters eigen selectors en de variabelen van de dna-componenten: zijbalk en iconenrail als één licht vlak met woordmerk in SF Pro, kaarten zonder rand met 14px hoeken, agenda- en notificatielijsten met hairlines, lesuur-chips en tellers als blauwe tinten, tabbladen als segmentknop, tabellen met alleen horizontale lijnen, donkere menu-tooltips, en een leesbare donkere variant (tekstvariabelen van Magister werden in het donker verkeerd gezet).
 - 0.8.0: thema's "Apple (licht)" en "Apple (donker)" naar de Human Interface Guidelines: systeemlettertype (SF Pro), systeemblauw, gegroepeerde grijze achtergrond met witte vlakken, hairline-scheidingslijnen in plaats van randen, 10px/14px hoeken, doorschijnende balken, lichte zijbalk met blauwe selectie en een focusring; werkt ook binnen Magisters dna-componenten. Lettertype "Apple (SF Pro)" apart kiesbaar.
 - 0.7.10: mailknop probeert meerdere plaatsingen rond Magisters knoppenbalk en meet welke op dezelfde rij uitkomt; de Bronnen-tekst meldt de gekozen plaatsing en de opbouw van de balk (alleen maten en structuur).
 - 0.7.9: mailknop staat op dezelfde rij als prullenbak, printer en plus (vóór Magisters knoppenbalk, met controle dat hij echt op die rij staat); icoon in Magisters navy en iets groter.
