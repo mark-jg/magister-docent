@@ -207,6 +207,12 @@ DT.register({
   /* Themavariabelen ook binnen elke shadow root zetten (componenten die ze op :host herdefiniëren). */
   injectShadow(DT, vars) {
     const css = (vars ? `:host { ${Object.entries(vars).map(([k, v]) => `${k}: ${v} !important;`).join(" ")} }` : "") + (this._shadowCss || "");
+    // Bron voor content/shadowroots.js (hoofdwereld): die zet deze tekst in elke shadow root bij het
+    // aanmaken, ook in gesloten roots en roots die pas later ontstaan. Hieronder blijft de zoekslag
+    // als vangnet voor roots die al bestonden voordat dat script liep.
+    let src = document.getElementById("dt-shadow-src");
+    if (!src) { src = document.createElement("script"); src.type = "text/x-dt-css"; src.id = "dt-shadow-src"; document.head.append(src); }
+    if (src.textContent !== css) src.textContent = css;
     walkAll(document.documentElement, (el) => {
       const sr = el.shadowRoot; if (!sr) return;
       let st = sr.getElementById("dt-shadow-tokens");
@@ -495,6 +501,9 @@ function appleTokens(t) {
       --heading-font: 600 1.0625rem/1.5rem ${t.font} !important; --description-font: .875rem/1.25rem ${t.font} !important; --padding: 1.75rem 1.5rem !important;
       --image-primary: ${rgba(t.accent, .3)} !important; --image-secondary: ${t.accent} !important; }
     dna-link-card p { color: ${t.muted}; }
+    dna-link-card { --image-size: 3.5rem !important; transition: transform .18s ease, box-shadow .18s ease; }
+    dna-link-card:hover { transform: translateY(-2px); --box-shadow: ${t.pop} !important; }
+    dna-link-card h1 { color: ${t.fg}; }
     /* SL-rooster: geen grijze kop, geen celvlakken, lichte lijnen */
     sl-grid { --_header-background: transparent !important; --_cell-background: transparent !important; --_border-radius: 12px !important; }
     sl-grid::part(header) { color: ${t.muted}; font-weight: 600; font-size: .6875rem; letter-spacing: .04em; text-transform: uppercase; }

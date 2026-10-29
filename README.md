@@ -101,6 +101,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.8.8: thema bereikt nu elke shadow root: een script in de hoofdwereld (`content/shadowroots.js`) geeft elke shadow root bij het aanmaken de themastijl mee, ook gesloten roots en roots die later ontstaan (Aanwezigheid, roosters); tegels op Aanwezigheid groter, met lift bij aanwijzen.
 - 0.8.7: agenda-afwerking: geen blauwe streep meer onder de kopbalk (regel was bij 0.8.1 weggevallen), navigatiebalk in de roosterkaart, afspraaktekst donkerblauw, minikalender met maandtitel op één regel; ronde knoppen in de kopbalk in accenttint.
 - 0.8.6: agenda in de stijl van Apple Agenda (kaart zonder kaders, lichte hairlines, afspraken als zachte tint met gekleurde linkerrand, rode nu-lijn, minikalender met vandaag in accent en keuze als gevulde cirkel, keuzelijsten met ronde hoeken); leerlingenlijst als kaart; de kleurvertaler blijft bij de Apple-thema's uit alle componenten weg, zodat tegels en paginakoppen (Aanwezigheid) nu wél het thema volgen.
 - 0.8.5: Apple-thema's doorgezet naar de nieuwe schermen: de blauwe paginakop (Aanwezigheid e.d.) wordt een gewone kop met grijze broodkruimels, de lichtblauwe achtergrond van de SL-schermen volgt het thema, tegels krijgen 20px hoeken, hairline-schaduw en een blauwe pijlknop, SL-roosters krijgen een rustige kop en lichte lijnen, en de leerlingenlijst (eigen tabel in een iframe) verliest de randen om elke cel en de rand om het filterpaneel; in Apple Glass zijn tegels en tabelkoppen van glas.

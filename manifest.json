@@ -60,6 +60,7 @@
         "*://*.magister.net/*"
       ],
       "js": [
+        "content/shadowroots.js",
         "content/netlog.js"
       ],
       "run_at": "document_start",
