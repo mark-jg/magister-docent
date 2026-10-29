@@ -8,7 +8,9 @@
  *  - links.lvs → links.logboeken (?begin&einde)         logboekformulieren
  *  - /api/leerlingen/{id}/afspraken?status=actief&begin&einde   rooster
  *  - /api/leerlingen/{id}/afspraken/taken?status=alle&begin&einde  taken (ELO)
- *  - /api/leerlingen/{id}/verantwoordingen/terugkommaatregelen     terugkommaatregelen */
+ *  - /api/leerlingen/{id}/verantwoordingen/terugkommaatregelen     terugkommaatregelen
+ *  - /api/m6/leerlingen/{id}/verantwoordingen?begin&einde  aanwezigheid: per les de registraties
+ *    (reden.verantwoordingType AB/TL/ZK/UI/VR/MV/HV/MK, reden.isGeoorloofd), zoals het scherm Verzuim */
 DT.register({
   id: "leerlingdash",
   _stop: null,
@@ -46,7 +48,7 @@ DT.register({
       this._card.addEventListener("click", (e) => {
         const a = e.target.closest("[data-state]"); if (!a) return;
         e.preventDefault();
-        try { window.parent.postMessage({ type: "dt:state:go", id: "ll" + Date.now(), name: a.dataset.state, params: { type: "leerling", id: String(id), rol: "Docent" } }, "*"); } catch {}
+        try { window.parent.postMessage({ type: "dt:state:go", id: "ll" + Date.now(), name: a.dataset.state, params: { type: "leerling", id: String(id), rol: "Docent", rolId: "" } }, "*"); } catch {}
       });
       page.prepend(this._card);
     } else if (page.firstElementChild !== this._card) page.prepend(this._card);
@@ -66,12 +68,22 @@ DT.register({
     const plus = (n) => new Date(today.getFullYear(), today.getMonth(), today.getDate() + n);
     const get = (url) => DT.api(url, { full: true, timeout: 12000 });
     const list = (r) => (r && r.status === 200 && r.json) ? (Array.isArray(r.json) ? r.json : r.json.items || r.json.Items || []) : null;
-    const [pers, afspr, taken, terug] = await Promise.all([
+    const sjStart = new Date(today.getFullYear() - (today.getMonth() < 7 ? 1 : 0), 7, 1);
+    const [pers, afspr, taken, terug, verantw] = await Promise.all([
       get(`/api/leerlingen/${id}`),
       get(`/api/leerlingen/${id}/afspraken?status=actief&begin=${ymd(today)}&einde=${ymd(plus(1))}`),
       get(`/api/leerlingen/${id}/afspraken/taken?status=alle&begin=${ymd(plus(-today.getDay() + 1))}&einde=${ymd(plus(8 - today.getDay()))}`),
       get(`/api/leerlingen/${id}/verantwoordingen/terugkommaatregelen`),
+      get(`/api/m6/leerlingen/${id}/verantwoordingen?begin=${ymd(sjStart)}&einde=${ymd(today)}`),
     ]);
+    /* Aanwezigheid: als elke les een registratie heeft, kent de lijst alleen de registraties en
+     * halen we het totale aantal lessen uit het rooster van dezelfde periode. */
+    let lessenTotaal = null;
+    const vItems = list(verantw);
+    if (vItems && vItems.length && vItems.every((x) => (x.verantwoordingen || []).length > 0)) {
+      const r = await get(`/api/leerlingen/${id}/afspraken?status=actief&begin=${ymd(sjStart)}&einde=${ymd(today)}`);
+      const l = list(r); if (l) lessenTotaal = l.filter((a) => new Date(a.einde || a.eind) <= today).length;
+    }
     const persoon = pers.status === 200 ? pers.json : null;
     /* Logboek: via het LVS-startpunt van de leerling, zoals het leerlingvolgsysteem zelf. */
     let logboek = null, logboekErr = pers.status !== 200 ? `persoon ${pers.status}` : "";
@@ -90,6 +102,7 @@ DT.register({
     return {
       persoon, afspraken: list(afspr), afsprakenErr: afspr.status, taken: list(taken), takenErr: taken.status,
       terugkom: list(terug), terugkomErr: terug.status, logboek, logboekErr, today: today.getTime(),
+      verantw: vItems, verantwErr: verantw.status, lessenTotaal, sjStart: sjStart.getTime(),
     };
   },
 
@@ -140,6 +153,9 @@ DT.register({
       jarig = { days: Math.round((nxt - today0) / 864e5), age: nxt.getFullYear() - geb.getFullYear() };
     }
 
+    /* Aanwezigheid dit schooljaar */
+    const att = aanwezigheid(d.verantw, d.lessenTotaal, new Date(d.sjStart), now);
+
     const tile = (kind, num, label, sub, { hot = false, state = "", err = "" } = {}) => `
       <${state ? `a href="#" data-state="${state}"` : "div"} class="dt-ll-tile${hot ? " is-hot" : ""}${err ? " is-err" : ""}" data-kind="${kind}" ${err ? `title="${esc(err)}"` : ""}>
         <span class="dt-ll-ico">${ICON[kind] || ""}</span>
@@ -150,7 +166,17 @@ DT.register({
     const fail = (status) => status == null || status === 200 ? "" : (status === 0 ? "geen antwoord" : `Magister antwoordde ${status}`);
 
     const lesSub = current ? `Nu: ${current.vak}${current.lokaal ? " · " + current.lokaal : ""}` : next ? `Volgende ${hhmm(next.start)}: ${next.vak}` : lessen.length ? "Lessen zijn voorbij" : "Geen lessen vandaag";
+    const ring = (pct, color) => { const r = 20, c = 2 * Math.PI * r, p = Math.max(0, Math.min(100, pct)); return `<svg class="dt-ll-ring" viewBox="0 0 48 48" width="48" height="48" aria-hidden="true"><circle cx="24" cy="24" r="${r}" fill="none" stroke="currentColor" stroke-opacity=".15" stroke-width="5"/><circle cx="24" cy="24" r="${r}" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${(c * p / 100).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 24 24)"/></svg>`; };
+    const attTile = att ? `
+      <a href="#" data-state="AttVerzuim" class="dt-ll-tile dt-ll-att${att.ongeoorloofd > 0 ? " is-hot" : ""}" data-kind="aanwezig" title="Open Verzuim">
+        <span class="dt-ll-ringwrap">${ring(att.pct, att.pct >= 90 ? "#34C759" : att.pct >= 80 ? "#FF9500" : "#FF3B30")}<span class="dt-ll-ringnum">${att.pct}<small>%</small></span></span>
+        <span class="dt-ll-att-text">
+          <span class="dt-ll-label">aanwezig dit schooljaar</span>
+          <span class="dt-ll-sub">${esc(att.lessen)} lessen · ${esc(att.afwezig)} afwezig${att.ongeoorloofd ? ` (${att.ongeoorloofd} ongeoorloofd)` : ""}${att.teLaat ? ` · ${att.teLaat}× te laat` : ""}${att.ziek ? ` · ${att.ziek}× ziek` : ""}</span>
+        </span>
+      </a>` : tile("aanwezig", "–", "aanwezigheid", d.verantw ? "geen lessen in deze periode" : "", { state: "AttVerzuim", err: d.verantw ? "" : fail(d.verantwErr) });
     const tiles = [
+      attTile,
       tile("rooster", d.afspraken ? lessen.filter((l) => !l.vervallen).length : "–", "lessen vandaag", lesSub, { err: d.afspraken ? "" : fail(d.afsprakenErr) }),
       tile("logboek", d.logboek ? lbUnread : "–", "ongelezen logboeken", d.logboek ? `${lbRecent} in de laatste 30 dagen${lbPrio ? ` · ${lbPrio} met prioriteit` : ""}` : "", { hot: lbUnread > 0 || lbPrio > 0, state: "begeleiding", err: d.logboek ? "" : d.logboekErr }),
       tile("taken", d.taken ? takenOpen : "–", "open taken deze week", d.taken ? `${taken.length} taken in totaal` : "", { hot: takenOpen > 0, err: d.taken ? "" : fail(d.takenErr) }),
@@ -162,6 +188,7 @@ DT.register({
       <div class="dt-ll-tiles">${tiles}</div>
       <div class="dt-ll-cols">
         <section class="dt-ll-sec"><h4>Rooster vandaag</h4>${lessen.length ? `<ul class="dt-ll-lessen">${lesRows}</ul>` : `<p class="dt-ll-empty">${d.afspraken ? "Geen lessen vandaag." : "Rooster niet beschikbaar."}</p>`}</section>
+        ${att && att.maanden.length ? (() => { const maxPct = Math.max(1, ...att.maanden.map((m) => m.pctAfwezigGeoorloofd + m.pctAfwezigOngeoorloofd)); const sc = 100 / maxPct; return `<section class="dt-ll-sec dt-ll-sec-maanden"><h4>Afwezig per maand</h4><div class="dt-ll-months">${att.maanden.map((m) => `<div class="dt-ll-month" title="${esc(m.label)}: ${m.lessen} lessen, ${m.afwezig} afwezig (${m.pctAfwezigGeoorloofd + m.pctAfwezigOngeoorloofd}%)${m.ongeoorloofd ? `, ${m.ongeoorloofd} ongeoorloofd` : ""}${m.teLaat ? `, ${m.teLaat}× te laat` : ""}"><div class="dt-ll-bar"><span class="dt-ll-bar-ok" style="height:${(m.pctAfwezigGeoorloofd * sc).toFixed(1)}%"></span><span class="dt-ll-bar-no" style="height:${(m.pctAfwezigOngeoorloofd * sc).toFixed(1)}%"></span></div><span class="dt-ll-month-label">${esc(m.kort)}</span><span class="dt-ll-month-val">${m.afwezig ? `${m.pctAfwezigGeoorloofd + m.pctAfwezigOngeoorloofd}%` : ""}</span></div>`).join("")}</div><div class="dt-ll-legend"><span><i class="is-no"></i>ongeoorloofd</span><span><i class="is-ok"></i>geoorloofd</span><span class="dt-ll-legend-note">percentage van de lessen die maand</span></div></section>`; })() : ""}
         <section class="dt-ll-sec"><h4>Laatste logboek</h4>${lbLast ? `<a href="#" data-state="begeleiding" class="dt-ll-lb"><span class="dt-ll-lb-type">${esc(lbLast.x.formulierType?.naam || lbLast.x.formulierTypeNaam || "Logboek")}</span><span class="dt-ll-lb-date">${esc(lbLast.t.toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" }))}</span><span class="dt-ll-lb-text">${esc(lbLast.x.omschrijving || lbLast.x.titel || "")}</span></a>` : `<p class="dt-ll-empty">${d.logboek ? "Nog geen logboekformulieren." : "Logboek niet beschikbaar."}</p>`}</section>
       </div>`;
   },
@@ -174,7 +201,7 @@ DT.register({
       dk-basisgegevens-page .container:not(.employee) > .wrapper, dk-basisgegevens-page .tab-content, dk-algemene-gegevens .page { min-width: 0; max-width: 100%; box-sizing: border-box; }
       #dt-ll-dash { grid-column: 1 / -1; min-width: 0; max-width: 100%; }
       #dt-ll-dash .dt-ll-body, #dt-ll-dash .dt-ll-tiles, #dt-ll-dash .dt-ll-cols, #dt-ll-dash .dt-ll-sec, #dt-ll-dash .dt-ll-tile, #dt-ll-dash .dt-ll-lb { min-width: 0; }
-      #dt-ll-dash .dt-ll-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); gap: 10px; margin-bottom: 1rem; }
+      #dt-ll-dash .dt-ll-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(128px, 100%), 1fr)); gap: 10px; margin-bottom: 1rem; }
       #dt-ll-dash .dt-ll-tile { --k: #6e6e73; display: grid; grid-template-columns: 1fr auto; grid-template-areas: "ico num" "label label" "sub sub"; gap: 4px 8px; padding: 12px 14px; border-radius: 14px; background: rgba(60,60,67,.05); color: inherit; text-decoration: none; min-height: 84px; align-content: start; }
       #dt-ll-dash a.dt-ll-tile { cursor: pointer; } #dt-ll-dash a.dt-ll-tile:hover { background: rgba(60,60,67,.09); }
       #dt-ll-dash .dt-ll-tile[data-kind="rooster"] { --k: #007AFF; } #dt-ll-dash .dt-ll-tile[data-kind="logboek"] { --k: #AF52DE; } #dt-ll-dash .dt-ll-tile[data-kind="taken"] { --k: #FF9500; } #dt-ll-dash .dt-ll-tile[data-kind="terugkom"] { --k: #FF3B30; } #dt-ll-dash .dt-ll-tile[data-kind="jarig"] { --k: #FF2D55; }
@@ -188,6 +215,26 @@ DT.register({
       #dt-ll-dash .dt-ll-label::first-letter { text-transform: uppercase; }
       #dt-ll-dash .dt-ll-tile.is-hot .dt-ll-label { color: inherit; }
       #dt-ll-dash .dt-ll-sub { grid-area: sub; font: 400 .6875rem/1.3 -apple-system, system-ui, sans-serif; color: #8e8e93; }
+      #dt-ll-dash .dt-ll-att { grid-column: span 2; grid-template-columns: auto 1fr; grid-template-areas: "ring text"; align-items: center; gap: 4px 12px; }
+      @media (max-width: 700px) { #dt-ll-dash .dt-ll-att { grid-column: span 1; } }
+      #dt-ll-dash .dt-ll-ringwrap { grid-area: ring; position: relative; width: 56px; height: 56px; color: #6e6e73; }
+      #dt-ll-dash .dt-ll-ring { width: 56px; height: 56px; }
+      #dt-ll-dash .dt-ll-ring { display: block; }
+      #dt-ll-dash .dt-ll-ringnum { position: absolute; inset: 0; display: grid; place-items: center; font: 700 .9375rem/1 -apple-system, system-ui, sans-serif; letter-spacing: -.02em; }
+      #dt-ll-dash .dt-ll-ringnum small { font-size: .5rem; font-weight: 600; margin-left: 1px; }
+      #dt-ll-dash .dt-ll-att-text { grid-area: text; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+      #dt-ll-dash .dt-ll-months { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; align-items: end; height: 92px; padding: 4px 4px 0; }
+      #dt-ll-dash .dt-ll-month { display: grid; grid-template-rows: 1fr auto auto; height: 100%; justify-items: center; gap: 3px; }
+      #dt-ll-dash .dt-ll-bar { width: 100%; max-width: 28px; height: 100%; display: flex; flex-direction: column-reverse; border-radius: 6px; background: rgba(60,60,67,.07); overflow: hidden; }
+      #dt-ll-dash .dt-ll-bar span { display: block; width: 100%; }
+      #dt-ll-dash .dt-ll-bar-ok { background: #FF9500; }
+      #dt-ll-dash .dt-ll-bar-no { background: #FF3B30; }
+      #dt-ll-dash .dt-ll-month-label { font: 500 .625rem/1 -apple-system, system-ui, sans-serif; color: #8e8e93; text-transform: uppercase; letter-spacing: .04em; }
+      #dt-ll-dash .dt-ll-month-val { font: 600 .6875rem/1 -apple-system, system-ui, sans-serif; color: #6e6e73; min-height: .6875rem; }
+      #dt-ll-dash .dt-ll-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; font: 400 .6875rem/1.2 -apple-system, system-ui, sans-serif; color: #8e8e93; }
+      #dt-ll-dash .dt-ll-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: 0; }
+      #dt-ll-dash .dt-ll-legend .is-no { background: #FF3B30; } #dt-ll-dash .dt-ll-legend .is-ok { background: #FF9500; }
+      #dt-ll-dash .dt-ll-legend-note { margin-left: auto; }
       #dt-ll-dash .dt-ll-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 1rem; }
       #dt-ll-dash .dt-ll-sec h4 { margin: 0 0 .375rem; font: 600 .6875rem/1 -apple-system, system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: #8e8e93; }
       #dt-ll-dash .dt-ll-lessen { list-style: none; margin: 0; padding: 0; }
@@ -211,7 +258,45 @@ DT.register({
   }
 });
 
+/* Aanwezigheid uit Magisters registraties (zoals het scherm Verzuim ze telt): per les de
+ * registraties met type en geoorloofd/ongeoorloofd. Afwezig = AB, ZK, UI of VR; te laat (TL) telt
+ * als aanwezig. Percentage over de lessen die al voorbij zijn. */
+function aanwezigheid(items, lessenTotaal, start, now) {
+  if (!items) return null;
+  const ABSENT = new Set(["AB", "ZK", "UI", "VR"]);
+  const MON = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
+  const MONL = ["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december"];
+  const perMaand = new Map();
+  let lessen = 0, afwezig = 0, ongeoorloofd = 0, teLaat = 0, ziek = 0;
+  for (const it of items) {
+    const a = it.afspraak || it.appointment || it;
+    const begin = new Date(a.begin || a.start || a.startDateTime || it.begin);
+    if (isNaN(begin) || begin > now) continue;
+    const regs = (it.verantwoordingen || it.registraties || it.registrations || []).map((r) => ({
+      type: String(r.reden?.verantwoordingType ?? r.verantwoordingType ?? r.attendanceTypeCode ?? r.code ?? "").toUpperCase(),
+      ok: r.reden?.isGeoorloofd ?? r.isGeoorloofd ?? r.geoorloofd ?? r.approved ?? true,
+    }));
+    const key = `${begin.getFullYear()}-${begin.getMonth()}`;
+    const m = perMaand.get(key) || { y: begin.getFullYear(), m: begin.getMonth(), lessen: 0, afwezig: 0, ongeoorloofd: 0, teLaat: 0 };
+    m.lessen++; lessen++;
+    const abs = regs.find((r) => ABSENT.has(r.type));
+    if (abs) { m.afwezig++; afwezig++; if (!abs.ok) { m.ongeoorloofd++; ongeoorloofd++; } if (abs.type === "ZK") ziek++; }
+    if (regs.some((r) => r.type === "TL")) { m.teLaat++; teLaat++; }
+    perMaand.set(key, m);
+  }
+  if (lessenTotaal && lessenTotaal > lessen) lessen = lessenTotaal;
+  if (!lessen) return null;
+  const pct = Math.round(100 * (lessen - afwezig) / lessen);
+  const maanden = [...perMaand.values()].sort((a, b) => a.y - b.y || a.m - b.m).map((m) => ({
+    ...m, kort: MON[m.m], label: `${MONL[m.m]} ${m.y}`,
+    pctAfwezigGeoorloofd: m.lessen ? Math.round(100 * (m.afwezig - m.ongeoorloofd) / m.lessen) : 0,
+    pctAfwezigOngeoorloofd: m.lessen ? Math.round(100 * m.ongeoorloofd / m.lessen) : 0,
+  }));
+  return { lessen, afwezig, ongeoorloofd, teLaat, ziek, pct, maanden };
+}
+
 const ICON = {
+  aanwezig: `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>`,
   rooster: `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>`,
   logboek: `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 0-3 3z"/><path d="M5 4v16M9 9h6M9 13h4"/></svg>`,
   taken: `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l2 2 4-4"/><rect x="4" y="4" width="16" height="16" rx="4"/></svg>`,

@@ -1145,6 +1145,11 @@ function leerlingkaartCss(t) {
     #dt-ll-dash .dt-ll-tile.is-hot .dt-ll-label, #dt-ll-dash .dt-ll-vak, #dt-ll-dash .dt-ll-tijd, #dt-ll-dash .dt-ll-lb-type { color: ${t.fg}; font-family: ${t.font}; }
     #dt-ll-dash .dt-ll-tile.is-hot .dt-ll-num { color: var(--k); }
     #dt-ll-dash .dt-ll-les.is-current { background: ${t.tint}; }
+    #dt-ll-dash .dt-ll-ringwrap { color: ${t.muted}; } #dt-ll-dash .dt-ll-ringnum { color: ${t.fg}; font-family: ${t.font}; }
+    #dt-ll-dash .dt-ll-bar { background: ${t.dark ? "rgba(255,255,255,.08)" : "rgba(60,60,67,.07)"}; }
+    #dt-ll-dash .dt-ll-bar-ok, #dt-ll-dash .dt-ll-legend .is-ok { background: ${t.orange}; } #dt-ll-dash .dt-ll-bar-no, #dt-ll-dash .dt-ll-legend .is-no { background: ${t.red}; }
+    #dt-ll-dash .dt-ll-month-label, #dt-ll-dash .dt-ll-month-val, #dt-ll-dash .dt-ll-legend { color: ${t.muted}; font-family: ${t.font}; }
+    #dt-ll-dash .dt-ll-tile[data-kind="aanwezig"] { --k: ${t.green}; }
     #dt-ll-dash .dt-ll-tile[data-kind="rooster"] { --k: ${t.accent}; } #dt-ll-dash .dt-ll-tile[data-kind="taken"] { --k: ${t.orange}; } #dt-ll-dash .dt-ll-tile[data-kind="terugkom"] { --k: ${t.red}; }
     /* Toestemmingen */
     dk-toestemmings-antwoorden .answer-entry { margin: 0 !important; padding: .5rem 0 !important; border-bottom: 1px solid ${t.sepSoft}; align-items: center !important; line-height: 1.3 !important; }
