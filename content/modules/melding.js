@@ -23,6 +23,7 @@ DT.register({
   _stop: null,
   _dlg: null,
   _style: null,
+  _placement: "",
 
   /* Labels van de vakjes "voor wie aangemeld" (groep in app-dynamic-fields). */
   TARGETS: [
@@ -186,16 +187,69 @@ DT.register({
       return dy <= 6 && a.right <= c.left + 2 && c.left - a.right <= 24;
     };
 
-    // 1. Buurelement vóór de balk, in dezelfde rij.
-    if (bar.parentNode) {
-      bar.parentNode.insertBefore(b, bar);
-      if (sameRow()) return b;
-      b.remove();
+    // De knop op de hoogte van de eerste knop in de balk zetten (de balk is bij Magister 80px breed
+    // en breekt zijn eigen knoppen in twee rijen; gecentreerd zou onze knop tussen die rijen hangen).
+    const alignToRef = () => {
+      b.style.alignSelf = "flex-start"; b.style.marginTop = "0";
+      const a = b.getBoundingClientRect(), c = ref.getBoundingClientRect();
+      if (a.height > 4 && c.height > 4) {
+        const d = (c.top + c.height / 2) - (a.top + a.height / 2);
+        if (d > 0 && d < 40) b.style.marginTop = `${Math.round(d)}px`;
+      }
+    };
+    // Plaatsingen op volgorde proberen; de eerste die meetbaar op dezelfde rij staat wint.
+    const tries = [
+      ["voor-balk", () => { bar.parentNode?.insertBefore(b, bar); alignToRef(); }, () => {}],
+      ["voor-balk+auto-marge", () => { bar.parentNode?.insertBefore(b, bar); b.style.marginLeft = "auto"; bar.dataset.dtMl = bar.style.marginLeft; bar.style.marginLeft = "0"; alignToRef(); },
+        () => { b.style.marginLeft = "0"; bar.style.marginLeft = bar.dataset.dtMl || ""; delete bar.dataset.dtMl; }],
+      ["in-balk-licht", () => { b.style.alignSelf = "center"; b.style.marginTop = "0"; bar.insertBefore(b, bar.firstChild); }, () => {}],
+      ["in-balk-schaduw", () => { b.style.alignSelf = "center"; b.style.marginTop = "0"; const first = bar.shadowRoot?.firstElementChild || bar.firstElementChild; (bar.shadowRoot || bar).insertBefore(b, first || null); }, () => {}]
+    ];
+    let chosen = "geen";
+    for (const [name, place, undo] of tries) {
+      try { place(); } catch { b.remove(); undo(); continue; }
+      if (!b.isConnected) { undo(); continue; }
+      if (sameRow()) { chosen = name; break; }
+      b.remove(); undo();
     }
-    // 2. Als eerste knop in de balk (indeling van 0.7.6/0.7.8).
-    const first = bar.shadowRoot?.firstElementChild || bar.firstElementChild;
-    (bar.shadowRoot || bar).insertBefore(b, first || null);
+    if (!b.isConnected) { tries[3][1](); chosen = "in-balk-schaduw (uitwijk)"; }
+
+    // Staat de knop vóór de balk, probeer dan de balk zo breed te maken dat Magisters eigen knoppen
+    // ook op één rij komen (prullenbak, printer, plus). Blijven ze in twee rijen, dan terugdraaien.
+    let widened = "nee";
+    if (chosen.startsWith("voor-balk")) {
+      try {
+        const btns = Array.from(bar.children).filter((n) => n.tagName?.toLowerCase() === "dna-button" && visible(n));
+        const rows = () => new Set(btns.map((n) => Math.round(n.getBoundingClientRect().top))).size;
+        if (btns.length >= 2 && rows() > 1) {
+          const prev = { width: bar.style.width, maxWidth: bar.style.maxWidth, flex: bar.style.flex };
+          bar.style.width = "auto"; bar.style.maxWidth = "none"; bar.style.flex = "0 0 auto";
+          if (rows() > 1) { Object.assign(bar.style, prev); widened = "mislukt"; }
+          else { widened = "ja"; b.style.alignSelf = "center"; b.style.marginTop = "0"; if (!sameRow()) alignToRef(); }
+        } else widened = btns.length >= 2 ? "niet nodig" : "geen knoppen gemeten";
+      } catch (e) { widened = `fout: ${e.message}`; }
+    }
+    this._placement = `knop: ${chosen}; balk verbreed: ${widened}; ${this.layoutDiag(bar, b, ref)}`;
     return b;
+  },
+
+  /* Korte beschrijving van de indeling rond de knoppenbalk (alleen structuur en maten, geen inhoud). */
+  layoutDiag(bar, b, ref) {
+    const rect = (n) => { const r = n.getBoundingClientRect(); return `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}`; };
+    const cs = (n) => { const c = getComputedStyle(n); return `${c.display}/${c.flexWrap}/${c.flexDirection} w=${c.width} ml=${c.marginLeft} gtc=${c.gridTemplateColumns}`; };
+    const tag = (n) => n.tagName ? n.tagName.toLowerCase() + (n.id ? "#" + n.id : "") + (n.className && typeof n.className === "string" ? "." + n.className.trim().split(/\s+/).join(".") : "") : "#shadow";
+    const out = [];
+    try {
+      const parent = bar.parentNode;
+      const host = parent?.host;
+      out.push(`balk ${tag(bar)} ${rect(bar)} [${cs(bar)}]`);
+      if (parent) out.push(`ouder ${host ? tag(host) + " (schaduw)" : tag(parent)} ${host ? rect(host) + " [" + cs(host) + "]" : ""}`);
+      if (parent) out.push("ouder-kinderen: " + Array.from(parent.children).map((c) => `${tag(c)} ${rect(c)}`).join(" | "));
+      out.push("balk-licht: " + Array.from(bar.children).map((c) => `${tag(c)} ${rect(c)}`).join(" | "));
+      if (bar.shadowRoot) out.push("balk-schaduw: " + Array.from(bar.shadowRoot.children).map((c) => `${tag(c)} ${rect(c)} [${cs(c)}]`).join(" | "));
+      out.push(`knop ${rect(b)}; referentie ${tag(ref)} ${rect(ref)}`);
+    } catch (e) { out.push(`diag mislukt: ${e.message}`); }
+    return out.join("\n  ");
   },
 
   /* Item in het overzicht eerst uitklappen (anders is de inhoud niet in de DOM). */
@@ -523,6 +577,7 @@ DT.register({
           DT.el("button", { type: "button", class: "dt-m-btn dt-m-ghost", text: "Bronnen", title: "Welke teksten zijn gevonden voor naam, nummer en klas (voor afstemming)",
             onclick: () => DT.copy(
               `leerlingId: ${this.leerlingId() || "(geen)"}\n` +
+              `indeling: ${this._placement || "(geen knop in het overzicht geplaatst)"}\n` +
               `via API: ${f.viaApi?.length ? f.viaApi.join(", ") : "niets"}\n` +
               (f.apiDiag || []).map((l) => "- " + l).join("\n") +
               `\n\nTeksten op de pagina (uitwijk; lak namen weg voor je dit deelt):\n` +

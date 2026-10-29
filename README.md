@@ -101,6 +101,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.7.10: mailknop probeert meerdere plaatsingen rond Magisters knoppenbalk en meet welke op dezelfde rij uitkomt; de Bronnen-tekst meldt de gekozen plaatsing en de opbouw van de balk (alleen maten en structuur).
 - 0.7.9: mailknop staat op dezelfde rij als prullenbak, printer en plus (vóór Magisters knoppenbalk, met controle dat hij echt op die rij staat); icoon in Magisters navy en iets groter.
 - 0.7.8: mailknop in het logboek is weer een eigen, randloze icoonknop op de plek van 0.7.6; hij meet maat, kleur en icoongrootte van de prullenbak-knop ernaast op (het kopiëren van Magisters knop uit 0.7.7 brak de indeling).
 - 0.7.7: mailknop in het logboek is nu een kopie van Magisters eigen icoonknoppen (zelfde maat, kleur en hover) met een envelop-icoon; knop "Mail coach" op de aanmaakpagina en het controlescherm in Magisters navy en Open Sans.
