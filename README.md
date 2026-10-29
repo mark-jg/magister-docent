@@ -101,6 +101,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.8.12: tegels op Aanwezigheid even hoog (alle rijen volgen de hoogste kaart) met de pijl overal op dezelfde plek.
 - 0.8.11: tegels op Aanwezigheid verfijnd: icoon linksboven in een zacht blauw afgerond vlak, titel en omschrijving links uitgelijnd, pijl als lichte tint die bij aanwijzen vult, raster dat met de tekst meegroeit; getest op de echte component.
 - 0.8.10: nieuwere dna-componenten (o.a. de aanwezigheidsapp) lezen privévariabelen met underscore; elke componentvariabele van het thema krijgt nu een tweeling met underscore, waardoor paginakop, broodkruimels en tegels van Aanwezigheid het thema volgen; getest op de echte aanwezigheidscomponent.
 - 0.8.9: het paginarapport (Alt+I, R) meldt nu versie, thema en of de themastijl de shadow roots bereikt (aantal roots, aantal met stijl, hoekradius van een tegel, achtergrond van de paginakop), om verschillen tussen de nabouw en de echte pagina te kunnen herleiden.

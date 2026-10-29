@@ -502,7 +502,7 @@ function appleTokens(t) {
       --heading-font: 600 1.0625rem/1.4 ${t.font} !important; --description-font: .8125rem/1.35 ${t.font} !important; --padding: 1.25rem 1.25rem 3.5rem !important; --heading-margin: .75rem 0 .25rem !important;
       --image-primary: ${rgba(t.accent, .3)} !important; --image-secondary: ${t.accent} !important; }
     dna-link-card p { color: ${t.muted}; }
-    dna-link-card { --image-size: 2.25rem !important; --_image-size: 2.25rem !important; --width: 17rem !important; --_width: 17rem !important; aspect-ratio: auto !important; min-block-size: 12.5rem; transition: transform .18s ease, box-shadow .18s ease; }
+    dna-link-card { --image-size: 2.25rem !important; --_image-size: 2.25rem !important; --width: 17rem !important; --_width: 17rem !important; aspect-ratio: auto !important; min-block-size: 13.5rem; block-size: 100%; transition: transform .18s ease, box-shadow .18s ease; }
     dna-link-card:hover { transform: translateY(-2px); --box-shadow: ${t.pop} !important; --_box-shadow: ${t.pop} !important; --arrow-background: ${t.accent} !important; --_arrow-background: ${t.accent} !important; --arrow-color: #fff !important; --_arrow-color: #fff !important; }
     /* Icoon in een zacht afgerond vlak, zoals app-iconen in Apples instellingen */
     dna-link-card > dna-icon { display: inline-grid !important; place-items: center; inline-size: 3.75rem !important; block-size: 3.75rem !important; padding: 0 !important; border-radius: 16px !important; background: ${t.tint} !important; --icon-size: 2.25rem !important; --_icon-size: 2.25rem !important; }
@@ -791,7 +791,7 @@ function appleShadowCss(p, dark, accent) {
     :host(dna-link-card) a, :host(dna-link-card) .wrapper { align-items: flex-start !important; justify-content: flex-start !important; text-align: start !important; }
     :host(dna-link-card) h1 { text-align: start !important; color: ${t.fg} !important; letter-spacing: -.01em; }
     :host(dna-link-card) p { text-align: start !important; color: ${t.muted} !important; }
-    :host(att-attendance-dashboard) .wrapper { grid-template-rows: none !important; grid-auto-rows: auto !important; align-content: start !important; align-items: start !important; gap: 1.25rem !important; padding-block: 1.25rem !important; }
+    :host(att-attendance-dashboard) .wrapper { grid-template-rows: none !important; grid-auto-rows: 1fr !important; block-size: max-content !important; align-content: start !important; align-items: stretch !important; gap: 1.25rem !important; padding-block: 1.25rem !important; }
     .dna-card, .card { background: ${t.surface}; color: ${t.fg}; }
   `;
 }
