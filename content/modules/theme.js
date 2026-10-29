@@ -1185,16 +1185,16 @@ function appleShadowCss(p, dark, accent) {
     .dna-card, .card { background: ${t.surface}; color: ${t.fg}; }
     /* Leerlingkiezer in de kop van de leerlingkaart: grote naam, klas eronder */
     :host(att-dk-student-selector) .selector { gap: .875rem !important; align-items: center !important; }
-    :host(att-dk-student-selector) .name { font: 700 1.5rem/1.2 ${t.font} !important; letter-spacing: -.02em; color: ${t.fg} !important; }
-    :host(att-dk-student-selector) .subtext { font: 400 .875rem/1.3 ${t.font} !important; color: ${t.muted} !important; }
-    :host(att-dk-student-selector) dna-avatar { --size: 48px !important; --_size: 48px !important; --background: ${t.tint} !important; --_background: ${t.tint} !important; --color: ${t.accent} !important; --_color: ${t.accent} !important; --font-weight: 600 !important; --_font-weight: 600 !important; }
+    :host(att-dk-student-selector) .selector > .right > .name { font: 700 1.5rem/1.2 ${t.font} !important; letter-spacing: -.02em; color: ${t.fg} !important; }
+    :host(att-dk-student-selector) .selector > .right > .subtext { font: 400 .875rem/1.3 ${t.font} !important; color: ${t.muted} !important; }
+    :host(att-dk-student-selector) .selector > dna-avatar { --size: 48px !important; --_size: 48px !important; --background: ${t.tint} !important; --_background: ${t.tint} !important; --color: ${t.accent} !important; --_color: ${t.accent} !important; --font-weight: 600 !important; --_font-weight: 600 !important; }
     :host(dna-tab-bar) .fade { background: transparent !important; box-shadow: none !important; }
     :host(dna-tab-bar) .indicator { display: none !important; }
     :host(dna-tab-bar) .wrapper { padding-block-end: var(--_spacing, 2px) !important; }
     :host(dna-button.upload-button) button, :host(dna-button.upload-button) .button, :host(dna-button.upload-button) a { border: 0 !important; background: transparent !important; color: #fff !important; padding: 0 !important; }
     /* Avatar met naam en hint eronder (profielkaart) */
-    :host(dna-avatar) .outer .inner { font: 600 1.125rem/1.3 ${t.font} !important; color: ${t.fg} !important; letter-spacing: -.01em; }
-    :host(dna-avatar) .outer .content { font: 400 .8125rem/1.3 ${t.font} !important; color: ${t.muted} !important; }
+    :host(dna-avatar[size="xl"]) .outer .inner { font: 600 1.125rem/1.3 ${t.font} !important; color: ${t.fg} !important; letter-spacing: -.01em; }
+    :host(dna-avatar[size="xl"]) .outer .content { font: 400 .8125rem/1.3 ${t.font} !important; color: ${t.muted} !important; }
     :host(dna-avatar) .picture { box-shadow: 0 0 0 .5px rgba(0,0,0,.06); }
   `;
 }
