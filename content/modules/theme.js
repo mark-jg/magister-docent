@@ -170,10 +170,16 @@ DT.register({
       return;
     }
     const sig = this._sig;
+    const shell = p.look ? ".appbar-host, .menu-host, nav.menu, .menu-container, .menu-footer, .appbar, mg-appbar, .logo, .logo *, .appbar-host *, section.main, .container > ui-view" : null;
     let budget = 6000;
     walkAll(document.documentElement, (el) => {
       if (budget-- <= 0) return;
       if (el.id && el.id.startsWith("dt-")) return;
+      // Een look-thema (Apple) kleurt de schil zelf; inline kleuren van de vertaler weghalen.
+      if (shell && el.matches && el.matches(shell)) {
+        if (el.dataset.dtRc) { for (const [, prop] of props) el.style.removeProperty(prop); ["border-top-color", "border-bottom-color", "border-left-color", "border-right-color"].forEach((x) => el.style.removeProperty(x)); delete el.dataset.dtRc; }
+        return;
+      }
       if (el.closest && el.closest("#dt-panel, #dt-table-menu, #dt-palette, #dt-ai-dialog, #dt-export-dialog, #dt-toasts, #dt-handle, #dt-role-menu, #dt-inspect-bar")) return;
       if (/^(script|style|link|meta|head|title|br|img|video|canvas|iframe)$/i.test(el.localName)) return;
       if (el.dataset.dtRc === sig) return;
@@ -437,11 +443,11 @@ function applePalette(p, dark, accent) {
     font: FONTS.apple,
     glass: Boolean(p.glass),
     // Liquid Glass: doorschijnend materiaal met vervaging en een lichtrand bovenaan
-    glassBg: dark ? "rgba(44, 44, 46, .55)" : "rgba(255, 255, 255, .55)",
+    glassBg: dark ? "rgba(44, 44, 46, .5)" : "rgba(255, 255, 255, .48)",
     glassStrong: dark ? "rgba(44, 44, 46, .78)" : "rgba(255, 255, 255, .8)",
-    glassSide: dark ? "rgba(28, 28, 30, .55)" : "rgba(255, 255, 255, .45)",
+    glassSide: dark ? "rgba(28, 28, 30, .5)" : "rgba(255, 255, 255, .36)",
     glassEdge: dark ? "inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 0 .5px rgba(255,255,255,.1)" : "inset 0 1px 0 rgba(255,255,255,.85), inset 0 0 0 .5px rgba(255,255,255,.55)",
-    glassShadow: dark ? "0 12px 40px rgba(0,0,0,.45)" : "0 10px 36px rgba(31, 41, 61, .10)",
+    glassShadow: dark ? "0 18px 50px rgba(0,0,0,.5), 0 2px 6px rgba(0,0,0,.25)" : "0 18px 50px rgba(31, 41, 61, .14), 0 2px 6px rgba(31, 41, 61, .05)",
     blur: "saturate(180%) blur(28px)"
   };
 }
@@ -531,13 +537,17 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     .menu-footer a, .menu-footer > a > dna-icon { color: ${t.muted} !important; background: transparent !important; }
     .menu-footer a:hover { color: ${t.fg} !important; }
     /* Uitklapmenu's en flyouts */
-    .popup-menu, .collapsed-menu .popup-menu, .appbar .popup-menu, .appbar-flyout-menu, .collapsed-menu .main-menu > li.active > ul {
+    .collapsed-menu .popup-menu, .appbar .popup-menu, .appbar-flyout-menu, .collapsed-menu .main-menu > li.active > ul {
       background: ${t.surface} !important; color: ${t.fg} !important; border: 0 !important; border-radius: 12px !important; box-shadow: ${t.pop} !important; padding: 4px !important;
     }
+    ul.main-menu > li > .popup-menu { background: transparent !important; box-shadow: none !important; padding: 0 !important; border: 0 !important; }
+    ul.main-menu li.expanded ul { margin: 0 0 4px 30px !important; }
+    ul.main-menu li.expanded ul li a { height: 30px !important; font-size: .8125rem !important; color: ${t.muted} !important; }
+    ul.main-menu li.expanded ul li.active a { color: ${t.accent} !important; background: transparent !important; font-weight: 600; }
     .popup-menu:after, .appbar .popup-menu:after, .collapsed-menu .popup-menu:after, .collapsed-menu .main-menu > li.active > ul:after { display: none !important; }
-    .popup-menu h3, .appbar .popup-menu h3, .collapsed-menu .popup-menu h3 { color: ${t.muted} !important; font: 600 11px/28px ${t.font} !important; letter-spacing: .04em; }
-    .popup-menu ul li a, .appbar .popup-menu ul li a, .collapsed-menu .popup-menu ul li a, .appbar .user-menu a, .collapsed-menu .main-menu > li.active > ul a { color: ${t.fg} !important; border-radius: 7px !important; font: 400 13px/32px ${t.font} !important; height: 32px !important; }
-    .popup-menu ul li a:hover, .appbar .popup-menu ul li a:hover, .collapsed-menu .popup-menu ul li a:hover, .collapsed-menu .main-menu > li.active > ul > li a:hover { background: ${t.accent} !important; color: #fff !important; }
+    .appbar .popup-menu h3, .collapsed-menu .popup-menu h3 { color: ${t.muted} !important; font: 600 11px/28px ${t.font} !important; letter-spacing: .04em; }
+    .appbar .popup-menu ul li a, .collapsed-menu .popup-menu ul li a, .appbar .user-menu a, .collapsed-menu .main-menu > li.active > ul a { color: ${t.fg} !important; border-radius: 7px !important; font: 400 13px/32px ${t.font} !important; height: 32px !important; }
+    .appbar .popup-menu ul li a:hover, .collapsed-menu .popup-menu ul li a:hover, .collapsed-menu .main-menu > li.active > ul > li a:hover { background: ${t.accent} !important; color: #fff !important; }
     .appbar .popup-menu footer { border-top: 1px solid ${t.sep} !important; }
     .appbar .profile { border-bottom: 1px solid ${t.sep} !important; }
 
@@ -570,9 +580,13 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     /* ---- Lijsten (agenda, notificaties, berichten) ---- */
     uib-accordion { background: transparent !important; }
     uib-accordion .panel-heading { background: transparent !important; border-bottom: 1px solid ${t.sep} !important; color: ${t.muted} !important; height: 32px !important; }
-    uib-accordion .panel-heading a { color: ${t.muted} !important; font: 600 .75rem/32px ${t.font} !important; letter-spacing: .04em; text-transform: uppercase; padding-left: 12px !important; }
+    uib-accordion .panel-heading a { color: ${t.muted} !important; font: 600 .75rem/32px ${t.font} !important; letter-spacing: .04em; text-transform: uppercase; padding-left: 14px !important; box-shadow: none !important; }
+    .agenda-widget-content { border: 0 !important; }
     uib-accordion .panel-heading a dna-icon { color: ${t.muted} !important; }
-    .list li { background: ${t.surface} !important; border-bottom: 1px solid ${t.sep} !important; color: ${t.fg} !important; }
+    .list li { background: ${t.surface} !important; border-bottom: 1px solid ${t.sep} !important; color: ${t.fg} !important; height: 44px !important; line-height: 44px !important; }
+    .list li.double-line { height: auto !important; min-height: 48px !important; line-height: 18px !important; }
+    .list li a { display: flex !important; align-items: center; gap: .5rem; padding: 0 12px 0 14px !important; }
+    .list li a > span { line-height: 1.25rem; }
     .list li:last-child { border-bottom: 0 !important; }
     .list li a, .list li.double-line > span { color: ${t.fg} !important; }
     .list li span.list-head { color: ${t.fg} !important; }
@@ -583,11 +597,11 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     .list li.alert:before, .list li.alert-info:before, .list li.alert-danger:before { width: 3px !important; border-radius: 2px; top: 8px !important; bottom: 8px !important; left: 5px !important; }
     .list li.alert-info:before, .list li.alert:before { background: ${t.accent} !important; }
     .list li.alert-danger:before { background: ${t.red} !important; }
-    li.vandaag-agenda-list-item { height: 2.5rem !important; }
+    li.vandaag-agenda-list-item { height: 2.75rem !important; }
     .vandaag-agenda-item-lesblok-tijd { color: ${t.muted} !important; font-variant-numeric: tabular-nums; margin-left: .875rem !important; }
     span.nrblock { background: ${t.tint} !important; color: ${t.accent} !important; border-radius: 6px !important; font: 600 .75rem/20px ${t.font} !important; height: 20px !important; min-width: 20px !important; padding: 0 6px !important; }
     ag-lesblok-wijziging > span { color: ${t.muted} !important; font-size: .75rem; }
-    .list li .special, .list li span.special { display: inline-block; min-width: 1.5rem; padding: 0 .5rem; margin-right: .5rem; border-radius: 999px; background: ${t.tint}; color: ${t.accent}; font-weight: 600; line-height: 1.375rem; text-align: center; }
+    .list li .special, .list li span.special, ul.list div a .special { display: inline-flex !important; align-items: center; justify-content: center; float: none !important; width: auto !important; min-width: 1.5rem; height: 1.375rem !important; padding: 0 .5rem; margin: 0 .25rem 0 0 !important; border-radius: 999px; background: ${t.tint}; color: ${t.accent}; font-weight: 600; font-size: .75rem; line-height: 1 !important; text-align: center; }
     .geen-afspraken-tekst, .geen-mededelingen-tekst { color: ${t.muted} !important; }
 
     /* ---- Tabellen ---- */
@@ -626,8 +640,8 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     .dna-head-bar-aside { background: transparent !important; }
     .dna-head-bar-aside .dna-head-bar-item:after { background: ${t.accent} !important; height: 2px !important; }
     .tabs, ul.tabs, .page-nav, [role=tablist] { background: transparent !important; border: 0 !important; border-bottom: 1px solid ${t.sep} !important; }
-    .tabs li a, ul.tabs li a, [role=tab] { border: 0 !important; color: ${t.muted} !important; }
-    .tabs li.active a, ul.tabs li.active a, [role=tab][aria-selected=true] { color: ${t.accent} !important; box-shadow: inset 0 -2px 0 ${t.accent} !important; font-weight: 600; }
+    .tabs li a, ul.tabs li a, [role=tablist] > [role=tab]:not(.panel-heading) { border: 0 !important; color: ${t.muted} !important; }
+    .tabs li.active a, ul.tabs li.active a, [role=tablist] > [role=tab][aria-selected=true]:not(.panel-heading) { color: ${t.accent} !important; box-shadow: inset 0 -2px 0 ${t.accent} !important; font-weight: 600; }
 
     /* ---- Meldingen en dialogen ---- */
     .dna-snack-bar { background: ${dark ? "#3A3A3C" : "#1D1D1F"} !important; color: #fff !important; border-radius: 12px !important; box-shadow: ${t.pop} !important; }
@@ -658,7 +672,7 @@ function glassCss(t, top) {
   const a = t.accent;
   const wash = t.dark
     ? `radial-gradient(70% 55% at 12% 0%, ${rgba(a, .28)} 0%, transparent 60%), radial-gradient(55% 45% at 95% 100%, rgba(191, 90, 242, .20) 0%, transparent 60%), radial-gradient(40% 35% at 70% 25%, rgba(48, 209, 88, .08) 0%, transparent 60%), linear-gradient(160deg, #15151b 0%, #1b1b22 100%)`
-    : `radial-gradient(70% 55% at 10% 0%, ${rgba(a, .26)} 0%, transparent 60%), radial-gradient(55% 45% at 95% 100%, rgba(175, 82, 222, .20) 0%, transparent 60%), radial-gradient(45% 40% at 70% 20%, rgba(255, 149, 0, .10) 0%, transparent 60%), radial-gradient(40% 35% at 40% 90%, rgba(48, 209, 88, .10) 0%, transparent 60%), linear-gradient(160deg, #e9eef9 0%, #f1edf8 55%, #e8f1f4 100%)`;
+    : `radial-gradient(60% 50% at 8% 0%, ${rgba(a, .34)} 0%, transparent 62%), radial-gradient(50% 45% at 96% 100%, rgba(175, 82, 222, .26) 0%, transparent 62%), radial-gradient(40% 38% at 72% 18%, rgba(255, 149, 0, .13) 0%, transparent 60%), radial-gradient(38% 34% at 38% 92%, rgba(48, 209, 88, .13) 0%, transparent 60%), radial-gradient(30% 30% at 55% 55%, rgba(90, 200, 250, .14) 0%, transparent 60%), linear-gradient(160deg, #e6ecfa 0%, #efeaf8 55%, #e4eff3 100%)`;
   const glass = `background: ${t.glassBg} !important; -webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur}; box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; border: 0 !important;`;
   return `
     /* Achtergrond: kleurwas (hoofdpagina) of doorzichtig (iframe) */
@@ -672,8 +686,8 @@ function glassCss(t, top) {
     }
     ul.main-menu > li > a:hover { background: ${t.dark ? "rgba(255,255,255,.08)" : "rgba(255,255,255,.55)"} !important; }
     /* Kaarten en vlakken */
-    dna-card { --background: ${t.glassBg} !important; --border-radius: 20px !important; --box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; -webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur}; }
-    .widget > .content-pane, .widget > .preview-pane, .dna-card, .dna-card-list, dna-accordion-item { ${glass} border-radius: 20px !important; }
+    dna-card { --background: linear-gradient(180deg, ${t.dark ? "rgba(255,255,255,.07)" : "rgba(255,255,255,.55)"}, transparent 40%), ${t.glassBg} !important; --border-radius: 20px !important; --box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; -webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur}; }
+    .widget > .content-pane, .widget > .preview-pane, .dna-card, .dna-card-list, dna-accordion-item { ${glass} background: linear-gradient(180deg, ${t.dark ? "rgba(255,255,255,.07)" : "rgba(255,255,255,.55)"}, transparent 40%), ${t.glassBg} !important; border-radius: 20px !important; }
     dna-accordion-item { --background: ${t.glassBg} !important; --border-radius: 20px !important; --box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; }
     .widget > .content-pane .content, .widget > .preview-pane .content, .widget > .content-pane > .content, .widget > .preview-pane > .content, .widget > .content-pane h3, uib-accordion, .list li, .dna-card-list-item,
     table.datagrid-table th, table.datagrid-table thead th, table.datagrid-table tfoot td, table.datagrid-table td { background: transparent !important; }
@@ -682,7 +696,7 @@ function glassCss(t, top) {
     .list li.active, .list li.selected, .list li.current-item, table.datagrid-table tr.selected td { background: ${rgba(a, .12)} !important; }
     /* Kopbalk van detailkaarten en popovers als glas */
     dna-head-bar, .dna-head-bar, .head-bar { ${glass} border-radius: 16px !important; margin-bottom: .5rem; }
-    .popup-menu, .collapsed-menu .popup-menu, .appbar .popup-menu, .appbar-flyout-menu, .collapsed-menu .main-menu > li.active > ul, .dialog, .modal-content, mg-dialog .dialog {
+    .collapsed-menu .popup-menu, .appbar .popup-menu, .appbar-flyout-menu, .collapsed-menu .main-menu > li.active > ul, .dialog, .modal-content, mg-dialog .dialog {
       background: ${t.glassStrong} !important; -webkit-backdrop-filter: saturate(180%) blur(40px); backdrop-filter: saturate(180%) blur(40px); box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; border-radius: 18px !important;
     }
     dna-menu, dna-overlay, dna-dialog { --background: ${t.glassStrong} !important; --box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; --border-radius: 18px !important; -webkit-backdrop-filter: saturate(180%) blur(40px); backdrop-filter: saturate(180%) blur(40px); }
