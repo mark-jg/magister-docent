@@ -78,11 +78,19 @@ DT.register({
     ]);
     /* Aanwezigheid: als elke les een registratie heeft, kent de lijst alleen de registraties en
      * halen we het totale aantal lessen uit het rooster van dezelfde periode. */
-    let lessenTotaal = null;
+    let lessenTotaal = null, lessenPerMaand = null;
     const vItems = list(verantw);
     if (vItems && vItems.length && vItems.every((x) => (x.verantwoordingen || []).length > 0)) {
       const r = await get(`/api/leerlingen/${id}/afspraken?status=actief&begin=${ymd(sjStart)}&einde=${ymd(today)}`);
-      const l = list(r); if (l) lessenTotaal = l.filter((a) => new Date(a.einde || a.eind) <= today).length;
+      const l = list(r);
+      if (l) {
+        lessenPerMaand = {}; lessenTotaal = 0;
+        for (const a of l) {
+          const b = new Date(a.start || a.begin), e = new Date(a.einde || a.eind);
+          if (isNaN(b) || isNaN(e) || e > today || a.status === 5 || a.isVervallen === true) continue;
+          const k = `${b.getFullYear()}-${b.getMonth()}`; lessenPerMaand[k] = (lessenPerMaand[k] || 0) + 1; lessenTotaal++;
+        }
+      }
     }
     const persoon = pers.status === 200 ? pers.json : null;
     /* Logboek: via het LVS-startpunt van de leerling, zoals het leerlingvolgsysteem zelf. */
@@ -102,7 +110,7 @@ DT.register({
     return {
       persoon, afspraken: list(afspr), afsprakenErr: afspr.status, taken: list(taken), takenErr: taken.status,
       terugkom: list(terug), terugkomErr: terug.status, logboek, logboekErr, today: today.getTime(),
-      verantw: vItems, verantwErr: verantw.status, lessenTotaal, sjStart: sjStart.getTime(),
+      verantw: vItems, verantwErr: verantw.status, lessenTotaal, lessenPerMaand, sjStart: sjStart.getTime(),
     };
   },
 
@@ -154,7 +162,7 @@ DT.register({
     }
 
     /* Aanwezigheid dit schooljaar */
-    const att = aanwezigheid(d.verantw, d.lessenTotaal, new Date(d.sjStart), now);
+    const att = aanwezigheid(d.verantw, d.lessenTotaal, new Date(d.sjStart), now, d.lessenPerMaand);
 
     const tile = (kind, num, label, sub, { hot = false, state = "", err = "" } = {}) => `
       <${state ? `a href="#" data-state="${state}"` : "div"} class="dt-ll-tile${hot ? " is-hot" : ""}${err ? " is-err" : ""}" data-kind="${kind}" ${err ? `title="${esc(err)}"` : ""}>
@@ -276,7 +284,7 @@ DT.register({
 /* Aanwezigheid uit Magisters registraties (zoals het scherm Verzuim ze telt): per les de
  * registraties met type en geoorloofd/ongeoorloofd. Afwezig = AB, ZK, UI of VR; te laat (TL) telt
  * als aanwezig. Percentage over de lessen die al voorbij zijn. */
-function aanwezigheid(items, lessenTotaal, start, now) {
+function aanwezigheid(items, lessenTotaal, start, now, lessenPerMaand) {
   if (!items) return null;
   const ABSENT = new Set(["AB", "ZK", "UI", "VR"]);
   /* Magister levert het type als naam (absent, teLaat, ziek, uitgestuurd, vrijstelling, …) of als code. */
@@ -309,6 +317,18 @@ function aanwezigheid(items, lessenTotaal, start, now) {
     m.per[cat] = (m.per[cat] || 0) + 1;
     for (const r of regs) if (["MV", "HV", "MK"].includes(r.type)) m.per.OVERIG = (m.per.OVERIG || 0) + 1;
     perMaand.set(key, m);
+  }
+  /* Kent de lijst alleen geregistreerde lessen, dan komt het aantal lessen per maand uit het rooster
+   * en zijn de overige lessen van die maand aanwezig. */
+  if (lessenPerMaand) {
+    for (const [key, n] of Object.entries(lessenPerMaand)) {
+      const [y, mo] = key.split("-").map(Number);
+      const m = perMaand.get(key) || { y, m: mo, lessen: 0, afwezig: 0, ongeoorloofd: 0, teLaat: 0, per: {} };
+      const geregistreerd = Object.entries(m.per).filter(([k]) => k !== "OVERIG").reduce((x, [, v]) => x + v, 0);
+      m.lessen = Math.max(n, geregistreerd);
+      m.per.OK = m.lessen - (geregistreerd - (m.per.OK || 0));
+      perMaand.set(key, m);
+    }
   }
   const perType = {};
   for (const m of perMaand.values()) for (const [k, v] of Object.entries(m.per)) perType[k] = (perType[k] || 0) + v;

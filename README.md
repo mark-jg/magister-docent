@@ -102,6 +102,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.14.2: aanwezigheid per maand: Magister geeft alleen lessen met een registratie terug; de maandbalken tellen de lessen nu uit het rooster van de leerling, net als de donut, zodat het groene deel klopt.
 - 0.14.1: het percentage in de aanwezigheidsdonut staat op één regel.
 - 0.14.0: de maandgrafiek op de leerlingkaart is een reeks horizontale balken: per maand alle lessen als één balk, met aanwezig in groen, te laat in geel en de afwezigheidstypen erachter, en het aanwezigheidspercentage rechts.
 - 0.13.4: maandgrafiek: de lege grijze achtergrond van de staven is weg; alleen de gevulde stapel is zichtbaar, met afgeronde hoeken, en een maand zonder registraties krijgt een streepje.
