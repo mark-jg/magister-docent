@@ -1136,8 +1136,10 @@ function leerlingkaartCss(t) {
     dk-basisgegevens-page dna-card > dna-card .gegevens-container { padding: .45rem 0 !important; }
     dk-basisgegevens-page dna-card > dna-card .gegevens-container:last-child { border-bottom: 0; }
     /* Leerlingoverzicht (module leerlingdash) in themakleuren */
-    #dt-ll-dash .dt-ll-tile, #dt-ll-dash .dt-ll-lb { background: ${group} !important; color: ${t.fg}; }
-    #dt-ll-dash a.dt-ll-tile:hover, #dt-ll-dash .dt-ll-lb:hover { background: ${t.dark ? "rgba(255,255,255,.1)" : "rgba(60,60,67,.09)"} !important; transform: translateY(-1px); transition: background .12s, transform .12s; }
+    #dt-ll-dash .dt-ll-tile { background: ${group} !important; color: ${t.fg}; }
+    #dt-ll-dash .dt-ll-lb { background: ${t.dark ? "rgba(255,255,255,.06)" : "rgba(60,60,67,.06)"} !important; }
+    #dt-ll-dash .dt-ll-hero .dt-ll-label { color: ${t.fg} !important; }
+    #dt-ll-dash a.dt-ll-tile:hover { background: ${t.dark ? "rgba(255,255,255,.1)" : "rgba(60,60,67,.09)"} !important; transform: translateY(-1px); transition: background .12s, transform .12s; }
     #dt-ll-dash .dt-ll-tile.is-hot { background: color-mix(in srgb, var(--k) ${t.dark ? "22%" : "12%"}, ${t.surface}) !important; }
     #dt-ll-dash .dt-ll-tile.is-hot:hover { background: color-mix(in srgb, var(--k) ${t.dark ? "30%" : "18%"}, ${t.surface}) !important; }
     #dt-ll-dash .dt-ll-ico { background: color-mix(in srgb, var(--k) 16%, ${t.surface}); }
@@ -1260,7 +1262,13 @@ function appleShellCss(p, dark, accent) {
   const bg = t.glass ? t.glassSide : t.sidebar;
   const blur = t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : "";
   return `
-    html body .container > .appbar-host, html body .container > .menu-host { background: ${bg} !important; background-color: ${bg} !important; background-image: none !important; ${blur} }
+
+    /* Stapeling: zijbalk en iconenrail boven het hoofdvlak, zodat hun schaduw doorloopt en de
+     * popups en tooltips van het ingeklapte menu niet achter het frame verdwijnen. */
+    .container > .appbar-host { position: relative !important; z-index: 1210 !important; }
+    .container > .menu-host { position: relative !important; z-index: 1200 !important; }
+    .container > ui-view[name="main"] { position: relative; z-index: 1; }
+    .collapsed-menu .popup-menu, .collapsed-menu li:hover span, .collapsed-menu .main-menu > li.active > ul, .collapsed-menu #faux-label { z-index: 1205 !important; }    html body .container > .appbar-host, html body .container > .menu-host { background: ${bg} !important; background-color: ${bg} !important; background-image: none !important; ${blur} }
     html body .appbar-host mg-appbar, html body .appbar-host .appbar, html body .menu-host nav.menu, html body .menu-host .menu-container, html body .menu-host .menu-footer, html body .menu-host .menu-footer a { background: transparent !important; background-color: transparent !important; background-image: none !important; }
     html body .appbar > div > a, html body .appbar .menu-button button, html body a.appbar-button { background: transparent !important; background-color: transparent !important; color: ${t.muted} !important; }
     html body .appbar > div > a:hover, html body .appbar .menu-button button:hover { background: ${t.hover} !important; background-color: ${t.hover} !important; color: ${t.fg} !important; }

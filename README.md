@@ -102,6 +102,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.15.0: leerlingoverzicht als bento-indeling: aanwezigheid (donut met maandbalken erin) en vandaag (met het rooster erin) als grote vlakken, logboek met de laatste notitie erin, taken, terugkomen en verjaardag ernaast; op smalle schermen twee kolommen. Schil: zijbalk en iconenrail staan nu boven het hoofdvlak, zodat de schaduw doorloopt en de popups en tooltips van het ingeklapte menu niet meer achter het frame vallen.
 - 0.14.2: aanwezigheid per maand: Magister geeft alleen lessen met een registratie terug; de maandbalken tellen de lessen nu uit het rooster van de leerling, net als de donut, zodat het groene deel klopt.
 - 0.14.1: het percentage in de aanwezigheidsdonut staat op één regel.
 - 0.14.0: de maandgrafiek op de leerlingkaart is een reeks horizontale balken: per maand alle lessen als één balk, met aanwezig in groen, te laat in geel en de afwezigheidstypen erachter, en het aanwezigheidspercentage rechts.

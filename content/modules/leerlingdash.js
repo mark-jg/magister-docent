@@ -164,46 +164,26 @@ DT.register({
     /* Aanwezigheid dit schooljaar */
     const att = aanwezigheid(d.verantw, d.lessenTotaal, new Date(d.sjStart), now, d.lessenPerMaand);
 
-    const tile = (kind, num, label, sub, { hot = false, state = "", err = "" } = {}) => `
-      <${state ? `a href="#" data-state="${state}"` : "div"} class="dt-ll-tile${hot ? " is-hot" : ""}${err ? " is-err" : ""}" data-kind="${kind}" ${err ? `title="${esc(err)}"` : ""}>
+    const head = (kind, num, label, sub, { hot = false, err = "" } = {}) => `
         <span class="dt-ll-ico">${ICON[kind] || ""}</span>
         <span class="dt-ll-num">${esc(num)}</span>
         <span class="dt-ll-label">${esc(label)}</span>
-        ${sub ? `<span class="dt-ll-sub">${esc(sub)}</span>` : ""}
+        ${sub ? `<span class="dt-ll-sub">${esc(sub)}</span>` : ""}`;
+    const tile = (kind, num, label, sub, { hot = false, state = "", err = "", cls = "", extra = "" } = {}) => `
+      <${state ? `a href="#" data-state="${state}"` : "div"} class="dt-ll-tile ${cls}${hot ? " is-hot" : ""}${err ? " is-err" : ""}" data-kind="${kind}" ${err ? `title="${esc(err)}"` : ""}>
+        <div class="dt-ll-tile-head">${head(kind, num, label, sub)}</div>${extra}
       </${state ? "a" : "div"}>`;
     const fail = (status) => status == null || status === 200 ? "" : (status === 0 ? "geen antwoord" : `Magister antwoordde ${status}`);
 
-    const lesSub = current ? `Nu: ${current.vak}${current.lokaal ? " · " + current.lokaal : ""}` : next ? `Volgende ${hhmm(next.start)}: ${next.vak}` : lessen.length ? "Lessen zijn voorbij" : "Geen lessen vandaag";
     /* Donut: aanwezig in groen, de afwezige lessen per type in de kleuren van de grafiek. */
-    const donut = (att) => {
+    const donut = (att, size) => {
       const r = 20, c = 2 * Math.PI * r, L = Math.max(1, att.lessen);
       const parts = [["ZK", "#AF52DE"], ["AB_OK", "#FF9500"], ["AB_NO", "#FF3B30"], ["UI", "#A2845E"], ["VR", "#32ADE6"]].map(([k, col]) => [Math.min(att.perType[k] || 0, L), col]).filter(([n]) => n > 0);
       const absN = parts.reduce((x, [n]) => x + n, 0), present = Math.max(0, L - absN);
       let off = 0; const seg = (n, col) => { const len = c * n / L; const out = `<circle cx="24" cy="24" r="${r}" fill="none" stroke="${col}" stroke-width="5" stroke-dasharray="${len.toFixed(2)} ${c.toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 24 24)"/>`; off += len; return out; };
-      return `<svg class="dt-ll-ring" viewBox="0 0 48 48" width="48" height="48" aria-hidden="true"><circle cx="24" cy="24" r="${r}" fill="none" stroke="currentColor" stroke-opacity=".12" stroke-width="5"/>${seg(present, "#34C759")}${parts.map(([n, col]) => seg(n, col)).join("")}</svg>`;
+      return `<svg class="dt-ll-ring" viewBox="0 0 48 48" width="${size}" height="${size}" aria-hidden="true"><circle cx="24" cy="24" r="${r}" fill="none" stroke="currentColor" stroke-opacity=".12" stroke-width="5"/>${seg(present, "#34C759")}${parts.map(([n, col]) => seg(n, col)).join("")}</svg>`;
     };
-    const attTile = att ? `
-      <a href="#" data-state="AttVerzuim" class="dt-ll-tile dt-ll-att" data-kind="aanwezig" title="${att.onbekend.length ? esc(`Onbekend registratietype: ${att.onbekend.join(", ")} (meld dit)`) : "Open Verzuim"}">
-        <span class="dt-ll-ringwrap">${donut(att)}<span class="dt-ll-ringnum">${att.pct}<small>%</small></span></span>
-        <span class="dt-ll-att-text">
-          <span class="dt-ll-label">aanwezig dit schooljaar</span>
-          <span class="dt-ll-sub">${esc(att.lessen - att.afwezig)} van ${esc(att.lessen)} lessen aanwezig${att.afwezig ? ` · ${att.ziek ? `${att.ziek}× ziek` : ""}${att.ziek && att.afwezig - att.ziek ? ", " : ""}${att.afwezig - att.ziek ? `${att.afwezig - att.ziek}× afwezig${att.ongeoorloofd ? ` (${att.ongeoorloofd} ongeoorloofd)` : ""}` : ""}` : ""}${att.teLaat ? ` · ${att.teLaat}× te laat` : ""}${att.onbekend.length ? ` · ${esc(att.onbekend.length)} onbekend type` : ""}</span>
-        </span>
-      </a>` : tile("aanwezig", "–", "aanwezigheid", d.verantw ? "geen lessen in deze periode" : "", { state: "AttVerzuim", err: d.verantw ? "" : fail(d.verantwErr) });
-    const tiles = [
-      attTile,
-      tile("rooster", d.afspraken ? lessen.filter((l) => !l.vervallen).length : "–", "lessen vandaag", lesSub, { err: d.afspraken ? "" : fail(d.afsprakenErr) }),
-      tile("logboek", d.logboek ? lbUnread : "–", "ongelezen logboeken", d.logboek ? `${lbRecent} in de laatste 30 dagen${lbPrio ? ` · ${lbPrio} met prioriteit` : ""}` : "", { hot: lbUnread > 0 || lbPrio > 0, state: "begeleiding", err: d.logboek ? "" : d.logboekErr }),
-      tile("taken", d.taken ? takenOpen : "–", "open taken deze week", d.taken ? `${taken.length} taken in totaal` : "", { hot: takenOpen > 0, err: d.taken ? "" : fail(d.takenErr) }),
-      tile("terugkom", d.terugkom ? terug.length : "–", "terugkommaatregelen", d.terugkom ? (terug.length ? "nog niet afgehandeld" : "niets open") : "", { hot: terug.length > 0, err: d.terugkom ? "" : fail(d.terugkomErr) }),
-      tile("jarig", jarig ? (jarig.days === 0 ? "🎂" : jarig.days) : "–", jarig ? (jarig.days === 0 ? `vandaag ${jarig.age} geworden` : jarig.days === 1 ? `morgen jarig, wordt ${jarig.age}` : `dagen tot verjaardag · wordt ${jarig.age}`) : "verjaardag", "", { hot: !!jarig && jarig.days <= 7 }),
-    ].join("");
-
-    body.innerHTML = `
-      <div class="dt-ll-tiles">${tiles}</div>
-      <div class="dt-ll-cols">
-        <section class="dt-ll-sec"><h4>Rooster vandaag</h4>${lessen.length ? `<ul class="dt-ll-lessen">${lesRows}</ul>` : `<p class="dt-ll-empty">${d.afspraken ? "Geen lessen vandaag." : "Rooster niet beschikbaar."}</p>`}</section>
-        ${att && att.maanden.length ? (() => {
+    const maandBalken = (att) => {
       const SOORT = [["OK", "aanwezig", "#34C759"], ["TL", "te laat", "#FFCC00"], ["ZK", "ziek", "#AF52DE"], ["AB_OK", "absent, geoorloofd", "#FF9500"], ["AB_NO", "absent, ongeoorloofd", "#FF3B30"], ["UI", "uitgestuurd", "#A2845E"], ["VR", "vrijstelling", "#32ADE6"]];
       const aanwezig = SOORT.filter(([k]) => att.maanden.some((m) => m.per[k]));
       const rows = att.maanden.map((m) => {
@@ -212,10 +192,39 @@ DT.register({
         return `<div class="dt-ll-hrow" title="${esc(tip)}"><span class="dt-ll-hlabel">${esc(m.kort)}</span><span class="dt-ll-hbar">${segs}</span><span class="dt-ll-hpct">${m.pctAanwezig}%</span></div>`;
       }).join("");
       const legend = aanwezig.map(([, n, c]) => `<span><i style="background:${c}"></i>${esc(n)}</span>`).join("");
-      return `<section class="dt-ll-sec dt-ll-sec-maanden"><h4>Aanwezigheid per maand</h4><div class="dt-ll-hrows">${rows}</div><div class="dt-ll-legend">${legend}</div></section>`;
-    })() : ""}
-        <section class="dt-ll-sec"><h4>Laatste logboek</h4>${lbLast ? `<a href="#" data-state="begeleiding" class="dt-ll-lb"><span class="dt-ll-lb-type">${esc(lbLast.x.formulierType?.naam || lbLast.x.formulierTypeNaam || "Logboek")}</span><span class="dt-ll-lb-date">${esc(lbLast.t.toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" }))}</span><span class="dt-ll-lb-text">${esc(lbLast.x.omschrijving || lbLast.x.titel || "")}</span></a>` : `<p class="dt-ll-empty">${d.logboek ? "Nog geen logboekformulieren." : "Logboek niet beschikbaar."}</p>`}</section>
-      </div>`;
+      return `<div class="dt-ll-hrows">${rows}</div><div class="dt-ll-legend">${legend}</div>`;
+    };
+
+    /* Grote tegel: aanwezigheid */
+    const attTile = att ? `
+      <a href="#" data-state="AttVerzuim" class="dt-ll-tile dt-ll-hero" data-kind="aanwezig" title="${att.onbekend.length ? esc(`Onbekend registratietype: ${att.onbekend.join(", ")} (meld dit)`) : "Open Verzuim"}">
+        <div class="dt-ll-hero-top">
+          <span class="dt-ll-ringwrap">${donut(att, 72)}<span class="dt-ll-ringnum">${att.pct}<small>%</small></span></span>
+          <span class="dt-ll-hero-text">
+            <span class="dt-ll-label">aanwezig dit schooljaar</span>
+            <span class="dt-ll-sub">${esc(att.lessen - att.afwezig)} van ${esc(att.lessen)} lessen aanwezig${att.afwezig ? ` · ${att.ziek ? `${att.ziek}× ziek` : ""}${att.ziek && att.afwezig - att.ziek ? ", " : ""}${att.afwezig - att.ziek ? `${att.afwezig - att.ziek}× afwezig${att.ongeoorloofd ? ` (${att.ongeoorloofd} ongeoorloofd)` : ""}` : ""}` : ""}${att.teLaat ? ` · ${att.teLaat}× te laat` : ""}${att.onbekend.length ? ` · ${esc(att.onbekend.length)} onbekend type` : ""}</span>
+          </span>
+        </div>
+        ${att.maanden.length ? maandBalken(att) : ""}
+      </a>` : tile("aanwezig", "–", "aanwezigheid", d.verantw ? "geen lessen in deze periode" : "", { state: "AttVerzuim", cls: "dt-ll-hero", err: d.verantw ? "" : fail(d.verantwErr) });
+
+    /* Grote tegel: vandaag, met het rooster erin */
+    const lesSub = current ? `Nu: ${current.vak}${current.lokaal ? " · " + current.lokaal : ""}` : next ? `Volgende ${hhmm(next.start)}: ${next.vak}` : lessen.length ? "Lessen zijn voorbij" : "Geen lessen vandaag";
+    const todayTile = tile("rooster", d.afspraken ? lessen.filter((l) => !l.vervallen).length : "–", "lessen vandaag", lesSub, { cls: "dt-ll-today", err: d.afspraken ? "" : fail(d.afsprakenErr),
+      extra: lessen.length ? `<ul class="dt-ll-lessen">${lesRows}</ul>` : `<p class="dt-ll-empty">${d.afspraken ? "Geen lessen vandaag." : "Rooster niet beschikbaar."}</p>` });
+
+    /* Logboek met de laatste notitie erin */
+    const lbExtra = lbLast ? `<span class="dt-ll-lb"><span class="dt-ll-lb-type">${esc(lbLast.x.formulierType?.naam || lbLast.x.formulierTypeNaam || "Logboek")}</span><span class="dt-ll-lb-date">${esc(lbLast.t.toLocaleDateString("nl-NL", { day: "numeric", month: "short" }))}</span><span class="dt-ll-lb-text">${esc(lbLast.x.omschrijving || lbLast.x.titel || "")}</span></span>` : `<p class="dt-ll-empty">${d.logboek ? "Nog geen logboekformulieren." : "Logboek niet beschikbaar."}</p>`;
+    const logTile = tile("logboek", d.logboek ? lbUnread : "–", "ongelezen logboeken", d.logboek ? `${lbRecent} in de laatste 30 dagen${lbPrio ? ` · ${lbPrio} met prioriteit` : ""}` : "", { hot: lbUnread > 0 || lbPrio > 0, state: "begeleiding", cls: "dt-ll-log", err: d.logboek ? "" : d.logboekErr, extra: lbExtra });
+
+    body.innerHTML = `<div class="dt-ll-grid">
+      ${attTile}
+      ${todayTile}
+      ${logTile}
+      ${tile("taken", d.taken ? takenOpen : "–", "open taken deze week", d.taken ? `${taken.length} taken in totaal` : "", { hot: takenOpen > 0, err: d.taken ? "" : fail(d.takenErr) })}
+      ${tile("terugkom", d.terugkom ? terug.length : "–", "terugkomen", d.terugkom ? (terug.length ? (terug.length === 1 ? "maatregel nog open" : "maatregelen nog open") : "geen maatregelen open") : "", { hot: terug.length > 0, err: d.terugkom ? "" : fail(d.terugkomErr) })}
+      ${tile("jarig", jarig ? (jarig.days === 0 ? "🎂" : jarig.days) : "–", jarig ? (jarig.days === 0 ? `vandaag ${jarig.age} geworden` : jarig.days === 1 ? `morgen jarig, wordt ${jarig.age}` : `dagen tot verjaardag · wordt ${jarig.age}`) : "verjaardag", "", { hot: !!jarig && jarig.days <= 7, cls: "dt-ll-wide" })}
+    </div>`;
   },
 
   css() {
@@ -225,57 +234,65 @@ DT.register({
       dk-basisgegevens-page .container:not(.employee) { grid-template-columns: minmax(0, 1fr); }
       dk-basisgegevens-page .container:not(.employee) > .wrapper, dk-basisgegevens-page .tab-content, dk-algemene-gegevens .page { min-width: 0; max-width: 100%; box-sizing: border-box; }
       #dt-ll-dash { grid-column: 1 / -1; min-width: 0; max-width: 100%; }
-      #dt-ll-dash .dt-ll-body, #dt-ll-dash .dt-ll-tiles, #dt-ll-dash .dt-ll-cols, #dt-ll-dash .dt-ll-sec, #dt-ll-dash .dt-ll-tile, #dt-ll-dash .dt-ll-lb { min-width: 0; }
-      #dt-ll-dash .dt-ll-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(128px, 100%), 1fr)); gap: 10px; margin-bottom: 1rem; }
-      #dt-ll-dash .dt-ll-tile { --k: #6e6e73; display: grid; grid-template-columns: 1fr auto; grid-template-areas: "ico num" "label label" "sub sub"; gap: 4px 8px; padding: 12px 14px; border-radius: 14px; background: rgba(60,60,67,.05); color: inherit; text-decoration: none; min-height: 84px; align-content: start; }
-      #dt-ll-dash a.dt-ll-tile { cursor: pointer; } #dt-ll-dash a.dt-ll-tile:hover { background: rgba(60,60,67,.09); }
-      #dt-ll-dash .dt-ll-tile[data-kind="rooster"] { --k: #007AFF; } #dt-ll-dash .dt-ll-tile[data-kind="logboek"] { --k: #AF52DE; } #dt-ll-dash .dt-ll-tile[data-kind="taken"] { --k: #FF9500; } #dt-ll-dash .dt-ll-tile[data-kind="terugkom"] { --k: #FF3B30; } #dt-ll-dash .dt-ll-tile[data-kind="jarig"] { --k: #FF2D55; }
+      #dt-ll-dash * { min-width: 0; }
+      #dt-ll-dash .dt-ll-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+      #dt-ll-dash .dt-ll-tile { --k: #6e6e73; display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 16px; background: rgba(60,60,67,.05); color: inherit; text-decoration: none; min-height: 92px; box-sizing: border-box; }
+      #dt-ll-dash a.dt-ll-tile { cursor: pointer; transition: background .12s, transform .12s; } #dt-ll-dash a.dt-ll-tile:hover { background: rgba(60,60,67,.09); transform: translateY(-1px); }
+      #dt-ll-dash .dt-ll-tile-head { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "ico num" "label label" "sub sub"; gap: 4px 8px; align-items: start; }
+      #dt-ll-dash .dt-ll-hero, #dt-ll-dash .dt-ll-today { grid-column: span 3; grid-row: span 2; }
+      #dt-ll-dash .dt-ll-log { grid-column: span 2; }
+      #dt-ll-dash .dt-ll-wide { grid-column: span 2; }
+      @media (max-width: 980px) {
+        #dt-ll-dash .dt-ll-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        #dt-ll-dash .dt-ll-hero, #dt-ll-dash .dt-ll-today, #dt-ll-dash .dt-ll-log, #dt-ll-dash .dt-ll-wide { grid-column: span 2; grid-row: auto; }
+      }
+      #dt-ll-dash .dt-ll-tile[data-kind="aanwezig"] { --k: #34C759; } #dt-ll-dash .dt-ll-tile[data-kind="rooster"] { --k: #007AFF; } #dt-ll-dash .dt-ll-tile[data-kind="logboek"] { --k: #AF52DE; } #dt-ll-dash .dt-ll-tile[data-kind="taken"] { --k: #FF9500; } #dt-ll-dash .dt-ll-tile[data-kind="terugkom"] { --k: #FF3B30; } #dt-ll-dash .dt-ll-tile[data-kind="jarig"] { --k: #FF2D55; }
       #dt-ll-dash .dt-ll-tile.is-hot { background: color-mix(in srgb, var(--k) 12%, #fff); }
       #dt-ll-dash .dt-ll-tile.is-err { opacity: .6; }
       #dt-ll-dash .dt-ll-ico { grid-area: ico; width: 30px; height: 30px; border-radius: 50%; display: inline-grid; place-items: center; background: color-mix(in srgb, var(--k) 16%, #fff); color: var(--k); }
       #dt-ll-dash .dt-ll-tile.is-hot .dt-ll-ico { background: var(--k); color: #fff; }
-      #dt-ll-dash .dt-ll-num { grid-area: num; font: 700 1.625rem/1 -apple-system, system-ui, sans-serif; letter-spacing: -.02em; color: #6e6e73; }
+      #dt-ll-dash .dt-ll-num { grid-area: num; font: 700 1.75rem/1 -apple-system, system-ui, sans-serif; letter-spacing: -.03em; color: #6e6e73; }
       #dt-ll-dash .dt-ll-tile.is-hot .dt-ll-num { color: var(--k); }
-      #dt-ll-dash .dt-ll-label { grid-area: label; font: 500 .75rem/1.25 -apple-system, system-ui, sans-serif; color: #6e6e73; }
+      #dt-ll-dash .dt-ll-label { grid-area: label; font: 500 .75rem/1.25 -apple-system, system-ui, sans-serif; color: #6e6e73; overflow-wrap: anywhere; }
       #dt-ll-dash .dt-ll-label::first-letter { text-transform: uppercase; }
       #dt-ll-dash .dt-ll-tile.is-hot .dt-ll-label { color: inherit; }
       #dt-ll-dash .dt-ll-sub { grid-area: sub; font: 400 .6875rem/1.3 -apple-system, system-ui, sans-serif; color: #8e8e93; }
-      #dt-ll-dash .dt-ll-att { grid-column: span 2; grid-template-columns: auto 1fr; grid-template-areas: "ring text"; align-items: center; gap: 4px 12px; }
-      @media (max-width: 700px) { #dt-ll-dash .dt-ll-att { grid-column: span 1; } }
-      #dt-ll-dash .dt-ll-ringwrap { grid-area: ring; position: relative; width: 56px; height: 56px; color: #6e6e73; }
-      #dt-ll-dash .dt-ll-ring { width: 56px; height: 56px; }
-      #dt-ll-dash .dt-ll-ring { display: block; }
-      #dt-ll-dash .dt-ll-ringnum { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; white-space: nowrap; font: 700 .9375rem/1 -apple-system, system-ui, sans-serif; letter-spacing: -.03em; color: #1D1D1F; }
-      #dt-ll-dash .dt-ll-ringnum small { font-size: .5625rem; font-weight: 600; margin-left: 1px; align-self: center; }
-      #dt-ll-dash .dt-ll-att-text { grid-area: text; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-      #dt-ll-dash .dt-ll-hrows { display: flex; flex-direction: column; gap: 7px; padding: 2px 0; }
+      /* Grote tegel aanwezigheid */
+      #dt-ll-dash .dt-ll-hero { justify-content: space-between; }
+      #dt-ll-dash .dt-ll-hero-top { display: flex; align-items: center; gap: 14px; }
+      #dt-ll-dash .dt-ll-hero-text { display: flex; flex-direction: column; gap: 3px; }
+      #dt-ll-dash .dt-ll-hero .dt-ll-label { font-size: 1rem; font-weight: 600; color: inherit; }
+      #dt-ll-dash .dt-ll-hero .dt-ll-sub { font-size: .75rem; }
+      #dt-ll-dash .dt-ll-ringwrap { position: relative; width: 72px; height: 72px; flex: 0 0 auto; color: #6e6e73; }
+      #dt-ll-dash .dt-ll-ring { display: block; width: 72px; height: 72px; }
+      #dt-ll-dash .dt-ll-ringnum { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; white-space: nowrap; font: 700 1.125rem/1 -apple-system, system-ui, sans-serif; letter-spacing: -.03em; color: #1D1D1F; }
+      #dt-ll-dash .dt-ll-ringnum small { font-size: .625rem; font-weight: 600; margin-left: 1px; }
+      #dt-ll-dash .dt-ll-hrows { display: flex; flex-direction: column; gap: 7px; margin-top: 2px; }
       #dt-ll-dash .dt-ll-hrow { display: grid; grid-template-columns: 2.25rem 1fr 2.75rem; align-items: center; gap: 8px; }
       #dt-ll-dash .dt-ll-hlabel { font: 500 .625rem/1 -apple-system, system-ui, sans-serif; color: #8e8e93; text-transform: uppercase; letter-spacing: .04em; }
       #dt-ll-dash .dt-ll-hbar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: rgba(60,60,67,.07); }
       #dt-ll-dash .dt-ll-hseg { display: block; height: 100%; min-width: 2px; }
       #dt-ll-dash .dt-ll-hseg + .dt-ll-hseg { border-left: 1px solid rgba(255,255,255,.7); }
       #dt-ll-dash .dt-ll-hpct { font: 600 .6875rem/1 -apple-system, system-ui, sans-serif; color: #6e6e73; text-align: right; }
-      #dt-ll-dash .dt-ll-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; font: 400 .6875rem/1.2 -apple-system, system-ui, sans-serif; color: #8e8e93; }
-      #dt-ll-dash .dt-ll-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: 0; }
-
-      #dt-ll-dash .dt-ll-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 1rem; }
-      #dt-ll-dash .dt-ll-sec h4 { margin: 0 0 .375rem; font: 600 .6875rem/1 -apple-system, system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: #8e8e93; }
-      #dt-ll-dash .dt-ll-lessen { list-style: none; margin: 0; padding: 0; }
-      #dt-ll-dash .dt-ll-les { display: grid; grid-template-columns: 3.25rem 1fr; grid-template-areas: "tijd vak" "tijd meta"; column-gap: 10px; padding: 6px 8px; border-radius: 10px; }
+      #dt-ll-dash .dt-ll-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; font: 400 .6875rem/1.2 -apple-system, system-ui, sans-serif; color: #8e8e93; }
+      #dt-ll-dash .dt-ll-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; }
+      /* Grote tegel vandaag: rooster */
+      #dt-ll-dash .dt-ll-lessen { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+      #dt-ll-dash .dt-ll-les { display: grid; grid-template-columns: 3rem 1fr; grid-template-areas: "tijd vak" "tijd meta"; column-gap: 10px; padding: 5px 8px; border-radius: 10px; }
       #dt-ll-dash .dt-ll-les.is-current { background: rgba(0,122,255,.1); }
       #dt-ll-dash .dt-ll-les.is-past { opacity: .5; }
       #dt-ll-dash .dt-ll-les.is-vervallen .dt-ll-vak { text-decoration: line-through; }
-      #dt-ll-dash .dt-ll-tijd { grid-area: tijd; display: flex; flex-direction: column; font: 600 .8125rem/1.2 -apple-system, system-ui, sans-serif; }
-      #dt-ll-dash .dt-ll-tijd small { font: 400 .6875rem/1.2 -apple-system, system-ui, sans-serif; color: #8e8e93; }
-      #dt-ll-dash .dt-ll-vak { grid-area: vak; font: 500 .875rem/1.25 -apple-system, system-ui, sans-serif; }
-      #dt-ll-dash .dt-ll-meta { grid-area: meta; font: 400 .75rem/1.25 -apple-system, system-ui, sans-serif; color: #8e8e93; }
+      #dt-ll-dash .dt-ll-tijd { grid-area: tijd; display: flex; flex-direction: column; font: 600 .75rem/1.2 -apple-system, system-ui, sans-serif; }
+      #dt-ll-dash .dt-ll-tijd small { font: 400 .625rem/1.2 -apple-system, system-ui, sans-serif; color: #8e8e93; }
+      #dt-ll-dash .dt-ll-vak { grid-area: vak; font: 500 .8125rem/1.25 -apple-system, system-ui, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #dt-ll-dash .dt-ll-meta { grid-area: meta; font: 400 .6875rem/1.25 -apple-system, system-ui, sans-serif; color: #8e8e93; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       #dt-ll-dash .dt-ll-meta em { font-style: normal; color: #FF3B30; }
-      #dt-ll-dash .dt-ll-lb { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "type date" "text text"; gap: 2px 8px; padding: 10px 12px; border-radius: 12px; background: rgba(60,60,67,.05); color: inherit; text-decoration: none; }
-      #dt-ll-dash .dt-ll-lb:hover { background: rgba(60,60,67,.09); }
-      #dt-ll-dash .dt-ll-lb-type { grid-area: type; font: 600 .8125rem/1.25 -apple-system, system-ui, sans-serif; }
-      #dt-ll-dash .dt-ll-lb-date { grid-area: date; font: 400 .75rem/1.25 -apple-system, system-ui, sans-serif; color: #8e8e93; }
-      #dt-ll-dash .dt-ll-lb-text { grid-area: text; font: 400 .8125rem/1.35 -apple-system, system-ui, sans-serif; color: #6e6e73; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-      #dt-ll-dash .dt-ll-empty, #dt-ll-dash .dt-ll-loading { margin: 0; font: 400 .8125rem/1.3 -apple-system, system-ui, sans-serif; color: #8e8e93; }
+      /* Logboek met laatste notitie */
+      #dt-ll-dash .dt-ll-lb { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "type date" "text text"; gap: 2px 8px; padding: 8px 10px; border-radius: 10px; background: rgba(60,60,67,.06); }
+      #dt-ll-dash .dt-ll-lb-type { grid-area: type; font: 600 .75rem/1.25 -apple-system, system-ui, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #dt-ll-dash .dt-ll-lb-date { grid-area: date; font: 400 .6875rem/1.25 -apple-system, system-ui, sans-serif; color: #8e8e93; }
+      #dt-ll-dash .dt-ll-lb-text { grid-area: text; font: 400 .75rem/1.35 -apple-system, system-ui, sans-serif; color: #6e6e73; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+      #dt-ll-dash .dt-ll-empty, #dt-ll-dash .dt-ll-loading { margin: 0; font: 400 .75rem/1.3 -apple-system, system-ui, sans-serif; color: #8e8e93; }
     `;
     document.head.append(this._style);
   }
