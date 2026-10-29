@@ -164,10 +164,13 @@ DT.register({
   recolor(DT) {
     const p = this.preset(DT);
     const active = DT.settings.theme.enabled !== false && DT.settings.theme.preset !== "magister" && String(DT.settings.theme.recolor) !== "false"
-      && !(this.isDark(DT) && this.darkStyle(DT) === "invert");
+      && !(this.isDark(DT) && this.darkStyle(DT) === "invert") && !p.look; // look-thema's (Apple) kleuren alles via CSS en tokens
     const props = [["color", "color"], ["background-color", "background-color"], ["border-top-color", "border-color"], ["border-bottom-color", "border-color"], ["border-left-color", "border-color"], ["fill", "fill"]];
     if (!active) {
+      // Eerder gezette inline kleuren één keer opruimen, niet bij elke poll opnieuw de hele DOM langs.
+      if (this._cleaned === this._sig) return;
       walkAll(document.documentElement, (el) => { if (el.dataset?.dtRc) { for (const [, prop] of props) el.style.removeProperty(prop); el.style.removeProperty("border-top-color"); el.style.removeProperty("border-bottom-color"); el.style.removeProperty("border-left-color"); delete el.dataset.dtRc; } });
+      this._cleaned = this._sig;
       return;
     }
     const sig = this._sig;
@@ -524,6 +527,7 @@ function appleTokens(t) {
     dna-dialog { --border-radius: 14px !important; --border-width: 0 !important; --border: 0 !important; --box-shadow: ${t.pop} !important; --heading-font: 600 1.0625rem/1.5rem ${t.font} !important; }
     dna-accordion-item { --border-radius: 12px !important; --border-color: transparent !important; --background: ${t.surface} !important; --box-shadow: ${t.card} !important; }
     dna-badge { --border-radius: 6px !important; }
+    sl-skeleton { border-radius: 20px !important; }
   `);
 }
 

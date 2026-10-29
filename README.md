@@ -101,6 +101,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.8.14: geen fouten meer in frames zonder body (sessie-iframe); de kleurvertaler slaat bij de Apple-thema's over (scheelt werk elke 2,5 s); het netwerkrapport (Alt+I, N) toont per API-call de duur, grootte en eventuele fout, zodat trage schermen te herleiden zijn; grote antwoorden worden niet meer geparsed; skelet-tegels met 20px hoeken.
 - 0.8.13: pijl op de Aanwezigheid-tegels staat midden in de cirkel.
 - 0.8.12: tegels op Aanwezigheid even hoog (alle rijen volgen de hoogste kaart) met de pijl overal op dezelfde plek.
 - 0.8.11: tegels op Aanwezigheid verfijnd: icoon linksboven in een zacht blauw afgerond vlak, titel en omschrijving links uitgelijnd, pijl als lichte tint die bij aanwijzen vult, raster dat met de tekst meegroeit; getest op de echte component.

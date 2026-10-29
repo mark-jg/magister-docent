@@ -97,7 +97,7 @@ DT.register({
         for (const c of part.log) {
           const key = `${c.method} ${c.url}`;
           if (seen.has(key)) continue; seen.add(key); total++;
-          out.push(`## ${key} → ${c.status}`);
+          out.push(`## ${key} → ${c.status}${c.ms != null ? ` (${c.ms} ms${c.size ? `, ${Math.round(c.size / 1024)} kB` : ""})` : ""}${c.error ? ` FOUT: ${c.error}` : ""}`);
           out.push(c.fields ? "```json\n" + JSON.stringify(c.fields, null, 1).replace(/"(string|number|boolean|object|undefined)"/g, "$1") + "\n```" : "(geen JSON)", "");
         }
       }

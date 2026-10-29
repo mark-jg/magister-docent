@@ -19,24 +19,31 @@
     return out;
   };
   const raw = []; // exacte URL's, blijven in de pagina en komen nooit in een rapport
-  const record = (method, url, status, text) => {
+  const record = (method, url, status, text, ms, error) => {
     if (raw.length >= MAX) raw.shift();
     raw.push({ method, url: String(url), status });
     if (log.length >= MAX) log.shift();
     let fields = null;
-    try { if (text && /^[\[{]/.test(text.trim())) fields = shape(JSON.parse(text)); } catch {}
-    log.push({ t: Date.now(), method, url: anon(url), status, fields });
+    // Grote antwoorden niet parsen (kost tijd op de hoofddraad); de structuur is dan niet nodig.
+    try { if (text && text.length < 400000 && /^[\[{]/.test(text.trim())) fields = shape(JSON.parse(text)); } catch {}
+    log.push({ t: Date.now(), method, url: anon(url), status, fields, ms: ms == null ? undefined : Math.round(ms), size: text ? text.length : undefined, error });
   };
   const of = window.fetch;
   window.fetch = async function (input, init) {
-    const res = await of.apply(this, arguments);
+    const t0 = performance.now();
+    let res;
+    try { res = await of.apply(this, arguments); }
+    catch (err) {
+      try { const u = typeof input === "string" ? input : input.url; if (/magister\.net/.test(new URL(u, location.href).host)) record((init && init.method) || "GET", u, 0, null, performance.now() - t0, String(err)); } catch {}
+      throw err;
+    }
     try {
       const url = typeof input === "string" ? input : input.url;
       if (res.ok && sameApi(url) && (init?.headers || input?.headers)) {
         const h = {}; new Headers(init?.headers || input.headers).forEach((v, k) => { h[k] = v; }); lastHeaders = h;
       }
       if (/magister\.net/.test(new URL(url, location.href).host) && /api|\.json|graphql/i.test(url)) {
-        res.clone().text().then((t) => record((init && init.method) || "GET", url, res.status, t)).catch(() => {});
+        res.clone().text().then((t) => record((init && init.method) || "GET", url, res.status, t, performance.now() - t0)).catch(() => {});
       }
     } catch {}
     return res;
@@ -46,9 +53,10 @@
   XMLHttpRequest.prototype.open = function (m, u) { this.__dt = { m, u, h: {} }; return oo.apply(this, arguments); };
   XMLHttpRequest.prototype.setRequestHeader = function (k, v) { if (this.__dt) this.__dt.h[k] = v; return osh.apply(this, arguments); };
   XMLHttpRequest.prototype.send = function () {
+    const t0 = performance.now();
     this.addEventListener("loadend", () => {
       try {
-        if (this.__dt && /api|\.json|graphql/i.test(this.__dt.u) && this.responseType !== "blob") record(this.__dt.m, this.__dt.u, this.status, this.responseText);
+        if (this.__dt && /api|\.json|graphql/i.test(this.__dt.u) && (this.responseType === "" || this.responseType === "text")) record(this.__dt.m, this.__dt.u, this.status, this.responseText, performance.now() - t0, this.status === 0 ? "mislukt" : undefined);
         if (this.__dt && this.status >= 200 && this.status < 300 && sameApi(this.__dt.u) && Object.keys(this.__dt.h).length) lastHeaders = { ...this.__dt.h };
       } catch {}
     });

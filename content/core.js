@@ -145,6 +145,7 @@
      * daarom wordt er daarnaast periodiek gescand. */
     observe(callback, { debounce = 300, poll = 2000 } = {}) {
       let timer = null;
+      if (!document.body) return () => {};
       const run = () => { clearTimeout(timer); timer = setTimeout(callback, debounce); };
       const obs = new MutationObserver(run);
       obs.observe(document.body, { childList: true, subtree: true });
