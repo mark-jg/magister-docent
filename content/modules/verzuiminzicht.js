@@ -9,6 +9,8 @@ DT.register({
   _stop: null,
   _root: null,     // shadow root van att-dk-attendance
   _btn: null,
+  _btn2: null,     // tabblad Vergelijken
+  _view: "inzicht", // "inzicht" of "vergelijk"
   _panel: null,
   _data: null,     // { id, at, regs, rooster }
   _busy: null,
@@ -23,8 +25,8 @@ DT.register({
   destroy() {
     this._stop && this._stop();
     this.deactivate();
-    this._btn?.remove(); this._panel?.remove();
-    this._btn = this._panel = this._root = null;
+    this._btn?.remove(); this._btn2?.remove(); this._panel?.remove();
+    this._btn = this._btn2 = this._panel = this._root = null;
   },
 
   leerlingId() {
@@ -38,30 +40,38 @@ DT.register({
     const root = host && host.shadowRoot;
     const tabs = root && root.querySelector("dna-tabs");
     const bar = tabs && tabs.querySelector("dna-tab-bar");
-    if (!bar) { if (this._btn) { this.deactivate(); this._btn.remove(); this._panel?.remove(); this._btn = this._panel = null; } return; }
+    if (!bar) { if (this._btn) { this.deactivate(); this._btn.remove(); this._btn2?.remove(); this._panel?.remove(); this._btn = this._btn2 = this._panel = null; } return; }
     if (this._root !== root || !this._btn || !this._btn.isConnected) {
       this.deactivate();
       this._root = root;
       this.css(root);
-      this._btn = document.createElement("button");
-      this._btn.type = "button"; this._btn.className = "dt-vz-tabbtn"; this._btn.textContent = "Inzicht";
-      this._btn.setAttribute("role", "tab");
-      this._btn.addEventListener("click", (e) => { e.stopPropagation(); this.activate(DT); });
-      bar.append(this._btn);
+      const knop = (tekst, view) => {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "dt-vz-tabbtn"; b.textContent = tekst; b.dataset.view = view;
+        b.setAttribute("role", "tab");
+        b.addEventListener("click", (e) => { e.stopPropagation(); this.activate(DT, view); });
+        return b;
+      };
+      this._btn2?.remove();
+      this._btn = knop("Inzicht", "inzicht");
+      this._btn2 = knop("Vergelijken", "vergelijk");
+      bar.append(this._btn, this._btn2);
       bar.addEventListener("click", (e) => { if (e.target.closest("dna-tab-button")) this.deactivate(); });
       this._panel?.remove();
       this._panel = document.createElement("div"); this._panel.id = "dt-vz"; this._panel.hidden = true;
       tabs.after(this._panel);
       /* Zelfde tabblad onthouden per sessie */
-      if (sessionStorage.getItem("dt-vz-active") === "1") this.activate(DT);
+      const bewaard = sessionStorage.getItem("dt-vz-active");
+      if (bewaard) this.activate(DT, bewaard === "vergelijk" ? "vergelijk" : "inzicht");
     }
-    if (this._data && this._data.id !== id) { this._data = null; if (this._active) this.activate(DT); }
+    if (this._data && this._data.id !== id) { this._data = null; if (this._active) this.activate(DT, this._view); }
   },
 
-  activate(DT) {
+  activate(DT, view = "inzicht") {
     if (!this._root) return;
-    this._active = true; sessionStorage.setItem("dt-vz-active", "1");
-    this._btn.classList.add("is-active");
+    this._active = true; this._view = view; sessionStorage.setItem("dt-vz-active", view);
+    this._btn.classList.toggle("is-active", view === "inzicht");
+    this._btn2?.classList.toggle("is-active", view === "vergelijk");
     const tabs = this._root.querySelector("dna-tabs");
     tabs?.querySelector("dna-tab-bar")?.classList.add("dt-vz-on");
     for (const t of tabs?.querySelectorAll(":scope > dna-tab, :scope > [slot='tab']") || []) { t.dataset.dtVzHidden = "1"; t.style.display = "none"; }
@@ -72,7 +82,7 @@ DT.register({
   deactivate() {
     if (!this._active) return;
     this._active = false; sessionStorage.removeItem("dt-vz-active");
-    this._btn?.classList.remove("is-active");
+    this._btn?.classList.remove("is-active"); this._btn2?.classList.remove("is-active");
     const tabs = this._root?.querySelector("dna-tabs");
     tabs?.querySelector("dna-tab-bar")?.classList.remove("dt-vz-on");
     for (const t of tabs?.querySelectorAll("[data-dt-vz-hidden]") || []) { t.style.display = ""; delete t.dataset.dtVzHidden; }
@@ -194,7 +204,7 @@ DT.register({
 
     /* Vergelijking met de twee vorige schooljaren: tot dezelfde datum (eerlijk vergelijken) en het hele jaar */
     let vergelijk = "";
-    if (d.jaren === "laden") vergelijk = `<section class="dt-vz-card dt-vz-wide dt-vz-cmpcard"><h4>Vergelijking met vorige schooljaren</h4><p class="dt-vz-empty">Vorige schooljaren ophalen…</p></section>`;
+    if (d.jaren === "laden") vergelijk = `<section class="dt-vz-card dt-vz-wide dt-vz-cmpcard"><h4>Per schooljaar</h4><p class="dt-vz-empty">Vorige schooljaren ophalen…</p></section>`;
     else if (Array.isArray(d.jaren)) {
       const eindVandaag = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
       const datumKort = now.toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
@@ -236,7 +246,15 @@ DT.register({
       if (delta != null && rijen[0].zelfde.telt >= 10) zin = delta <= -5 ? `Dit schooljaar is de aanwezigheid tot nu toe <b>${rijen[0].zelfde.pct}%</b>, vorig schooljaar was dat tot dezelfde datum <b>${vorig.zelfde.pct}%</b>: ${Math.abs(delta)} procentpunt lager.`
         : delta >= 5 ? `Dit schooljaar gaat het beter: <b>${rijen[0].zelfde.pct}%</b> tot nu toe, tegenover <b>${vorig.zelfde.pct}%</b> vorig schooljaar tot dezelfde datum.`
         : `De aanwezigheid is vergelijkbaar met vorig schooljaar tot dezelfde datum (${rijen[0].zelfde.pct}% nu, ${vorig.zelfde.pct}% toen).`;
-      vergelijk = `<section class="dt-vz-card dt-vz-wide dt-vz-cmpcard"><h4>Vergelijking met vorige schooljaren</h4>${zin ? `<p class="dt-vz-cmpzin">${zin}</p>` : ""}${tabel}${mgraf ? `<div class="dt-vz-cmpgraf">${mgraf}<div class="dt-vz-legend">${lijnen.map(({ r }) => `<span><i style="background:${r.kleur}"></i>${esc(r.naam)}</span>`).join("")}<span class="dt-vz-legend-n">aanwezig per maand</span></div></div>` : ""}<p class="dt-vz-cmpnoot">"t/m ${esc(datumKort)}" telt elk schooljaar van 1 augustus tot dezelfde datum, zodat de jaren eerlijk te vergelijken zijn. Gemist, ziek, ongeoorloofd en te laat gaan ook over die periode.</p></section>`;
+      vergelijk = `<section class="dt-vz-card dt-vz-wide dt-vz-cmpcard"><h4>Per schooljaar</h4>${zin ? `<p class="dt-vz-cmpzin">${zin}</p>` : ""}${tabel}${mgraf ? `<div class="dt-vz-cmpgraf">${mgraf}<div class="dt-vz-legend">${lijnen.map(({ r }) => `<span><i style="background:${r.kleur}"></i>${esc(r.naam)}</span>`).join("")}<span class="dt-vz-legend-n">aanwezig per maand</span></div></div>` : ""}<p class="dt-vz-cmpnoot">"t/m ${esc(datumKort)}" telt elk schooljaar van 1 augustus tot dezelfde datum, zodat de jaren eerlijk te vergelijken zijn. Gemist, ziek, ongeoorloofd en te laat gaan ook over die periode.</p></section>`;
+    }
+
+    if (this._view === "vergelijk") {
+      p.innerHTML = `
+        <div class="dt-vz-head"><div class="dt-vz-title">Vergelijken met vorige schooljaren</div></div>
+        <div class="dt-vz-grid">${vergelijk || `<p class="dt-vz-empty">Geen gegevens om te vergelijken.</p>`}</div>
+        <div class="dt-vz-foot">Uit de registraties en het rooster van Magister, per schooljaar van 1 augustus tot en met 31 juli. Afwezig = absent, ziek of uitgestuurd; te laat telt als aanwezig; een vrijstelling telt niet mee. Zonder rooster van een schooljaar is er geen percentage.</div>`;
+      return;
     }
 
     const seg = (k, label) => `<button type="button" class="dt-vz-seg${this._periode === k ? " is-on" : ""}" data-periode="${k}">${label}</button>`;
@@ -252,7 +270,6 @@ DT.register({
       </div>
       <div class="dt-vz-obs">${obs.map((o) => `<div class="dt-vz-ob">${o}</div>`).join("")}</div>
       <div class="dt-vz-grid">
-        ${vergelijk}
         <section class="dt-vz-card dt-vz-wide"><h4>Verloop per week</h4>${lijn || `<p class="dt-vz-empty">Nog te weinig weken voor een verloop.</p>`}</section>
         <section class="dt-vz-card"><h4>Per vak</h4>${rows(S.vakken)}</section>
         ${S.docenten.length ? `<section class="dt-vz-card"><h4>Per docent</h4>${rows(S.docenten)}</section>` : ""}
