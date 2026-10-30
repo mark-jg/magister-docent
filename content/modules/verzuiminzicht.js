@@ -97,9 +97,27 @@ DT.register({
         DT.api(`/api/leerlingen/${id}/afspraken?status=actief&begin=${ymd(vanaf)}&einde=${ymd(today)}`, { full: true, timeout: 20000 }),
       ]);
       const regs = list(v), rooster = list(a);
-      this._data = { id, at: Date.now(), regs, rooster, err: { regs: v.status, rooster: a.status }, sj: sj.getTime() };
+      this._data = { id, at: Date.now(), regs, rooster, err: { regs: v.status, rooster: a.status }, sj: sj.getTime(), jaren: "laden" };
       this.render();
+      this.loadJaren(DT, id, sj);
     } finally { if (this._busy === id) this._busy = null; }
+  },
+
+  /* Twee vorige schooljaren (1 augustus t/m 31 juli) ophalen voor de vergelijking. Komt na het
+   * eerste beeld binnen, zodat het tabblad niet langer op zich laat wachten. */
+  async loadJaren(DT, id, sj) {
+    const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const list = (r) => (r && r.status === 200 && r.json) ? (Array.isArray(r.json) ? r.json : r.json.items || []) : null;
+    const jaren = [];
+    for (const k of [1, 2]) {
+      const van = new Date(sj.getFullYear() - k, 7, 1), tot = new Date(sj.getFullYear() - k + 1, 6, 31);
+      const [v, a] = await Promise.all([
+        DT.api(`/api/m6/leerlingen/${id}/verantwoordingen?begin=${ymd(van)}&einde=${ymd(tot)}`, { full: true, timeout: 25000 }),
+        DT.api(`/api/leerlingen/${id}/afspraken?status=actief&begin=${ymd(van)}&einde=${ymd(tot)}`, { full: true, timeout: 25000 }),
+      ]);
+      jaren.push({ k, van: van.getTime(), tot: tot.getTime() + 864e5 - 1, regs: list(v), rooster: list(a), status: { regs: v.status, rooster: a.status } });
+    }
+    if (this._data && this._data.id === id) { this._data.jaren = jaren; if (this._active) this.render(); }
   },
 
   render() {
@@ -174,6 +192,53 @@ DT.register({
       if (!obs.length) obs.push(T.afwezig ? "Het verzuim is verspreid over vakken, docenten en dagen; er springt niets uit." : "Geen gemiste lessen in deze periode.");
     }
 
+    /* Vergelijking met de twee vorige schooljaren: tot dezelfde datum (eerlijk vergelijken) en het hele jaar */
+    let vergelijk = "";
+    if (d.jaren === "laden") vergelijk = `<section class="dt-vz-card dt-vz-wide dt-vz-cmpcard"><h4>Vergelijking met vorige schooljaren</h4><p class="dt-vz-empty">Vorige schooljaren ophalen…</p></section>`;
+    else if (Array.isArray(d.jaren)) {
+      const eindVandaag = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      const datumKort = now.toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
+      const sjNaam = (t) => { const y = new Date(t).getFullYear(); return `${y}–${y + 1}`; };
+      const Sj = vzStats(d.regs || [], d.rooster || [], new Date(d.sj), now);
+      const rijen = [{ naam: sjNaam(d.sj), sub: "dit schooljaar", zelfde: Sj.totaal, heel: null, S: Sj, rooster: !!(d.rooster && d.rooster.length), kleur: "var(--dt-vz-accent)" }];
+      const KLEUR = ["#8E8E93", "#C7C7CC"];
+      for (const j of d.jaren) {
+        const heeft = (j.regs && j.regs.length) || (j.rooster && j.rooster.length);
+        if (!heeft) { rijen.push({ naam: sjNaam(j.van), leeg: true, status: j.status }); continue; }
+        const zelfdeTot = new Date(eindVandaag); zelfdeTot.setFullYear(eindVandaag.getFullYear() - j.k);
+        const heel = vzStats(j.regs || [], j.rooster || [], new Date(j.van), new Date(j.tot));
+        const zelfde = vzStats(j.regs || [], j.rooster || [], new Date(j.van), zelfdeTot);
+        rijen.push({ naam: sjNaam(j.van), sub: j.k === 1 ? "vorig schooljaar" : "twee jaar terug", zelfde: zelfde.totaal, heel: heel.totaal, S: heel, rooster: !!(j.rooster && j.rooster.length), kleur: KLEUR[j.k - 1], dash: j.k === 2 });
+      }
+      const pc = (T, r) => r.rooster && T && T.telt ? `<b style="color:${pctCol(T.pct)}">${T.pct}%</b>` : `<span class="dt-vz-dim" title="Rooster van dat jaar niet beschikbaar; zonder rooster is er geen percentage">–</span>`;
+      const vorig = rijen[1] && !rijen[1].leeg && rijen[1].rooster ? rijen[1] : null;
+      const delta = vorig && rijen[0].rooster && rijen[0].zelfde.telt ? rijen[0].zelfde.pct - vorig.zelfde.pct : null;
+      const chip = delta == null ? "" : `<span class="dt-vz-delta ${delta > 0 ? "is-up" : delta < 0 ? "is-down" : ""}" title="Verschil met vorig schooljaar tot dezelfde datum">${delta > 0 ? "+" : delta < 0 ? "−" : "±"}${Math.abs(delta)}</span>`;
+      const tabel = `<table class="dt-vz-cmp"><thead><tr><th>Schooljaar</th><th>t/m ${esc(datumKort)}</th><th>Hele jaar</th><th>Gemist</th><th>Ziek</th><th>Ongeoorl.</th><th>Te laat</th></tr></thead><tbody>${rijen.map((r, i) => r.leeg
+        ? `<tr class="is-leeg"><td><span class="dt-vz-cmpdot" style="background:${KLEUR[i - 1] || "#C7C7CC"}"></span><b>${esc(r.naam)}</b></td><td colspan="6" class="dt-vz-dim">${r.status && r.status.regs && r.status.regs !== 200 ? `Niet op te halen (Magister antwoordde ${esc(r.status.regs)})` : "Geen registraties of rooster in dat schooljaar"}</td></tr>`
+        : `<tr><td><span class="dt-vz-cmpdot" style="background:${r.kleur}"></span><b>${esc(r.naam)}</b><small>${esc(r.sub)}</small></td><td>${pc(r.zelfde, r)}${i === 0 ? chip : ""}</td><td>${r.heel ? pc(r.heel, r) : `<span class="dt-vz-dim">loopt nog</span>`}</td><td>${r.zelfde.afwezig}</td><td>${r.zelfde.ziek}</td><td>${r.zelfde.ongeoorloofd}</td><td>${r.zelfde.teLaat}</td></tr>`).join("")}</tbody></table>`;
+      /* Maandlijnen over elkaar: augustus t/m juli */
+      const lijnen = rijen.filter((r) => !r.leeg && r.rooster).map((r) => ({ r, pts: r.S.maanden.filter((m) => m.telt > 0) })).filter((x) => x.pts.length);
+      let mgraf = "";
+      if (lijnen.length) {
+        const W = Math.max(320, (p.clientWidth || 800) - 64), H = 170, L = 34, R = 12, Tt = 12, B = 26, w = W - L - R, h = H - Tt - B;
+        const lo = Math.min(50, ...lijnen.flatMap((x) => x.pts.map((m) => Math.floor(m.pct / 10) * 10)));
+        const x = (i) => L + w * i / 11, y = (pct) => Tt + h * (1 - (Math.max(lo, pct) - lo) / (100 - lo));
+        const ticks = []; for (let v = 100; v >= lo; v -= 10) ticks.push(v);
+        const MX = ["aug", "sep", "okt", "nov", "dec", "jan", "feb", "mrt", "apr", "mei", "jun", "jul"];
+        mgraf = `<svg class="dt-vz-line" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-label="Aanwezigheid per maand per schooljaar">
+          ${ticks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"/><text x="${L - 6}" y="${(y(v) + 3.5).toFixed(1)}" class="dt-vz-ytick" text-anchor="end">${v}</text>`).join("")}
+          ${MX.map((m, i) => `<text x="${x(i).toFixed(1)}" y="${H - 8}" class="dt-vz-xtick" text-anchor="middle">${m}</text>`).join("")}
+          ${lijnen.slice().reverse().map(({ r, pts }) => `<polyline points="${pts.map((m) => `${x(m.idx).toFixed(1)},${y(m.pct).toFixed(1)}`).join(" ")}" fill="none" stroke="${r.kleur}" stroke-width="${r.sub === "dit schooljaar" ? 2.5 : 2}" ${r.dash ? 'stroke-dasharray="5 4"' : ""} stroke-linejoin="round" stroke-linecap="round"/>${pts.map((m) => `<circle cx="${x(m.idx).toFixed(1)}" cy="${y(m.pct).toFixed(1)}" r="${r.sub === "dit schooljaar" ? 3.5 : 2.5}" fill="${r.kleur}" stroke="var(--dt-vz-surface)" stroke-width="1.5"><title>${esc(`${m.label} ${m.y}: ${m.pct}% aanwezig (${m.telt} lessen, ${m.afwezig} gemist)`)}</title></circle>`).join("")}`).join("")}
+        </svg>`;
+      }
+      let zin = "";
+      if (delta != null && rijen[0].zelfde.telt >= 10) zin = delta <= -5 ? `Dit schooljaar is de aanwezigheid tot nu toe <b>${rijen[0].zelfde.pct}%</b>, vorig schooljaar was dat tot dezelfde datum <b>${vorig.zelfde.pct}%</b>: ${Math.abs(delta)} procentpunt lager.`
+        : delta >= 5 ? `Dit schooljaar gaat het beter: <b>${rijen[0].zelfde.pct}%</b> tot nu toe, tegenover <b>${vorig.zelfde.pct}%</b> vorig schooljaar tot dezelfde datum.`
+        : `De aanwezigheid is vergelijkbaar met vorig schooljaar tot dezelfde datum (${rijen[0].zelfde.pct}% nu, ${vorig.zelfde.pct}% toen).`;
+      vergelijk = `<section class="dt-vz-card dt-vz-wide dt-vz-cmpcard"><h4>Vergelijking met vorige schooljaren</h4>${zin ? `<p class="dt-vz-cmpzin">${zin}</p>` : ""}${tabel}${mgraf ? `<div class="dt-vz-cmpgraf">${mgraf}<div class="dt-vz-legend">${lijnen.map(({ r }) => `<span><i style="background:${r.kleur}"></i>${esc(r.naam)}</span>`).join("")}<span class="dt-vz-legend-n">aanwezig per maand</span></div></div>` : ""}<p class="dt-vz-cmpnoot">"t/m ${esc(datumKort)}" telt elk schooljaar van 1 augustus tot dezelfde datum, zodat de jaren eerlijk te vergelijken zijn. Gemist, ziek, ongeoorloofd en te laat gaan ook over die periode.</p></section>`;
+    }
+
     const seg = (k, label) => `<button type="button" class="dt-vz-seg${this._periode === k ? " is-on" : ""}" data-periode="${k}">${label}</button>`;
     p.innerHTML = `
       <div class="dt-vz-head">
@@ -187,6 +252,7 @@ DT.register({
       </div>
       <div class="dt-vz-obs">${obs.map((o) => `<div class="dt-vz-ob">${o}</div>`).join("")}</div>
       <div class="dt-vz-grid">
+        ${vergelijk}
         <section class="dt-vz-card dt-vz-wide"><h4>Verloop per week</h4>${lijn || `<p class="dt-vz-empty">Nog te weinig weken voor een verloop.</p>`}</section>
         <section class="dt-vz-card"><h4>Per vak</h4>${rows(S.vakken)}</section>
         ${S.docenten.length ? `<section class="dt-vz-card"><h4>Per docent</h4>${rows(S.docenten)}</section>` : ""}
@@ -244,6 +310,19 @@ DT.register({
       .dt-vz-more { font: 400 .6875rem/1.2 var(--dt-vz-font); color: var(--dt-vz-muted); margin-top: 2px; }
       .dt-vz-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 10px; font: 400 .6875rem/1.2 var(--dt-vz-font); color: var(--dt-vz-muted); } .dt-vz-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; } .dt-vz-legend-n { margin-left: auto; }
       .dt-vz-line { max-width: 100%; height: auto; display: block; } .dt-vz-grid-line, .dt-vz-line line { stroke: var(--dt-vz-sep); stroke-width: 1; } .dt-vz-ytick, .dt-vz-xtick { font: 500 9px var(--dt-vz-font); fill: var(--dt-vz-muted); } .dt-vz-area { fill: color-mix(in srgb, var(--dt-vz-accent) 12%, transparent); } .dt-vz-poly { fill: none; stroke: var(--dt-vz-accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+      .dt-vz-cmp { width: 100%; border-collapse: collapse; font: 400 .8125rem/1.3 var(--dt-vz-font); font-variant-numeric: tabular-nums; }
+      .dt-vz-cmp th { text-align: right; font: 600 .6875rem/1.2 var(--dt-vz-font); color: var(--dt-vz-muted); padding: 0 8px 8px; white-space: nowrap; }
+      .dt-vz-cmp th:first-child, .dt-vz-cmp td:first-child { text-align: left; padding-left: 0; }
+      .dt-vz-cmp td { text-align: right; padding: 8px; border-top: 1px solid var(--dt-vz-sep); white-space: nowrap; }
+      .dt-vz-cmp td:first-child b { font-weight: 600; } .dt-vz-cmp td small { display: block; font-size: .6875rem; color: var(--dt-vz-muted); margin-left: 16px; }
+      .dt-vz-cmpdot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; vertical-align: 1px; }
+      .dt-vz-cmp tr.is-leeg td { color: var(--dt-vz-muted); }
+      .dt-vz-dim { color: var(--dt-vz-muted); }
+      .dt-vz-delta { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px; font: 600 .6875rem/18px var(--dt-vz-font); background: var(--dt-vz-group); color: var(--dt-vz-muted); }
+      .dt-vz-delta.is-up { background: rgba(52, 199, 89, .14); color: #1E7B34; } .dt-vz-delta.is-down { background: rgba(255, 59, 48, .12); color: #C4271D; }
+      .dt-vz-cmpzin { margin: 0 0 12px; font: 400 .8125rem/1.4 var(--dt-vz-font); }
+      .dt-vz-cmpgraf { margin-top: 14px; }
+      .dt-vz-cmpnoot { margin: 10px 0 0; font: 400 .6875rem/1.4 var(--dt-vz-font); color: var(--dt-vz-muted); }
       .dt-vz-foot { margin-top: 12px; font: 400 .6875rem/1.4 var(--dt-vz-font); color: var(--dt-vz-muted); }
     `;
     root.append(st);
@@ -282,13 +361,15 @@ function vzStats(regs, rooster, van, tot) {
   const mk = (label, sub = "") => ({ label, sub, lessen: 0, afwezig: 0, ongeoorloofd: 0, teLaat: 0, vrij: 0, ziek: 0, per: {}, pct: 0 });
   const add = (g, l) => { g.lessen++; g.per[l.cat] = (g.per[l.cat] || 0) + 1; if (l.cat === "VR") g.vrij++; else if (!["OK", "TL"].includes(l.cat)) g.afwezig++; if (l.cat === "AB_NO") g.ongeoorloofd++; if (l.cat === "ZK") g.ziek++; if (l.cat === "TL") g.teLaat++; };
   const fin = (g) => { const telt = g.lessen - g.vrij; g.telt = telt; g.pct = telt > 0 ? Math.round(100 * (telt - g.afwezig) / telt) : 100; return g; };
-  const totaal = mk("Totaal"), vakken = new Map(), docenten = new Map(), dagen = new Map(), uren = new Map(), weken = new Map();
+  const totaal = mk("Totaal"), vakken = new Map(), docenten = new Map(), dagen = new Map(), uren = new Map(), weken = new Map(), maanden = new Map();
+  const MND = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
   for (const l of lessen) {
     add(totaal, l);
     const kv = l.vak; if (!vakken.has(kv)) vakken.set(kv, mk(l.vak, l.docent)); add(vakken.get(kv), l);
     if (l.docent) { for (const dn of l.docent.split(", ")) { if (!docenten.has(dn)) docenten.set(dn, mk(dn)); add(docenten.get(dn), l); } }
     const kd = l.begin.getDay(); if (!dagen.has(kd)) dagen.set(kd, mk(DAG[kd][0].toUpperCase() + DAG[kd].slice(1))); add(dagen.get(kd), l);
     const ku = l.begin.getHours(); if (!uren.has(ku)) uren.set(ku, mk(`${String(ku).padStart(2, "0")}:00`)); add(uren.get(ku), l);
+    const km = `${l.begin.getFullYear()}-${l.begin.getMonth()}`; if (!maanden.has(km)) maanden.set(km, Object.assign(mk(MND[l.begin.getMonth()]), { y: l.begin.getFullYear(), m: l.begin.getMonth(), idx: (l.begin.getMonth() + 5) % 12 })); add(maanden.get(km), l);
     const wk = isoWeek(l.begin); const kw = `${wk.y}-${wk.w}`; if (!weken.has(kw)) weken.set(kw, Object.assign(mk(`week ${wk.w}`), { y: wk.y, week: wk.w })); add(weken.get(kw), l);
   }
   const sortBad = (a, b) => a.pct - b.pct || b.lessen - a.lessen;
@@ -299,6 +380,7 @@ function vzStats(regs, rooster, van, tot) {
     dagen: [...dagen.entries()].sort((a, b) => ((a[0] + 6) % 7) - ((b[0] + 6) % 7)).map(([, g]) => fin(g)),
     uren: [...uren.entries()].sort((a, b) => a[0] - b[0]).map(([, g]) => fin(g)),
     weken: [...weken.values()].map(fin).sort((a, b) => a.y - b.y || a.week - b.week),
+    maanden: [...maanden.values()].map(fin).sort((a, b) => a.y - b.y || a.m - b.m),
   };
 }
 

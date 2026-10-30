@@ -68,7 +68,35 @@ DT.register({
       const data = await this.load(DT, id);
       this._cache.set(id, { at: Date.now(), data });
       if (this._card && this._card.dataset.id === id) this.render(data);
+      /* Daarna (zonder het eerste beeld op te houden) vorig schooljaar tot dezelfde datum */
+      data.vorig = await this.loadVorig(DT, id, new Date(data.sjStart));
+      if (data.vorig && this._card && this._card.dataset.id === id) this.render(data);
     } finally { if (this._busy === id) this._busy = null; }
+  },
+
+  /* Vorig schooljaar van 1 augustus tot dezelfde datum als vandaag: registraties en rooster,
+   * zodat de aanwezigheid eerlijk te vergelijken is. null als er geen bruikbare gegevens zijn. */
+  async loadVorig(DT, id, sjStart) {
+    try {
+      const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const list = (r) => (r && r.status === 200 && r.json) ? (Array.isArray(r.json) ? r.json : r.json.items || r.json.Items || []) : null;
+      const now = new Date(), van = new Date(sjStart.getFullYear() - 1, 7, 1);
+      const tot = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      const [v, a] = await Promise.all([
+        DT.api(`/api/m6/leerlingen/${id}/verantwoordingen?begin=${ymd(van)}&einde=${ymd(tot)}`, { full: true, timeout: 15000 }),
+        DT.api(`/api/leerlingen/${id}/afspraken?status=actief&begin=${ymd(van)}&einde=${ymd(tot)}`, { full: true, timeout: 15000 }),
+      ]);
+      const items = list(v), rooster = list(a);
+      if (!items || !rooster || !rooster.length) return null;
+      const perMaand = {}; let totaal = 0;
+      for (const x of rooster) {
+        const b = new Date(x.start || x.begin), e = new Date(x.einde || x.eind);
+        if (isNaN(b) || isNaN(e) || e > tot || x.status === 5 || x.isVervallen === true) continue;
+        const k = `${b.getFullYear()}-${b.getMonth()}`; perMaand[k] = (perMaand[k] || 0) + 1; totaal++;
+      }
+      const att = aanwezigheid(items, totaal, van, tot, perMaand);
+      return att && att.telt ? { pct: att.pct, telt: att.telt, afwezig: att.afwezig, jaar: `${van.getFullYear()}–${van.getFullYear() + 1}` } : null;
+    } catch { return null; }
   },
 
   async load(DT, id) {
@@ -209,7 +237,7 @@ DT.register({
         <div class="dt-ll-hero-top">
           <span class="dt-ll-ringwrap">${donut(att, 72)}<span class="dt-ll-ringnum">${att.pct}<small>%</small></span></span>
           <span class="dt-ll-hero-text">
-            <span class="dt-ll-label">aanwezig dit schooljaar</span>
+            <span class="dt-ll-label">aanwezig dit schooljaar${d.vorig ? (() => { const dl = att.pct - d.vorig.pct; return ` <span class="dt-ll-delta${dl > 0 ? " is-up" : dl < 0 ? " is-down" : ""}" title="${esc(`Schooljaar ${d.vorig.jaar} tot dezelfde datum: ${d.vorig.pct}% aanwezig (${d.vorig.telt - d.vorig.afwezig} van ${d.vorig.telt} lessen)`)}">${dl > 0 ? "+" : dl < 0 ? "−" : "±"}${Math.abs(dl)} t.o.v. vorig jaar</span>`; })() : ""}</span>
             <span class="dt-ll-sub">${esc(att.telt - att.afwezig)} van ${esc(att.telt)} lessen aanwezig${att.afwezig ? ` · ${att.ziek ? `${att.ziek}× ziek` : ""}${att.ziek && att.afwezig - att.ziek ? ", " : ""}${att.afwezig - att.ziek ? `${att.afwezig - att.ziek}× afwezig${att.ongeoorloofd ? ` (${att.ongeoorloofd} ongeoorloofd)` : ""}` : ""}` : ""}${att.teLaat ? ` · ${att.teLaat}× te laat` : ""}${att.vrij ? ` · ${att.vrij}× vrijgesteld (telt niet mee)` : ""}${att.onbekend.length ? ` · ${esc(att.onbekend.length)} onbekend type` : ""}</span>
           </span>
         </div>
@@ -304,6 +332,9 @@ DT.register({
       #dt-ll-dash .dt-ll-hero-top { display: flex; align-items: center; gap: 14px; }
       #dt-ll-dash .dt-ll-hero-text { display: flex; flex-direction: column; gap: 3px; }
       #dt-ll-dash .dt-ll-hero .dt-ll-label { font-size: 1rem; font-weight: 600; color: inherit; }
+      #dt-ll-dash .dt-ll-delta { display: inline-block; vertical-align: 2px; margin-left: 4px; padding: 0 7px; border-radius: 999px; font: 600 .6875rem/18px inherit; font-family: inherit; background: rgba(120,120,128,.14); color: #6e6e73; white-space: nowrap; }
+      #dt-ll-dash .dt-ll-delta.is-up { background: rgba(52,199,89,.15); color: #1E7B34; }
+      #dt-ll-dash .dt-ll-delta.is-down { background: rgba(255,59,48,.12); color: #C4271D; }
       #dt-ll-dash .dt-ll-hero .dt-ll-sub { font-size: .75rem; }
       #dt-ll-dash .dt-ll-ringwrap { position: relative; width: 72px; height: 72px; flex: 0 0 auto; color: #6e6e73; }
       #dt-ll-dash .dt-ll-ring { display: block; width: 72px; height: 72px; }

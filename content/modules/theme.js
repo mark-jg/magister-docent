@@ -1284,6 +1284,8 @@ function leerlingkaartCss(t) {
     dk-basisgegevens-page .page { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)) !important; gap: 1rem !important; padding: .25rem 1.5rem 1.5rem !important; align-items: stretch !important; max-width: 1480px; box-sizing: border-box; }
     dk-algemene-gegevens .page:has(> #dt-ll-dash) { grid-template-columns: 17rem repeat(2, minmax(0, 1fr)) !important; }
     @media (max-width: 1100px) { dk-algemene-gegevens .page:has(> #dt-ll-dash) { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+    #dt-ll-dash .dt-ll-delta.is-up { color: ${t.dark ? t.green : "#1E7B34"} !important; background: ${rgba(t.green, t.dark ? .22 : .15)} !important; }
+    #dt-ll-dash .dt-ll-delta.is-down { color: ${t.dark ? t.red : "#C4271D"} !important; background: ${rgba(t.red, t.dark ? .22 : .12)} !important; }
     #dt-ll-dash .dt-ll-toest dna-card { --background: transparent !important; --_background: transparent !important; --box-shadow: none !important; --_box-shadow: none !important; --body-padding: 0 !important; --_body-padding: 0 !important; --header-padding: 0 !important; --_header-padding: 0 !important; min-height: 0 !important; height: auto !important; }
     #dt-ll-dash .dt-ll-toest .answer-entry, #dt-ll-dash .dt-ll-toest .permission-type { font-size: .75rem !important; color: ${t.fg}; border-bottom: 0 !important; }
     #dt-ll-dash .dt-ll-toest .last-modified-message { color: ${t.muted} !important; font-size: .6875rem !important; margin: 4px 0 0 !important; }
@@ -1379,6 +1381,8 @@ function appleShadowCss(p, dark, accent) {
     .dt-vz-tabbtn:hover { background: ${t.hover} !important; color: ${t.fg} !important; }
     .dt-vz-tabbtn.is-active { background: ${t.tint} !important; color: ${t.accent} !important; font-weight: 600 !important; }
     .dt-vz-tabbtn.is-active::after { display: none !important; }
+    .dt-vz-delta.is-up { color: ${t.dark ? t.green : "#1E7B34"} !important; background: ${rgba(t.green, t.dark ? .22 : .14)} !important; }
+    .dt-vz-delta.is-down { color: ${t.dark ? t.red : "#C4271D"} !important; background: ${rgba(t.red, t.dark ? .22 : .12)} !important; }
     .dt-vz-ziek:not(.is-nul) { color: ${t.dark ? "#DA8FFF" : "#8E3BB8"} !important; background: ${rgba("#AF52DE", t.dark ? .26 : .13)} !important; }
     :host(dna-tab-bar) .wrapper { padding-block-end: var(--_spacing, 2px) !important; }
     :host(dna-button.upload-button) button, :host(dna-button.upload-button) .button, :host(dna-button.upload-button) a { border: 0 !important; background: transparent !important; color: #fff !important; padding: 0 !important; }
