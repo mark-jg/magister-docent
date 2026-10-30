@@ -93,3 +93,20 @@ html.dt-dark .dt-widget a { color: #8fb6e6; }
 .dt-field select, .dt-field input[type=color] { width: 100%; box-sizing: border-box; min-height: 30px; }
 
 #dt-role-menu { position: fixed; z-index: 2147483200; min-width: 230px; background: var(--dt-bg); color: var(--dt-fg); border: 1px solid var(--dt-line); border-radius: 10px; box-shadow: var(--dt-shadow); padding: 6px; font: 13px var(--dt-font); }
+
+/* Bedieningsdeel in het zijpaneel */
+.dt-bediening { display: flex; flex-direction: column; gap: 10px; }
+.dt-theme-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+.dt-select { width: 100%; font: 13px var(--dt-font); padding: 7px 28px 7px 10px; border: 0; border-radius: 10px; background: color-mix(in srgb, var(--dt-fg) 7%, transparent); color: var(--dt-fg); appearance: none; -webkit-appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--dt-muted) 50%), linear-gradient(135deg, var(--dt-muted) 50%, transparent 50%); background-position: calc(100% - 15px) 55%, calc(100% - 10px) 55%; background-size: 5px 5px; background-repeat: no-repeat; }
+.dt-seg { display: inline-flex; padding: 2px; border-radius: 9px; background: color-mix(in srgb, var(--dt-fg) 7%, transparent); }
+.dt-segbtn { font: 500 12px var(--dt-font); padding: 5px 10px; border: 0; border-radius: 7px; background: transparent; color: var(--dt-muted); cursor: pointer; }
+.dt-segbtn.is-on { background: var(--dt-bg); color: var(--dt-fg); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.14); }
+.dt-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.dt-tile { --k: #6e6e73; display: grid; grid-template-columns: 30px 1fr; gap: 8px; align-items: center; padding: 9px 10px; border: 0; border-radius: 14px; background: color-mix(in srgb, var(--dt-fg) 5%, transparent); color: var(--dt-fg); text-align: left; cursor: pointer; font: 13px var(--dt-font); min-height: 52px; transition: background .12s, transform .08s; }
+.dt-tile:active { transform: scale(.98); }
+.dt-tile-ico { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--k) 16%, var(--dt-bg)); color: var(--k); }
+.dt-tile.is-on { background: color-mix(in srgb, var(--k) 12%, var(--dt-bg)); }
+.dt-tile.is-on .dt-tile-ico { background: var(--k); color: #fff; }
+.dt-tile b { display: block; font-size: 12px; font-weight: 600; line-height: 1.2; }
+.dt-tile small { display: block; font-size: 10.5px; color: var(--dt-muted); line-height: 1.2; margin-top: 1px; }
+.dt-tile:not(.is-on) b { color: var(--dt-muted); }

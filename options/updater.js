@@ -94,11 +94,13 @@ if (typeof document !== "undefined" && typeof chrome !== "undefined" && chrome.s
     $("folderName").textContent = dir ? `Extensiemap: ${dir.name}` : "Nog geen extensiemap gekozen.";
     $("pickFolder").textContent = dir ? "Andere map kiezen" : "Extensiemap kiezen";
     $("forgetFolder").hidden = !dir;
+    const inPopup = !$("updates");
+    if (inPopup) { $("pickFolder").hidden = !!dir; $("folderName").hidden = !dir; }
     const can = supported && dir && update?.available && (update.zipApi || update.zip);
     $("doUpdate").disabled = !can;
     $("doUpdate").textContent = update?.available ? `Nu bijwerken naar ${update.latest}` : "Nu bijwerken";
     if (!supported) progress("Deze browser ondersteunt het kiezen van een map niet; werk handmatig bij (zip downloaden).");
-    else if (!dir) progress("Kies eerst één keer de map waarin de extensie staat (de map met manifest.json).");
+    else if (!dir) progress(update?.available ? "Kies eerst één keer de map waarin de extensie staat (de map met manifest.json)." : "");
     else if (!update?.available) progress(update?.latest ? `Je hebt de nieuwste versie (${manifest.version}).` : "");
     else progress(`Versie ${update.latest} staat klaar. Chrome vraagt bij het bijwerken om toestemming voor de map.`);
   }
@@ -110,7 +112,9 @@ if (typeof document !== "undefined" && typeof chrome !== "undefined" && chrome.s
       await kvSet("dir", picked);
       progress(`Map gekozen (${picked.name}, versie ${m.version}).`);
     } catch (e) {
-      if (e?.name !== "AbortError") progress(`Map niet gebruikt: ${e.message || e}.`);
+      if (e?.name === "AbortError") { /* geannuleerd */ }
+      else if (!$("updates")) { progress("Kies de map via de instellingenpagina, die opent nu…"); chrome.tabs.create({ url: chrome.runtime.getURL("options/options.html#update") }); }
+      else progress(`Map niet gebruikt: ${e.message || e}.`);
     }
     refreshUi();
   };
@@ -170,5 +174,5 @@ if (typeof document !== "undefined" && typeof chrome !== "undefined" && chrome.s
 
   chrome.storage.onChanged.addListener((ch, area) => { if (area === "local" && ch.update) refreshUi(); });
   refreshUi();
-  if (location.hash === "#update") setTimeout(() => $("updates").scrollIntoView({ behavior: "smooth" }), 100);
+  if (location.hash === "#update" && $("updates")) setTimeout(() => $("updates").scrollIntoView({ behavior: "smooth" }), 100);
 })();

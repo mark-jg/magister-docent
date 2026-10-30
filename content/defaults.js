@@ -3,7 +3,7 @@
 globalThis.DT_DEFAULTS = {
   theme: { enabled: true, preset: "magister", lightPreset: "magister", darkPreset: "nacht", mode: "auto", darkStyle: "invert", accent: "#1B3A5C", density: "normal", font: "thema", fontScale: 1, radius: "thema", extra: [], recolor: true, agendaKleur: "vak" },
   compact: { enabled: false, hideSelectors: [] },
-  panel: { enabled: true, position: "right", widgets: ["klok", "links", "notities", "export"] },
+  panel: { enabled: true, position: "right", handle: true, widgets: ["klok", "links", "notities", "export"] },
   tables: { enabled: true, alwaysAsk: false, mode: "hover" },
   quickinput: { enabled: true, shortcuts: true },
   ai: { enabled: true, provider: "claude" },
