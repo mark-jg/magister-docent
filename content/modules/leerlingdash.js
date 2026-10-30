@@ -185,14 +185,14 @@ DT.register({
 
     /* Donut: aanwezig in groen, de afwezige lessen per type in de kleuren van de grafiek. */
     const donut = (att, size) => {
-      const r = 20, c = 2 * Math.PI * r, L = Math.max(1, att.lessen);
-      const parts = [["ZK", "#AF52DE"], ["AB_OK", "#FF9500"], ["AB_NO", "#FF3B30"], ["UI", "#A2845E"], ["VR", "#32ADE6"]].map(([k, col]) => [Math.min(att.perType[k] || 0, L), col]).filter(([n]) => n > 0);
+      const r = 20, c = 2 * Math.PI * r, L = Math.max(1, att.telt);
+      const parts = [["ZK", "#AF52DE"], ["AB_OK", "#FF9500"], ["AB_NO", "#FF3B30"], ["UI", "#A2845E"]].map(([k, col]) => [Math.min(att.perType[k] || 0, L), col]).filter(([n]) => n > 0);
       const absN = parts.reduce((x, [n]) => x + n, 0), present = Math.max(0, L - absN);
       let off = 0; const seg = (n, col) => { const len = c * n / L; const out = `<circle cx="24" cy="24" r="${r}" fill="none" stroke="${col}" stroke-width="5" stroke-dasharray="${len.toFixed(2)} ${c.toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 24 24)"/>`; off += len; return out; };
       return `<svg class="dt-ll-ring" viewBox="0 0 48 48" width="${size}" height="${size}" aria-hidden="true"><circle cx="24" cy="24" r="${r}" fill="none" stroke="currentColor" stroke-opacity=".12" stroke-width="5"/>${seg(present, "#34C759")}${parts.map(([n, col]) => seg(n, col)).join("")}</svg>`;
     };
     const maandBalken = (att) => {
-      const SOORT = [["OK", "aanwezig", "#34C759"], ["TL", "te laat", "#FFCC00"], ["ZK", "ziek", "#AF52DE"], ["AB_OK", "absent, geoorloofd", "#FF9500"], ["AB_NO", "absent, ongeoorloofd", "#FF3B30"], ["UI", "uitgestuurd", "#A2845E"], ["VR", "vrijstelling", "#32ADE6"]];
+      const SOORT = [["OK", "aanwezig", "#34C759"], ["TL", "te laat", "#FFCC00"], ["ZK", "ziek", "#AF52DE"], ["AB_OK", "absent, geoorloofd", "#FF9500"], ["AB_NO", "absent, ongeoorloofd", "#FF3B30"], ["UI", "uitgestuurd", "#A2845E"], ["VR", "vrijstelling (telt niet mee)", "#32ADE6"]];
       const aanwezig = SOORT.filter(([k]) => att.maanden.some((m) => m.per[k]));
       const rows = att.maanden.map((m) => {
         const segs = aanwezig.map(([k, n, c]) => m.per[k] ? `<span class="dt-ll-hseg" style="width:${(100 * m.per[k] / m.lessen).toFixed(2)}%;background:${c}" title="${esc(`${m.per[k]}× ${n}`)}"></span>` : "").join("");
@@ -210,7 +210,7 @@ DT.register({
           <span class="dt-ll-ringwrap">${donut(att, 72)}<span class="dt-ll-ringnum">${att.pct}<small>%</small></span></span>
           <span class="dt-ll-hero-text">
             <span class="dt-ll-label">aanwezig dit schooljaar</span>
-            <span class="dt-ll-sub">${esc(att.lessen - att.afwezig)} van ${esc(att.lessen)} lessen aanwezig${att.afwezig ? ` · ${att.ziek ? `${att.ziek}× ziek` : ""}${att.ziek && att.afwezig - att.ziek ? ", " : ""}${att.afwezig - att.ziek ? `${att.afwezig - att.ziek}× afwezig${att.ongeoorloofd ? ` (${att.ongeoorloofd} ongeoorloofd)` : ""}` : ""}` : ""}${att.teLaat ? ` · ${att.teLaat}× te laat` : ""}${att.onbekend.length ? ` · ${esc(att.onbekend.length)} onbekend type` : ""}</span>
+            <span class="dt-ll-sub">${esc(att.telt - att.afwezig)} van ${esc(att.telt)} lessen aanwezig${att.afwezig ? ` · ${att.ziek ? `${att.ziek}× ziek` : ""}${att.ziek && att.afwezig - att.ziek ? ", " : ""}${att.afwezig - att.ziek ? `${att.afwezig - att.ziek}× afwezig${att.ongeoorloofd ? ` (${att.ongeoorloofd} ongeoorloofd)` : ""}` : ""}` : ""}${att.teLaat ? ` · ${att.teLaat}× te laat` : ""}${att.vrij ? ` · ${att.vrij}× vrijgesteld (telt niet mee)` : ""}${att.onbekend.length ? ` · ${esc(att.onbekend.length)} onbekend type` : ""}</span>
           </span>
         </div>
         ${att.maanden.length ? maandBalken(att) : ""}
@@ -341,11 +341,12 @@ DT.register({
 });
 
 /* Aanwezigheid uit Magisters registraties (zoals het scherm Verzuim ze telt): per les de
- * registraties met type en geoorloofd/ongeoorloofd. Afwezig = AB, ZK, UI of VR; te laat (TL) telt
- * als aanwezig. Percentage over de lessen die al voorbij zijn. */
+ * registraties met type en geoorloofd/ongeoorloofd. Afwezig = AB, ZK of UI; te laat (TL) telt
+ * als aanwezig. Een vrijstelling (VR) is met toestemming: die les telt niet als afwezig en valt
+ * buiten het percentage (de leerling hoefde er niet te zijn). Percentage over voorbije lessen. */
 function aanwezigheid(items, lessenTotaal, start, now, lessenPerMaand) {
   if (!items) return null;
-  const ABSENT = new Set(["AB", "ZK", "UI", "VR"]);
+  const ABSENT = new Set(["AB", "ZK", "UI"]);
   /* Magister levert het type als naam (absent, teLaat, ziek, uitgestuurd, vrijstelling, …) of als code. */
   const TYPE = { absent: "AB", ab: "AB", absentie: "AB", telaat: "TL", tl: "TL", ziek: "ZK", zk: "ZK", uitgestuurd: "UI", ui: "UI", vrijstelling: "VR", vr: "VR", boekenvergeten: "MV", materiaalvergeten: "MV", mv: "MV", huiswerkvergeten: "HV", hv: "HV", mobielinklas: "MK", mk: "MK", onbekend: "ON", on: "ON", present: "", aanwezig: "" };
   const norm = (v) => { const k = String(v ?? "").replace(/[\s_-]/g, "").toLowerCase(); return k in TYPE ? TYPE[k] : String(v ?? "").toUpperCase(); };
@@ -353,7 +354,7 @@ function aanwezigheid(items, lessenTotaal, start, now, lessenPerMaand) {
   const MON = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
   const MONL = ["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december"];
   const perMaand = new Map();
-  let lessen = 0, afwezig = 0, ongeoorloofd = 0, teLaat = 0, ziek = 0;
+  let lessen = 0, afwezig = 0, ongeoorloofd = 0, teLaat = 0, ziek = 0, vrij = 0;
   for (const it of items) {
     const a = it.afspraak || it.appointment || it;
     const begin = new Date(a.begin || a.start || a.startDateTime || it.begin);
@@ -366,13 +367,15 @@ function aanwezigheid(items, lessenTotaal, start, now, lessenPerMaand) {
       return { type, ok: r.reden?.isGeoorloofd ?? r.isGeoorloofd ?? r.geoorloofd ?? r.approved ?? true };
     });
     const key = `${begin.getFullYear()}-${begin.getMonth()}`;
-    const m = perMaand.get(key) || { y: begin.getFullYear(), m: begin.getMonth(), lessen: 0, afwezig: 0, ongeoorloofd: 0, teLaat: 0, per: {} };
+    const m = perMaand.get(key) || { y: begin.getFullYear(), m: begin.getMonth(), lessen: 0, afwezig: 0, ongeoorloofd: 0, teLaat: 0, vrij: 0, per: {} };
     m.lessen++; lessen++;
     const abs = regs.find((r) => ABSENT.has(r.type));
     if (abs) { m.afwezig++; afwezig++; if (!abs.ok) { m.ongeoorloofd++; ongeoorloofd++; } if (abs.type === "ZK") ziek++; }
-    if (regs.some((r) => r.type === "TL")) { m.teLaat++; teLaat++; }
-    /* Per les één categorie voor de grafiek: afwezigheidstype gaat voor te laat, te laat voor aanwezig. */
-    const cat = abs ? (abs.type === "AB" ? (abs.ok ? "AB_OK" : "AB_NO") : abs.type) : (regs.some((r) => r.type === "TL") ? "TL" : "OK");
+    const vr = !abs && regs.some((r) => r.type === "VR");
+    if (vr) { m.vrij++; vrij++; }
+    if (!vr && regs.some((r) => r.type === "TL")) { m.teLaat++; teLaat++; }
+    /* Per les één categorie voor de grafiek: afwezigheid > vrijstelling > te laat > aanwezig. */
+    const cat = abs ? (abs.type === "AB" ? (abs.ok ? "AB_OK" : "AB_NO") : abs.type) : vr ? "VR" : (regs.some((r) => r.type === "TL") ? "TL" : "OK");
     m.per[cat] = (m.per[cat] || 0) + 1;
     for (const r of regs) if (["MV", "HV", "MK"].includes(r.type)) m.per.OVERIG = (m.per.OVERIG || 0) + 1;
     perMaand.set(key, m);
@@ -382,7 +385,7 @@ function aanwezigheid(items, lessenTotaal, start, now, lessenPerMaand) {
   if (lessenPerMaand) {
     for (const [key, n] of Object.entries(lessenPerMaand)) {
       const [y, mo] = key.split("-").map(Number);
-      const m = perMaand.get(key) || { y, m: mo, lessen: 0, afwezig: 0, ongeoorloofd: 0, teLaat: 0, per: {} };
+      const m = perMaand.get(key) || { y, m: mo, lessen: 0, afwezig: 0, ongeoorloofd: 0, teLaat: 0, vrij: 0, per: {} };
       const geregistreerd = Object.entries(m.per).filter(([k]) => k !== "OVERIG").reduce((x, [, v]) => x + v, 0);
       m.lessen = Math.max(n, geregistreerd);
       m.per.OK = m.lessen - (geregistreerd - (m.per.OK || 0));
@@ -393,12 +396,13 @@ function aanwezigheid(items, lessenTotaal, start, now, lessenPerMaand) {
   for (const m of perMaand.values()) for (const [k, v] of Object.entries(m.per)) perType[k] = (perType[k] || 0) + v;
   if (lessenTotaal && lessenTotaal > lessen) lessen = lessenTotaal;
   if (!lessen) return null;
-  const pct = Math.round(100 * (lessen - afwezig) / lessen);
+  const telt = Math.max(0, lessen - vrij);
+  const pct = telt ? Math.round(100 * (telt - afwezig) / telt) : 100;
   const maanden = [...perMaand.values()].sort((a, b) => a.y - b.y || a.m - b.m).map((m) => ({
     ...m, kort: MON[m.m], label: `${MONL[m.m]} ${m.y}`, totaal: Object.entries(m.per).filter(([k]) => k !== "OK" && k !== "OVERIG").reduce((x, [, y]) => x + y, 0),
-    pctAanwezig: m.lessen ? Math.round(100 * (m.lessen - m.afwezig) / m.lessen) : 0,
+    pctAanwezig: m.lessen - m.vrij > 0 ? Math.round(100 * (m.lessen - m.vrij - m.afwezig) / (m.lessen - m.vrij)) : 100,
   }));
-  return { lessen, afwezig, ongeoorloofd, teLaat, ziek, pct, maanden, registraties, onbekend: [...onbekend], perType };
+  return { lessen, telt, vrij, afwezig, ongeoorloofd, teLaat, ziek, pct, maanden, registraties, onbekend: [...onbekend], perType };
 }
 
 const ICON = {

@@ -107,11 +107,11 @@ DT.register({
     const van = this._periode === "jaar" ? new Date(d.sj) : new Date(now.getFullYear(), now.getMonth(), now.getDate() - (this._periode === "8w" ? 56 : 28));
     const S = vzStats(d.regs || [], d.rooster || [], van, now);
     const pctCol = (pct) => pct >= 90 ? "#34C759" : pct >= 80 ? "#FF9500" : "#FF3B30";
-    const SOORT = [["OK", "aanwezig", "#34C759"], ["TL", "te laat", "#FFCC00"], ["ZK", "ziek", "#AF52DE"], ["AB_OK", "absent, geoorloofd", "#FF9500"], ["AB_NO", "absent, ongeoorloofd", "#FF3B30"], ["UI", "uitgestuurd", "#A2845E"], ["VR", "vrijstelling", "#32ADE6"]];
+    const SOORT = [["OK", "aanwezig", "#34C759"], ["TL", "te laat", "#FFCC00"], ["ZK", "ziek", "#AF52DE"], ["AB_OK", "absent, geoorloofd", "#FF9500"], ["AB_NO", "absent, ongeoorloofd", "#FF3B30"], ["UI", "uitgestuurd", "#A2845E"], ["VR", "vrijstelling (telt niet mee)", "#32ADE6"]];
     const used = SOORT.filter(([k]) => S.totaal.per[k]);
     const bar = (g) => `<span class="dt-vz-bar">${used.map(([k, n, c]) => g.per[k] ? `<span style="width:${(100 * g.per[k] / g.lessen).toFixed(2)}%;background:${c}" title="${esc(`${g.per[k]}× ${n}`)}"></span>` : "").join("")}</span>`;
     const rows = (groups, { max = 12, empty = "Geen lessen in deze periode." } = {}) => groups.length ? `<div class="dt-vz-rows">${groups.slice(0, max).map((g) => `
-      <div class="dt-vz-row${g.afwezig >= 3 && g.lessen >= 4 && g.pct < S.totaal.pct - 8 ? " is-warn" : ""}" title="${esc(`${g.label}: ${g.lessen} lessen, ${g.afwezig} afwezig, ${g.teLaat}× te laat`)}">
+      <div class="dt-vz-row${g.afwezig >= 3 && g.telt >= 4 && g.pct < S.totaal.pct - 8 ? " is-warn" : ""}" title="${esc(`${g.label}: ${g.telt} lessen, ${g.afwezig} afwezig, ${g.teLaat}× te laat${g.vrij ? `, ${g.vrij}× vrijgesteld (telt niet mee)` : ""}`)}">
         <span class="dt-vz-label"><b>${esc(g.label)}</b>${g.sub ? `<small>${esc(g.sub)}</small>` : ""}</span>
         ${bar(g)}
         <span class="dt-vz-pct" style="color:${pctCol(g.pct)}">${g.pct}%</span>
@@ -141,20 +141,20 @@ DT.register({
     const obs = [];
     const T = S.totaal;
     if (T.lessen) {
-      const worstVak = S.vakken.find((g) => g.lessen >= 4 && g.afwezig >= 2);
-      if (worstVak && worstVak.pct < T.pct - 5) obs.push(`Het verzuim zit vooral bij <b>${esc(worstVak.label)}</b>: ${worstVak.afwezig} van ${worstVak.lessen} lessen gemist (${worstVak.pct}% aanwezig, tegenover ${T.pct}% totaal).`);
-      const worstDoc = S.docenten.find((g) => g.lessen >= 4 && g.afwezig >= 2);
-      if (worstDoc && worstDoc.pct < T.pct - 5 && (!worstVak || worstDoc.label !== worstVak.sub)) obs.push(`Bij <b>${esc(worstDoc.label)}</b> is de aanwezigheid het laagst: ${worstDoc.pct}% over ${worstDoc.lessen} lessen.`);
-      const worstDag = S.dagen.filter((g) => g.lessen >= 4).sort((a, b) => a.pct - b.pct)[0];
+      const worstVak = S.vakken.find((g) => g.telt >= 4 && g.afwezig >= 2);
+      if (worstVak && worstVak.pct < T.pct - 5) obs.push(`Het verzuim zit vooral bij <b>${esc(worstVak.label)}</b>: ${worstVak.afwezig} van ${worstVak.telt} lessen gemist (${worstVak.pct}% aanwezig, tegenover ${T.pct}% totaal).`);
+      const worstDoc = S.docenten.find((g) => g.telt >= 4 && g.afwezig >= 2);
+      if (worstDoc && worstDoc.pct < T.pct - 5 && (!worstVak || worstDoc.label !== worstVak.sub)) obs.push(`Bij <b>${esc(worstDoc.label)}</b> is de aanwezigheid het laagst: ${worstDoc.pct}% over ${worstDoc.telt} lessen.`);
+      const worstDag = S.dagen.filter((g) => g.telt >= 4).sort((a, b) => a.pct - b.pct)[0];
       if (worstDag && worstDag.pct < T.pct - 8) obs.push(`Op <b>${esc(worstDag.label.toLowerCase())}</b> is de aanwezigheid duidelijk lager (${worstDag.pct}%) dan gemiddeld.`);
-      const worstUur = S.uren.filter((g) => g.lessen >= 4).sort((a, b) => a.pct - b.pct)[0];
+      const worstUur = S.uren.filter((g) => g.telt >= 4).sort((a, b) => a.pct - b.pct)[0];
       if (worstUur && worstUur.pct < T.pct - 8) obs.push(`Lessen die om <b>${esc(worstUur.label)}</b> beginnen worden het vaakst gemist (${worstUur.pct}% aanwezig).`);
-      const lateVak = S.vakken.filter((g) => g.teLaat >= 2).sort((a, b) => b.teLaat / b.lessen - a.teLaat / a.lessen)[0];
-      if (lateVak) obs.push(`Te laat komt vooral voor bij <b>${esc(lateVak.label)}</b> (${lateVak.teLaat}× in ${lateVak.lessen} lessen).`);
+      const lateVak = S.vakken.filter((g) => g.teLaat >= 2).sort((a, b) => b.teLaat / b.telt - a.teLaat / a.telt)[0];
+      if (lateVak) obs.push(`Te laat komt vooral voor bij <b>${esc(lateVak.label)}</b> (${lateVak.teLaat}× in ${lateVak.telt} lessen).`);
       if (T.ongeoorloofd >= 3) obs.push(`<b>${T.ongeoorloofd}</b> van de ${T.afwezig} gemiste lessen zijn ongeoorloofd.`);
       if (weeks.length >= 4) {
         const recent = weeks.slice(-3), eerder = weeks.slice(0, -3);
-        const avg = (ws) => ws.reduce((x, w) => x + w.pct * w.lessen, 0) / Math.max(1, ws.reduce((x, w) => x + w.lessen, 0));
+        const avg = (ws) => ws.reduce((x, w) => x + w.pct * w.telt, 0) / Math.max(1, ws.reduce((x, w) => x + w.telt, 0));
         const r = avg(recent), e = avg(eerder);
         if (eerder.length && r < e - 8) obs.push(`De laatste drie weken (${Math.round(r)}%) zijn slechter dan daarvoor (${Math.round(e)}%).`);
         else if (eerder.length && r > e + 8) obs.push(`De laatste drie weken (${Math.round(r)}%) gaan beter dan daarvoor (${Math.round(e)}%).`);
@@ -171,7 +171,7 @@ DT.register({
       ${T.lessen ? `
       <div class="dt-vz-summary">
         <span class="dt-vz-big" style="color:${pctCol(T.pct)}">${T.pct}%</span>
-        <span class="dt-vz-sumtext"><b>aanwezig</b> · ${T.lessen - T.afwezig} van ${T.lessen} lessen · ${T.afwezig} gemist${T.ongeoorloofd ? ` (${T.ongeoorloofd} ongeoorloofd)` : ""}${T.teLaat ? ` · ${T.teLaat}× te laat` : ""}${S.onbekend ? ` · ${S.onbekend} lessen zonder vak in het rooster` : ""}</span>
+        <span class="dt-vz-sumtext"><b>aanwezig</b> · ${T.telt - T.afwezig} van ${T.telt} lessen · ${T.afwezig} gemist${T.ongeoorloofd ? ` (${T.ongeoorloofd} ongeoorloofd)` : ""}${T.teLaat ? ` · ${T.teLaat}× te laat` : ""}${S.onbekend ? ` · ${S.onbekend} lessen zonder vak in het rooster` : ""}</span>
       </div>
       <div class="dt-vz-obs">${obs.map((o) => `<div class="dt-vz-ob">${o}</div>`).join("")}</div>
       <div class="dt-vz-grid">
@@ -182,7 +182,7 @@ DT.register({
         <section class="dt-vz-card"><h4>Per lesuur (begintijd)</h4>${rows(S.uren, { max: 12 })}</section>
       </div>
       ${legend}` : `<p class="dt-vz-empty">Geen lessen in deze periode.</p>`}
-      <div class="dt-vz-foot">Uit de registraties en het rooster van Magister. Afwezig = absent, ziek, uitgestuurd of vrijstelling; te laat telt als aanwezig. Vak${S.docenten.length ? " en docent" : ""} uit het rooster; ${d.rooster ? `${(d.rooster || []).length} roosteritems` : "rooster niet beschikbaar"}${d.rooster && !S.docenten.length ? "; het rooster van de leerling noemt geen docenten, daarom is er geen blok per docent" : ""}.</div>`;
+      <div class="dt-vz-foot">Uit de registraties en het rooster van Magister. Afwezig = absent, ziek of uitgestuurd; te laat telt als aanwezig. Een vrijstelling is met toestemming: die les telt niet als gemist en valt buiten het percentage. Vak${S.docenten.length ? " en docent" : ""} uit het rooster; ${d.rooster ? `${(d.rooster || []).length} roosteritems` : "rooster niet beschikbaar"}${d.rooster && !S.docenten.length ? "; het rooster van de leerling noemt geen docenten, daarom is er geen blok per docent" : ""}.</div>`;
     p.querySelectorAll(".dt-vz-seg").forEach((b) => b.addEventListener("click", () => { this._periode = b.dataset.periode; this.render(); }));
   },
 
@@ -233,7 +233,7 @@ DT.register({
 
 /* Statistiek: per les één categorie (afwezigheidstype > te laat > aanwezig), gegroepeerd. */
 function vzStats(regs, rooster, van, tot) {
-  const ABSENT = new Set(["AB", "ZK", "UI", "VR"]);
+  const ABSENT = new Set(["AB", "ZK", "UI"]);
   const TYPE = { absent: "AB", ab: "AB", telaat: "TL", tl: "TL", ziek: "ZK", zk: "ZK", uitgestuurd: "UI", ui: "UI", vrijstelling: "VR", vr: "VR", boekenvergeten: "MV", materiaalvergeten: "MV", mv: "MV", huiswerkvergeten: "HV", hv: "HV", mobielinklas: "MK", mk: "MK", onbekend: "ON", on: "ON" };
   const norm = (v) => { const k = String(v ?? "").replace(/[\s_-]/g, "").toLowerCase(); return k in TYPE ? TYPE[k] : String(v ?? "").toUpperCase(); };
   const names = (arr, keys) => (Array.isArray(arr) ? arr : []).map((x) => (typeof x === "string" ? x : keys.map((k) => x?.[k]).find(Boolean))).filter(Boolean);
@@ -257,11 +257,12 @@ function vzStats(regs, rooster, van, tot) {
     let l = (a.id != null && byId.get(String(a.id))) || byStart.get(b.getTime());
     if (!l) { l = { id: a.id, begin: b, vak: a.omschrijving || "Onbekend", docent: "", cat: "OK", extra: 0 }; lessen.push(l); onbekend++; }
     const abs = rs.find((r) => ABSENT.has(r.type));
-    l.cat = abs ? (abs.type === "AB" ? (abs.ok ? "AB_OK" : "AB_NO") : abs.type) : (rs.some((r) => r.type === "TL") ? "TL" : "OK");
+    /* Vrijstelling is met toestemming: geen verzuim, en de les valt buiten het percentage. */
+    l.cat = abs ? (abs.type === "AB" ? (abs.ok ? "AB_OK" : "AB_NO") : abs.type) : rs.some((r) => r.type === "VR") ? "VR" : (rs.some((r) => r.type === "TL") ? "TL" : "OK");
   }
-  const mk = (label, sub = "") => ({ label, sub, lessen: 0, afwezig: 0, ongeoorloofd: 0, teLaat: 0, per: {}, pct: 0 });
-  const add = (g, l) => { g.lessen++; g.per[l.cat] = (g.per[l.cat] || 0) + 1; if (!["OK", "TL"].includes(l.cat)) g.afwezig++; if (l.cat === "AB_NO") g.ongeoorloofd++; if (l.cat === "TL") g.teLaat++; };
-  const fin = (g) => { g.pct = g.lessen ? Math.round(100 * (g.lessen - g.afwezig) / g.lessen) : 0; return g; };
+  const mk = (label, sub = "") => ({ label, sub, lessen: 0, afwezig: 0, ongeoorloofd: 0, teLaat: 0, vrij: 0, per: {}, pct: 0 });
+  const add = (g, l) => { g.lessen++; g.per[l.cat] = (g.per[l.cat] || 0) + 1; if (l.cat === "VR") g.vrij++; else if (!["OK", "TL"].includes(l.cat)) g.afwezig++; if (l.cat === "AB_NO") g.ongeoorloofd++; if (l.cat === "TL") g.teLaat++; };
+  const fin = (g) => { const telt = g.lessen - g.vrij; g.telt = telt; g.pct = telt > 0 ? Math.round(100 * (telt - g.afwezig) / telt) : 100; return g; };
   const totaal = mk("Totaal"), vakken = new Map(), docenten = new Map(), dagen = new Map(), uren = new Map(), weken = new Map();
   for (const l of lessen) {
     add(totaal, l);
