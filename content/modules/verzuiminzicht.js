@@ -190,10 +190,11 @@ DT.register({
     if (root.querySelector("#dt-vz-style")) return;
     const st = document.createElement("style"); st.id = "dt-vz-style";
     st.textContent = `
-      :host { --dt-vz-fg: var(--sl-color-foreground-plain, var(--dna-text-color, #1d1d1f)); --dt-vz-muted: var(--sl-color-foreground-accent-grey-subtlest, #6e6e73); --dt-vz-surface: var(--dna-foreground, #fff); --dt-vz-group: rgba(120,120,128,.08); --dt-vz-sep: rgba(60,60,67,.12); --dt-vz-accent: var(--dna-primary, #007aff); --dt-vz-font: -apple-system, system-ui, "Segoe UI", sans-serif; }
-      .dt-vz-tabbtn { appearance: none; border: 0; background: transparent; color: var(--dt-vz-muted); font: 500 .875rem/1.25 var(--dt-vz-font); padding: .375rem .875rem; border-radius: 999px; cursor: pointer; margin-left: .25rem; transition: background .12s, color .12s; }
-      .dt-vz-tabbtn:hover { background: var(--dt-vz-group); color: var(--dt-vz-fg); }
-      .dt-vz-tabbtn.is-active { background: color-mix(in srgb, var(--dt-vz-accent) 14%, transparent); color: var(--dt-vz-accent); font-weight: 600; }
+      :host { --dt-vz-fg: var(--sl-color-foreground-plain, var(--dna-text-color, #1d1d1f)); --dt-vz-muted: var(--sl-color-foreground-accent-grey-subtlest, #6e6e73); --dt-vz-surface: var(--dna-foreground, #fff); --dt-vz-group: rgba(120,120,128,.08); --dt-vz-sep: rgba(60,60,67,.12); --dt-vz-accent: var(--dna-primary, #007aff); --dt-vz-font: inherit; }
+      .dt-vz-tabbtn { appearance: none; border: 0; background: transparent; color: var(--dt-vz-fg); font: 400 14px/20px var(--dt-vz-font); padding: 6px 16px 10px; margin-left: 2px; cursor: pointer; position: relative; border-radius: 6px 6px 0 0; }
+      .dt-vz-tabbtn:hover { background: color-mix(in srgb, var(--dt-vz-accent) 10%, transparent); }
+      .dt-vz-tabbtn.is-active { color: var(--dt-vz-accent); }
+      .dt-vz-tabbtn.is-active::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: var(--dt-vz-accent); }
       dna-tab-bar.dt-vz-on dna-tab-button[selected] { --color: var(--dt-vz-muted); --_color: var(--dt-vz-muted); --background: transparent; --_background: transparent; font-weight: 500; }
       #dt-vz { padding: 0 1rem 1.5rem; font-family: var(--dt-vz-font); color: var(--dt-vz-fg); }
       #dt-vz[hidden] { display: none; }

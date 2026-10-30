@@ -125,3 +125,27 @@ html.dt-dark .dt-widget a { color: #8fb6e6; }
 #dt-panel .dt-btn { border-radius: 10px; }
 #dt-panel textarea { border: 0; border-radius: 10px; background: var(--dt-panel-bg); color: var(--dt-fg); }
 #dt-panel .dt-tablerow { border-bottom-color: color-mix(in srgb, var(--dt-fg) 10%, transparent); }
+
+/* Startscherm: samenvattingschips onder de datum (neutraal; Apple-thema's kleuren ze verder in) */
+.dt-summary { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 14px; }
+.dt-summary:empty { display: none; }
+.dt-chip { --k: #1f97f9; display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 11px 0 9px; border-radius: 13px; background: #fff; border: 1px solid #dfe3e8; color: #424242; font: 500 12px/1 inherit; font-family: inherit; white-space: nowrap; }
+.dt-chip i { width: 8px; height: 8px; border-radius: 50%; background: var(--k); }
+.dt-chip-done { --k: #28a745; } .dt-chip-wijz { --k: #ff9a42; } .dt-chip-jarig { --k: #FF2D55; }
+html.dt-dark .dt-chip { background: #2b313b; border-color: #3a4150; color: #e8eaee; }
+/* Kaart Jarig op Vandaag (neutraal) */
+.dt-jarig-badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: #FF2D55; color: #fff; font-size: 11px; font-weight: 700; margin-left: 6px; vertical-align: 2px; }
+.dt-jarig-list { list-style: none; margin: 0; padding: 0; }
+.dt-jarig-row { border-bottom: 1px solid #efefef; }
+.dt-jarig-row:last-child { border-bottom: 0; }
+.dt-jarig-row a { display: flex; align-items: center; gap: 12px; padding: 7px 4px; text-decoration: none; color: inherit; }
+.dt-jarig-row a:hover { background: #f2f2f2; }
+.dt-jarig-av { width: 32px; height: 32px; border-radius: 50%; display: inline-grid; place-items: center; background: color-mix(in srgb, var(--k, #1f97f9) 18%, #fff); color: var(--k, #1f97f9); font-size: 12px; font-weight: 700; flex: 0 0 auto; }
+.dt-jarig-today .dt-jarig-av { background: var(--k, #1f97f9); color: #fff; }
+.dt-jarig-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.dt-jarig-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dt-jarig-sub { font-size: 11px; color: #666; }
+.dt-jarig-when { font-size: 11px; color: #666; white-space: nowrap; }
+.dt-jarig-today .dt-jarig-when { color: #FF2D55; font-weight: 700; }
+.dt-jarig-empty { color: #666; font-size: 12px; padding: 2px 4px 6px; }
+html.dt-dark .dt-jarig-row { border-bottom-color: #2b313b; } html.dt-dark .dt-jarig-row a:hover { background: #222831; } html.dt-dark .dt-jarig-sub, html.dt-dark .dt-jarig-when, html.dt-dark .dt-jarig-empty { color: #9aa3b2; }

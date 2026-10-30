@@ -1257,6 +1257,11 @@ function appleShadowCss(p, dark, accent) {
     :host(att-dk-student-selector) .selector > dna-avatar { --size: 48px !important; --_size: 48px !important; --background: ${t.tint} !important; --_background: ${t.tint} !important; --color: ${t.accent} !important; --_color: ${t.accent} !important; --font-weight: 600 !important; --_font-weight: 600 !important; }
     :host(dna-tab-bar) .fade { background: transparent !important; box-shadow: none !important; }
     :host(dna-tab-bar) .indicator { display: none !important; }
+    /* Tabblad Inzicht (verzuiminzicht) als capsule, zoals de andere tabbladen in de Apple-thema's */
+    .dt-vz-tabbtn { font: 500 .875rem/1.25 ${t.font} !important; padding: .375rem .875rem !important; border-radius: 999px !important; color: ${t.muted} !important; margin-left: .25rem !important; }
+    .dt-vz-tabbtn:hover { background: ${t.hover} !important; color: ${t.fg} !important; }
+    .dt-vz-tabbtn.is-active { background: ${t.tint} !important; color: ${t.accent} !important; font-weight: 600 !important; }
+    .dt-vz-tabbtn.is-active::after { display: none !important; }
     :host(dna-tab-bar) .wrapper { padding-block-end: var(--_spacing, 2px) !important; }
     :host(dna-button.upload-button) button, :host(dna-button.upload-button) .button, :host(dna-button.upload-button) a { border: 0 !important; background: transparent !important; color: #fff !important; padding: 0 !important; }
     /* Avatar met naam en hint eronder (profielkaart) */

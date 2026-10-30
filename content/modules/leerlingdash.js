@@ -284,21 +284,21 @@ DT.register({
       #dt-ll-dash .dt-ll-toest dna-card { --background: transparent; --_background: transparent; --box-shadow: none; --_box-shadow: none; --border: 0; --_border: 0; --border-width: 0; --_border-width: 0; --body-padding: 0; --_body-padding: 0; --header-padding: 0; --_header-padding: 0; min-height: 0; height: auto; -webkit-backdrop-filter: none; backdrop-filter: none; }
       #dt-ll-dash .dt-ll-toest dna-card-title { display: none; }
       #dt-ll-dash .dt-ll-toest .antwoorden-wrapper { margin-top: -4px; }
-      #dt-ll-dash .dt-ll-toest .answer-entry { margin: 0; padding: 4px 0; font: 400 .75rem/1.3 -apple-system, system-ui, sans-serif; align-items: center; width: auto; }
+      #dt-ll-dash .dt-ll-toest .answer-entry { margin: 0; padding: 4px 0; font: 400 .75rem/1.3 inherit; align-items: center; width: auto; }
       #dt-ll-dash .dt-ll-toest .permission-type { flex: 1 1 auto; min-width: 0; white-space: normal; overflow-wrap: anywhere; padding: 0 .5rem; }
       #dt-ll-dash .dt-ll-toest .dna-card-footer { justify-content: flex-start; }
-      #dt-ll-dash .dt-ll-toest .last-modified-message { margin: 4px 0 0; font: 400 .6875rem/1.2 -apple-system, system-ui, sans-serif; color: #8e8e93; text-align: left; }
+      #dt-ll-dash .dt-ll-toest .last-modified-message { margin: 4px 0 0; font: 400 .6875rem/1.2 inherit; color: #8e8e93; text-align: left; }
       #dt-ll-dash .dt-ll-tile[data-kind="aanwezig"] { --k: #34C759; } #dt-ll-dash .dt-ll-tile[data-kind="rooster"] { --k: #007AFF; } #dt-ll-dash .dt-ll-tile[data-kind="logboek"] { --k: #AF52DE; } #dt-ll-dash .dt-ll-tile[data-kind="taken"] { --k: #FF9500; } #dt-ll-dash .dt-ll-tile[data-kind="terugkom"] { --k: #FF3B30; } #dt-ll-dash .dt-ll-tile[data-kind="jarig"] { --k: #FF2D55; } #dt-ll-dash .dt-ll-tile[data-kind="toest"] { --k: #5856D6; }
       #dt-ll-dash .dt-ll-tile.is-hot { background: color-mix(in srgb, var(--k) 12%, #fff); }
       #dt-ll-dash .dt-ll-tile.is-err { opacity: .6; }
       #dt-ll-dash .dt-ll-ico { grid-area: ico; width: 30px; height: 30px; border-radius: 50%; display: inline-grid; place-items: center; background: color-mix(in srgb, var(--k) 16%, #fff); color: var(--k); }
       #dt-ll-dash .dt-ll-tile.is-hot .dt-ll-ico { background: var(--k); color: #fff; }
-      #dt-ll-dash .dt-ll-num { grid-area: num; font: 700 1.75rem/1 -apple-system, system-ui, sans-serif; letter-spacing: -.03em; color: #6e6e73; }
+      #dt-ll-dash .dt-ll-num { grid-area: num; font: 700 1.75rem/1 inherit; letter-spacing: -.03em; color: #6e6e73; }
       #dt-ll-dash .dt-ll-tile.is-hot .dt-ll-num { color: var(--k); }
-      #dt-ll-dash .dt-ll-label { grid-area: label; font: 500 .75rem/1.25 -apple-system, system-ui, sans-serif; color: #6e6e73; overflow-wrap: anywhere; }
+      #dt-ll-dash .dt-ll-label { grid-area: label; font: 500 .75rem/1.25 inherit; color: #6e6e73; overflow-wrap: anywhere; }
       #dt-ll-dash .dt-ll-label::first-letter { text-transform: uppercase; }
       #dt-ll-dash .dt-ll-tile.is-hot .dt-ll-label { color: inherit; }
-      #dt-ll-dash .dt-ll-sub { grid-area: sub; font: 400 .6875rem/1.3 -apple-system, system-ui, sans-serif; color: #8e8e93; }
+      #dt-ll-dash .dt-ll-sub { grid-area: sub; font: 400 .6875rem/1.3 inherit; color: #8e8e93; }
       /* Grote tegel aanwezigheid */
       #dt-ll-dash .dt-ll-hero { justify-content: space-between; }
       #dt-ll-dash .dt-ll-hero-top { display: flex; align-items: center; gap: 14px; }
@@ -307,16 +307,16 @@ DT.register({
       #dt-ll-dash .dt-ll-hero .dt-ll-sub { font-size: .75rem; }
       #dt-ll-dash .dt-ll-ringwrap { position: relative; width: 72px; height: 72px; flex: 0 0 auto; color: #6e6e73; }
       #dt-ll-dash .dt-ll-ring { display: block; width: 72px; height: 72px; }
-      #dt-ll-dash .dt-ll-ringnum { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; white-space: nowrap; font: 700 1.125rem/1 -apple-system, system-ui, sans-serif; letter-spacing: -.03em; color: #1D1D1F; }
+      #dt-ll-dash .dt-ll-ringnum { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; white-space: nowrap; font: 700 1.125rem/1 inherit; letter-spacing: -.03em; color: #1D1D1F; }
       #dt-ll-dash .dt-ll-ringnum small { font-size: .625rem; font-weight: 600; margin-left: 1px; }
       #dt-ll-dash .dt-ll-hrows { display: flex; flex-direction: column; gap: 7px; margin-top: 2px; }
       #dt-ll-dash .dt-ll-hrow { display: grid; grid-template-columns: 2.25rem 1fr 2.75rem; align-items: center; gap: 8px; }
-      #dt-ll-dash .dt-ll-hlabel { font: 500 .625rem/1 -apple-system, system-ui, sans-serif; color: #8e8e93; text-transform: uppercase; letter-spacing: .04em; }
+      #dt-ll-dash .dt-ll-hlabel { font: 500 .625rem/1 inherit; color: #8e8e93; text-transform: uppercase; letter-spacing: .04em; }
       #dt-ll-dash .dt-ll-hbar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: rgba(60,60,67,.07); }
       #dt-ll-dash .dt-ll-hseg { display: block; height: 100%; min-width: 2px; }
       #dt-ll-dash .dt-ll-hseg + .dt-ll-hseg { border-left: 1px solid rgba(255,255,255,.7); }
-      #dt-ll-dash .dt-ll-hpct { font: 600 .6875rem/1 -apple-system, system-ui, sans-serif; color: #6e6e73; text-align: right; }
-      #dt-ll-dash .dt-ll-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; font: 400 .6875rem/1.2 -apple-system, system-ui, sans-serif; color: #8e8e93; }
+      #dt-ll-dash .dt-ll-hpct { font: 600 .6875rem/1 inherit; color: #6e6e73; text-align: right; }
+      #dt-ll-dash .dt-ll-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; font: 400 .6875rem/1.2 inherit; color: #8e8e93; }
       #dt-ll-dash .dt-ll-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; }
       /* Grote tegel vandaag: rooster */
       #dt-ll-dash .dt-ll-lessen { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -324,17 +324,17 @@ DT.register({
       #dt-ll-dash .dt-ll-les.is-current { background: rgba(0,122,255,.1); }
       #dt-ll-dash .dt-ll-les.is-past { opacity: .5; }
       #dt-ll-dash .dt-ll-les.is-vervallen .dt-ll-vak { text-decoration: line-through; }
-      #dt-ll-dash .dt-ll-tijd { grid-area: tijd; display: flex; flex-direction: column; font: 600 .75rem/1.2 -apple-system, system-ui, sans-serif; }
-      #dt-ll-dash .dt-ll-tijd small { font: 400 .625rem/1.2 -apple-system, system-ui, sans-serif; color: #8e8e93; }
-      #dt-ll-dash .dt-ll-vak { grid-area: vak; font: 500 .8125rem/1.25 -apple-system, system-ui, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      #dt-ll-dash .dt-ll-meta { grid-area: meta; font: 400 .6875rem/1.25 -apple-system, system-ui, sans-serif; color: #8e8e93; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #dt-ll-dash .dt-ll-tijd { grid-area: tijd; display: flex; flex-direction: column; font: 600 .75rem/1.2 inherit; }
+      #dt-ll-dash .dt-ll-tijd small { font: 400 .625rem/1.2 inherit; color: #8e8e93; }
+      #dt-ll-dash .dt-ll-vak { grid-area: vak; font: 500 .8125rem/1.25 inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #dt-ll-dash .dt-ll-meta { grid-area: meta; font: 400 .6875rem/1.25 inherit; color: #8e8e93; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       #dt-ll-dash .dt-ll-meta em { font-style: normal; color: #FF3B30; }
       /* Logboek met laatste notitie */
       #dt-ll-dash .dt-ll-lb { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "type date" "text text"; gap: 2px 8px; padding: 8px 10px; border-radius: 10px; background: rgba(60,60,67,.06); }
-      #dt-ll-dash .dt-ll-lb-type { grid-area: type; font: 600 .75rem/1.25 -apple-system, system-ui, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      #dt-ll-dash .dt-ll-lb-date { grid-area: date; font: 400 .6875rem/1.25 -apple-system, system-ui, sans-serif; color: #8e8e93; }
-      #dt-ll-dash .dt-ll-lb-text { grid-area: text; font: 400 .75rem/1.35 -apple-system, system-ui, sans-serif; color: #6e6e73; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-      #dt-ll-dash .dt-ll-empty, #dt-ll-dash .dt-ll-loading { margin: 0; font: 400 .75rem/1.3 -apple-system, system-ui, sans-serif; color: #8e8e93; }
+      #dt-ll-dash .dt-ll-lb-type { grid-area: type; font: 600 .75rem/1.25 inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #dt-ll-dash .dt-ll-lb-date { grid-area: date; font: 400 .6875rem/1.25 inherit; color: #8e8e93; }
+      #dt-ll-dash .dt-ll-lb-text { grid-area: text; font: 400 .75rem/1.35 inherit; color: #6e6e73; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+      #dt-ll-dash .dt-ll-empty, #dt-ll-dash .dt-ll-loading { margin: 0; font: 400 .75rem/1.3 inherit; color: #8e8e93; }
     `;
     document.head.append(this._style);
   }
