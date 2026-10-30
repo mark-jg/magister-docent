@@ -770,7 +770,23 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     /* Het grote vlak onder de paginakop doorzichtig: kaarten liggen los op de gegroepeerde achtergrond */
     section.main, section.dna-main-no-subheader, ui-view[name="main"] > * > section { background: transparent !important; box-shadow: none !important; border: 0 !important; }
     .head-bar h1, ui-view[name="main"] h1 { color: ${t.fg} !important; font: 700 1.75rem/2.125rem ${t.font} !important; letter-spacing: -.02em; }
-    .head-bar h1:after { background: ${t.accent} !important; }
+    .head-bar h1:after { display: none !important; }
+    .head-bar h1 a, .head-bar h1 a span, .head-bar h1 > span { color: ${t.fg} !important; }
+    .head-bar h1 a i { color: ${t.accent} !important; }
+    /* "Les verantwoord" / "nog niet verantwoord" onder de lestitel als rustig label */
+    .verantwoord-container .verantwoord { height: 24px !important; align-items: center; gap: 5px; padding: 0 10px 0 8px !important; border-radius: 999px; font: 500 .75rem/24px ${t.font} !important; }
+    .verantwoord-container .verantwoord i { font-size: .75rem !important; padding: 0 !important; }
+    .verantwoord-container .verantwoord.wel { color: ${t.dark ? t.green : "#1E7B34"} !important; background: ${rgba(t.green, t.dark ? .2 : .13)} !important; }
+    .verantwoord-container .verantwoord.niet { color: ${t.dark ? t.red : "#C4271D"} !important; background: ${rgba(t.red, t.dark ? .2 : .11)} !important; }
+    /* Tabbladen van het lesdashboard (fotoboek, leerlinglijst, ...) als segmentknop */
+    ld-menu .page-nav, .page-nav:has(> ul.tabs) { background: transparent !important; border: 0 !important; box-shadow: none !important; height: auto !important; line-height: normal !important; padding: 0 !important; margin: 6px 0 12px !important; text-align: left !important; }
+    .page-nav > ul.tabs { display: inline-flex !important; flex-wrap: nowrap; gap: 2px; max-width: 100%; overflow-x: auto; scrollbar-width: none; box-sizing: border-box; height: auto !important; padding: 3px !important; border: 0 !important; border-radius: 999px !important; background: ${t.glass ? t.glassBg : t.gray6} !important; box-shadow: ${t.glass ? t.glassEdge : "none"} !important; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} }
+    .page-nav > ul.tabs::-webkit-scrollbar { display: none; }
+    .page-nav > ul.tabs > li { float: none !important; flex: none; height: auto !important; margin: 0 !important; border: 0 !important; background: transparent !important; }
+    .page-nav > ul.tabs > li > a { display: block !important; height: 30px !important; line-height: 30px !important; padding: 0 14px !important; border: 0 !important; border-radius: 999px !important; background: transparent !important; box-shadow: none !important; color: ${t.muted} !important; font: 500 .8125rem/30px ${t.font} !important; white-space: nowrap; transition: background .12s, color .12s; }
+    .page-nav > ul.tabs > li > a:hover { color: ${t.fg} !important; background: ${t.hover} !important; }
+    .page-nav > ul.tabs > li.active > a { height: 30px !important; border-top: 0 !important; background: ${t.dark ? "rgba(255,255,255,.14)" : t.surface} !important; color: ${t.fg} !important; font-weight: 600 !important; box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 0 0 .5px rgba(0,0,0,.04) !important; }
+    .page-nav > ul.tabs > li.active > a::after { display: none !important; }
     .head-bar, .page-header, [class*="page-header"], header:not(#dt-panel *), .main-header, .detail-header, [class*="detail-header"] { box-shadow: none !important; border: 0 !important; background: transparent !important; color: ${t.fg} !important; }
     .head-bar div a i.ico { background: ${t.tint} !important; color: ${t.accent} !important; transition: background .12s; }
     .head-bar div a:hover i.ico { background: ${t.tintStrong} !important; }
@@ -1144,6 +1160,36 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     aside .student-pass > div a { color: ${t.accent} !important; text-decoration: none !important; font: 500 .8125rem/1.3 ${t.font} !important; }
     aside .student-pass > div a::after { content: "›"; margin-left: 4px; }
     aside .student-pass > h2:only-of-type { grid-row: 1; }
+    /* Zijbalk 'weergave': Deze les (label boven waarde, niets afgekapt) en vorige/volgende als knoppen */
+    aside ld-lesdetails-panel .list { margin: 0 -8px !important; background: transparent !important; }
+    aside .list li.double-line { height: auto !important; min-height: 0 !important; line-height: 1.3 !important; padding: 8px 0 !important; border-radius: 10px; background: transparent !important; }
+    aside .list li.double-line::after { left: 8px; right: 8px; }
+    aside .list li.double-line:hover { background: transparent !important; }
+    aside .list li.double-line > a { display: flex !important; flex-direction: column; align-items: flex-start !important; gap: 2px !important; height: auto !important; padding: 0 8px !important; white-space: normal !important; }
+    aside .list li.double-line > a::after { display: none !important; }
+    aside .list li.double-line strong, aside .list li.double-line .list-head { display: block; color: ${t.muted} !important; font: 500 .75rem/1.3 ${t.font} !important; }
+    aside .list li.double-line .value, aside .list li.double-line .single-line { color: ${t.fg} !important; font: 400 .875rem/1.35 ${t.font} !important; white-space: normal !important; overflow: visible !important; text-overflow: clip !important; max-width: none !important; width: auto !important; float: none !important; height: auto !important; }
+    aside .list li.double-line .single-line .value { display: inline !important; font-variant-numeric: tabular-nums; }
+    aside .widget footer.endlink { display: flex !important; justify-content: space-between; align-items: center; gap: 8px; position: static !important; height: auto !important; background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 4px 16px 16px !important; }
+    aside .widget footer.endlink a { float: none !important; position: static !important; display: inline-flex !important; align-items: center; gap: 4px; height: 30px !important; line-height: 30px !important; padding: 0 14px !important; border-radius: 999px !important; background: ${t.tint} !important; color: ${t.accent} !important; font: 500 .8125rem/30px ${t.font} !important; text-decoration: none !important; }
+    aside .widget footer.endlink a:hover { background: ${t.tintStrong} !important; }
+    aside .widget footer.endlink a.disabled { background: ${t.gray6} !important; color: ${t.muted} !important; opacity: .7; pointer-events: none; }
+    aside ld-lesdetails-panel footer.endlink a#lesdashboard-lesdetails-vorige::before { content: "‹"; font-size: 1rem; line-height: 1; }
+    aside ld-lesdetails-panel footer.endlink a#lesdashboard-lesdetails-volgende::after { content: "›"; font-size: 1rem; line-height: 1; }
+    /* Werkbalk snelle aanwezigheid boven de leerlinglijst */
+    #leerlinglijst .dt-att-bar { background: transparent !important; border: 0 !important; padding: 0 2px !important; margin: 0 0 10px !important; gap: 8px !important; font: 400 .75rem/1.3 ${t.font} !important; color: ${t.muted} !important; }
+    #leerlinglijst .dt-att-bar .dt-btn { height: 32px; padding: 0 14px !important; gap: 6px; border: 0 !important; border-radius: 999px !important; font: 500 .8125rem/1 ${t.font} !important; background: ${t.glass ? t.glassStrong : t.surface} !important; color: ${t.fg} !important; box-shadow: ${t.glass ? `${t.glassEdge}, 0 1px 3px rgba(0,0,0,.08)` : t.card} !important; transition: background .12s, transform .12s; }
+    #leerlinglijst .dt-att-bar .dt-btn:hover { background: ${t.glass ? (t.dark ? "rgba(72,72,74,.85)" : "rgba(255,255,255,.95)") : t.hover} !important; }
+    #leerlinglijst .dt-att-bar .dt-btn:active { transform: scale(.97); }
+    #leerlinglijst .dt-att-bar .dt-btn-primary { background: ${t.accent} !important; color: #fff !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 2px 8px ${rgba(accent, .3)} !important; }
+    #leerlinglijst .dt-att-bar .dt-btn-primary:hover { background: ${mix(accent, dark ? "#ffffff" : "#000000", .08)} !important; }
+    #leerlinglijst .dt-att-bar kbd { border: 0 !important; min-width: 18px; height: 18px; line-height: 18px !important; padding: 0 5px; border-radius: 5px; background: ${t.dark ? "rgba(118,118,128,.32)" : "rgba(118,118,128,.14)"} !important; color: ${t.fg} !important; font: 600 .6875rem/18px ${t.font} !important; box-shadow: none !important; }
+    #leerlinglijst .dt-att-bar .dt-att-shortcut kbd { color: ${t.muted} !important; }
+    #leerlinglijst .dt-att-search svg { left: 11px; color: ${t.muted}; }
+    #leerlinglijst .dt-att-input { width: 200px; height: 32px; padding: 0 12px 0 30px; border: 0 !important; border-radius: 999px !important; background: ${t.glass ? t.glassBg : (t.dark ? "rgba(118,118,128,.24)" : "rgba(118,118,128,.12)")} !important; box-shadow: ${t.glass ? t.glassEdge : "none"} !important; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} color: ${t.fg} !important; font: 400 .8125rem/32px ${t.font} !important; outline: 0 !important; }
+    #leerlinglijst .dt-att-input::placeholder { color: ${t.muted}; }
+    #leerlinglijst .dt-att-input:focus { box-shadow: ${t.focus} !important; }
+    #leerlinglijst .dt-att-legend { gap: 4px 12px; color: ${t.muted}; }
     /* Minikalender (datepicker): geen celranden, vandaag in accent, keuze als gevulde cirkel */
     div.calendar table, div[uib-datepicker] table, .content-pane div.calendar table { border: 0 !important; border-collapse: separate !important; border-spacing: 0 2px !important; }
     div.calendar, div[uib-datepicker] { padding: 6px 8px 2px !important; max-width: none !important; }

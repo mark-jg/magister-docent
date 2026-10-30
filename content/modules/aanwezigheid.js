@@ -70,18 +70,24 @@ DT.register({
     const host = document.querySelector("#leerlinglijst");
     if (!host || host.querySelector(".dt-att-bar")) return;
     const cols = this.columns(grid);
-    const legend = cols.filter((c) => c.key).map((c) => `${c.key.toUpperCase()} = ${c.label}`).join(" · ");
+    const mac = /Mac/i.test(navigator.platform || navigator.userAgent || "");
+    const kbd = (t) => DT.el("kbd", { text: t });
+    const legend = DT.el("span", { class: "dt-att-legend", title: "Toetsen in de toetsenbordmodus" },
+      cols.filter((c) => c.key).map((c) => DT.el("span", { class: "dt-att-key" }, [kbd(c.key.toUpperCase()), DT.el("span", { text: c.label })])));
 
-    const search = DT.el("input", { type: "text", placeholder: "Spring naar naam…", "aria-label": "Zoek leerling", class: "dt-btn", style: "width:170px" });
+    const search = DT.el("input", { type: "search", placeholder: "Spring naar naam…", "aria-label": "Zoek leerling", class: "dt-att-input" });
     search.addEventListener("input", () => this.jumpTo(DT, search.value));
     search.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); this.startKeyboard(DT, this._row); search.blur(); } });
+    const zoek = DT.el("label", { class: "dt-att-search" }, [search]);
+    zoek.insertAdjacentHTML("afterbegin", '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="4.75" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10.6 10.6 14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>');
 
-    const bar = DT.el("div", { class: "dt-table-tools dt-att-bar" }, [
-      DT.el("span", { text: "Docent Tools:" }),
-      DT.el("button", { class: "dt-btn dt-btn-sm dt-btn-primary", text: "Iedereen aanwezig", onclick: () => this.allPresent(DT) }),
-      DT.el("button", { class: "dt-btn dt-btn-sm", text: "Toetsenbord (Alt+A)", onclick: () => this.startKeyboard(DT, 0) }),
-      search,
-      DT.el("span", { style: "opacity:.8", text: legend })
+    const alle = DT.el("button", { class: "dt-btn dt-btn-sm dt-btn-primary dt-att-all", onclick: () => this.allPresent(DT) }, [DT.el("span", { text: "Iedereen aanwezig" })]);
+    alle.insertAdjacentHTML("afterbegin", '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+    const toets = DT.el("button", { class: "dt-btn dt-btn-sm dt-att-kbdbtn", title: "Toetsenbordmodus (" + (mac ? "⌥A" : "Alt+A") + ")", onclick: () => this.startKeyboard(DT, 0) },
+      [DT.el("span", { text: "Toetsenbord" }), DT.el("span", { class: "dt-att-shortcut" }, [kbd(mac ? "⌥" : "Alt"), kbd("A")])]);
+
+    const bar = DT.el("div", { class: "dt-table-tools dt-att-bar", "aria-label": "Docent Tools: snelle aanwezigheid" }, [
+      alle, toets, zoek, legend
     ]);
     host.insertBefore(bar, host.firstChild);
   },
@@ -133,7 +139,7 @@ DT.register({
   },
 
   onKey(DT, e) {
-    if (e.altKey && !e.ctrlKey && !e.metaKey && e.key.toLowerCase() === "a") {
+    if (e.altKey && !e.ctrlKey && !e.metaKey && (e.code === "KeyA" || e.key.toLowerCase() === "a")) {
       if (this.grid()) { e.preventDefault(); this._active ? this.stopKeyboard() : this.startKeyboard(DT, this._row); }
       return;
     }

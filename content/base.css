@@ -34,6 +34,17 @@ html.dt-dark {
 
 /* Balk (alleen nog bij snelle aanwezigheid) */
 .dt-table-tools { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 8px 0; padding: 6px 8px; font: 12px var(--dt-font); color: var(--dt-muted); background: color-mix(in srgb, var(--dt-accent) 6%, transparent); border: 1px solid color-mix(in srgb, var(--dt-accent) 20%, transparent); border-radius: var(--dt-radius); }
+/* Werkbalk snelle aanwezigheid (leerlinglijst): neutrale basis die in het standaardthema past */
+.dt-att-bar { gap: 8px; }
+.dt-att-bar svg { flex: none; }
+.dt-att-bar kbd { display: inline-block; min-width: 16px; padding: 0 4px; border: 1px solid var(--dt-line); border-bottom-width: 2px; border-radius: 4px; font: 600 10px/14px var(--dt-font); text-align: center; color: var(--dt-fg); background: var(--dt-bg); box-sizing: border-box; }
+.dt-att-shortcut { display: inline-flex; gap: 2px; margin-left: 2px; }
+.dt-att-search { position: relative; display: inline-flex; align-items: center; }
+.dt-att-search svg { position: absolute; left: 8px; color: var(--dt-muted); pointer-events: none; }
+.dt-att-input { font: 12px var(--dt-font); width: 170px; height: 26px; padding: 0 8px 0 26px; border: 1px solid var(--dt-line); border-radius: 7px; background: var(--dt-bg); color: var(--dt-fg); box-sizing: border-box; }
+.dt-att-input:focus { outline: 2px solid var(--dt-gold); outline-offset: 1px; }
+.dt-att-legend { display: inline-flex; flex-wrap: wrap; gap: 4px 10px; margin-left: auto; color: var(--dt-muted); }
+.dt-att-key { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 
 /* Zwevend exportknopje */
 #dt-table-chip { position: fixed; z-index: 2147482500; display: inline-flex; align-items: center; gap: 6px; font: 600 12px/1 var(--dt-font); padding: 6px 10px; border: 0; border-radius: 999px; background: var(--dt-accent); color: var(--dt-accent-ink); box-shadow: 0 4px 14px rgba(0,0,0,.18); cursor: pointer; opacity: 0; transform: translateY(-4px) scale(.96); pointer-events: none; transition: opacity .15s, transform .15s; }
