@@ -774,6 +774,24 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     .head-bar, .page-header, [class*="page-header"], header:not(#dt-panel *), .main-header, .detail-header, [class*="detail-header"] { box-shadow: none !important; border: 0 !important; background: transparent !important; color: ${t.fg} !important; }
     .head-bar div a i.ico { background: ${t.tint} !important; color: ${t.accent} !important; transition: background .12s; }
     .head-bar div a:hover i.ico { background: ${t.tintStrong} !important; }
+    /* Tekstknoppen en keuzemenu's in de kopbalk (lesdashboard: leerlingen, verantwoorden, registraties) */
+    .head-bar div a.text-menu, .head-bar div.sub > a { color: ${t.accent} !important; background: ${t.tint} !important; border-radius: 999px !important; height: 32px !important; line-height: 32px !important; margin: 5px 0 0 !important; padding: 0 !important; font: 500 .8125rem/32px ${t.font} !important; transition: background .12s; }
+    .head-bar div a.text-menu span, .head-bar div.sub > a span { color: inherit !important; line-height: 32px !important; padding: 0 14px !important; display: inline-block !important; }
+    .head-bar div a.text-menu:hover, .head-bar div.sub > a:hover { background: ${t.tintStrong} !important; color: ${t.accent} !important; }
+    .head-bar div a.text-menu.disabled, .head-bar div.sub.disabled > a, .head-bar div a.disabled.text-menu { color: ${t.muted} !important; background: ${t.gray6} !important; opacity: .8 !important; }
+    .head-bar div.sub > a { padding-right: 18px !important; }
+    .head-bar div.sub:after { color: ${t.accent} !important; line-height: 42px !important; right: 6px !important; }
+    .head-bar div.sub.disabled:after { color: ${t.muted} !important; }
+    .head-bar div.sub ul { background: ${t.surface} !important; border: 0 !important; border-radius: 12px !important; box-shadow: ${t.pop} !important; padding: 6px !important; top: 42px !important; }
+    .head-bar div.sub ul:after { display: none !important; }
+    .head-bar div.sub ul li { padding: 0 !important; }
+    .head-bar div.sub ul li a { color: ${t.fg} !important; background: transparent !important; border-radius: 8px !important; padding: 0 12px !important; height: 32px !important; line-height: 32px !important; font: 400 .8125rem/32px ${t.font} !important; margin: 0 !important; }
+    .head-bar div.sub ul li a:hover, .head-bar div.sub ul li.active a { background: ${t.tint} !important; color: ${t.accent} !important; }
+    .head-bar div.sub ul li a.disabled { color: ${t.muted} !important; }
+    /* Primaire knoppen (dialogen, voetbalken) */
+    a.primary, .btn.primary, .registeren-footer .primary, footer.endlink a.primary { background: ${t.accent} !important; border: 0 !important; color: #fff !important; border-radius: 10px !important; font: 600 .875rem/40px ${t.font} !important; height: 40px !important; }
+    a.primary:hover, .btn.primary:hover { background: ${mix(accent, dark ? "#ffffff" : "#000000", .08)} !important; color: #fff !important; }
+    a.primary.disabled, .btn.primary.disabled { background: ${t.gray6} !important; color: ${t.muted} !important; }
     .head-bar .tabs li a { color: ${t.muted} !important; }
 
     /* ---- Oude widgets (Tahoma 11px) ---- */
@@ -880,6 +898,55 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     .list li .special, .list li span.special, ul.list div a .special { display: inline-flex !important; align-items: center; justify-content: center; float: none !important; width: auto !important; min-width: 1.5rem; height: 1.375rem !important; padding: 0 .5rem; margin: 0 .25rem 0 0 !important; border-radius: 999px; background: ${t.tint}; color: ${t.accent}; font-weight: 600; font-size: .75rem; line-height: 1 !important; text-align: center; }
     .geen-afspraken-tekst, .geen-mededelingen-tekst { color: ${t.muted} !important; }
 
+    /* ---- Leerlinglijst van de les (lesdashboard, ui-grid) ---- */
+    #leerlinglijst .acl-collapse-header { background: transparent !important; border: 0 !important; height: 36px !important; line-height: 36px !important; padding: 0 6px !important; color: ${t.muted} !important; font: 600 .6875rem/36px ${t.font} !important; letter-spacing: .06em; text-transform: uppercase; }
+    #leerlinglijst .acl-collapse-caption { font-weight: 600 !important; color: ${t.muted} !important; }
+    #leerlinglijst .verantwoording-absent-container .acl-collapse-caption { color: ${t.red} !important; }
+    #leerlinglijst .verantwoording-grid-container { height: calc(100% - 36px) !important; }
+    #leerlinglijst .ui-grid { background: ${t.surface} !important; border: 0 !important; border-radius: 16px !important; box-shadow: ${t.card} !important; overflow: hidden; }
+    #leerlinglijst .ui-grid-contents-wrapper, #leerlinglijst .ui-grid-render-container, #leerlinglijst .ui-grid-viewport, #leerlinglijst .ui-grid-canvas, #leerlinglijst .ui-grid-header, #leerlinglijst .ui-grid-top-panel, #leerlinglijst .ui-grid-header-viewport, #leerlinglijst .ui-grid-footer-panel, #leerlinglijst .ui-grid-footer-viewport { background: transparent !important; border: 0 !important; }
+    #leerlinglijst .ui-grid-header-cell, #leerlinglijst .ui-grid-header-cell-row { border: 0 !important; background: transparent !important; }
+    #leerlinglijst .ui-grid-header { border-bottom: 1px solid ${t.sepSoft} !important; }
+    #leerlinglijst .ui-grid-header-cell .ui-grid-cell-contents, #leerlinglijst .ui-grid-header-cell-label { color: ${t.muted} !important; font: 600 .6875rem/32px ${t.font} !important; letter-spacing: .04em; text-transform: uppercase; }
+    #leerlinglijst .ui-grid-header-cell:hover { background: transparent !important; }
+    #leerlinglijst .ui-grid-header-cell .ui-grid-column-menu-button { display: none !important; }
+    #leerlinglijst .ui-grid-row, #leerlinglijst .ui-grid-row > div { background: transparent !important; }
+    #leerlinglijst .ui-grid-row .ui-grid-cell { background: transparent !important; border: 0 !important; border-bottom: 1px solid ${t.sepSoft} !important; color: ${t.fg} !important; }
+    #leerlinglijst .ui-grid-canvas .ui-grid-row > div > div:last-child { border-right: 0 !important; }
+    #leerlinglijst .ui-grid-row:last-child .ui-grid-cell { border-bottom: 0 !important; }
+    #leerlinglijst .ui-grid-row:nth-child(even) .ui-grid-cell { background: transparent !important; }
+    #leerlinglijst .ui-grid-row:hover .ui-grid-cell { background: ${t.hover} !important; }
+    #leerlinglijst .ui-grid-row.ui-grid-row-selected > [ui-grid-row] > .ui-grid-cell { background: ${t.tint} !important; }
+    #leerlinglijst .ui-grid-cell-contents { font: 400 .8125rem/30px ${t.font} !important; padding: 0 8px !important; }
+    #leerlinglijst .leerlinglijst-naam-cell, #leerlinglijst .ui-grid-cell-contents.pointer-cursor { font-weight: 500 !important; }
+    #leerlinglijst .leerlinglijst-presentie-cell, #leerlinglijst .leerlinglijst-presentie-cell > .mg-checkbox-cell { background: ${rgba(t.green, dark ? .14 : .08)} !important; }
+    #leerlinglijst .leerlinglijst-presentie-cell-icon { color: ${t.green} !important; }
+    #leerlinglijst .mg-avatar-image, #leerlinglijst ccl-avatar .avatar { border-radius: 50% !important; }
+    #leerlinglijst .fa-gift { color: #FF2D55 !important; }
+    #leerlinglijst .error, #leerlinglijst .ui-grid-cell-contents.error { background: ${rgba(t.red, .12)} !important; }
+    /* Vinkjes: ronde hoeken, per registratietype een kleur */
+    #leerlinglijst .checkbox-input { height: 30px !important; line-height: 30px !important; margin: 0 !important; width: 100% !important; display: flex !important; align-items: center; justify-content: center; }
+    #leerlinglijst .checkbox-input input[type=checkbox] + label { display: block !important; }
+    #leerlinglijst .checkbox-input input[type=checkbox] + label span { width: 22px !important; height: 22px !important; margin: 0 !important; border-radius: 7px !important; border: 1.5px solid ${t.border} !important; background: ${t.surface} !important; position: relative; transition: background .12s, border-color .12s, transform .08s; }
+    #leerlinglijst .checkbox-input input[type=checkbox] + label span:hover { background: ${t.hover} !important; border-color: ${t.muted} !important; }
+    #leerlinglijst .checkbox-input input[type=checkbox] + label span:after { color: #fff !important; font-size: 13px !important; font-weight: 700 !important; width: 22px !important; height: 22px !important; line-height: 22px !important; left: -1.5px !important; top: -1.5px !important; }
+    #leerlinglijst .checkbox-input input[type=checkbox]:checked + label span { --dt-cb: ${t.accent}; background: var(--dt-cb) !important; border-color: var(--dt-cb) !important; }
+    #leerlinglijst .checkbox-input input[class*="leerlinglijst_present_"]:checked + label span, #leerlinglijst .ui-grid-header-cell:nth-child(6) .checkbox-input input:checked + label span { --dt-cb: ${t.green}; }
+    #leerlinglijst .checkbox-input input[class*="leerlinglijst_absent_"]:checked + label span { --dt-cb: ${t.red}; }
+    #leerlinglijst .checkbox-input input[class*="leerlinglijst_ziek_"]:checked + label span { --dt-cb: #AF52DE; }
+    #leerlinglijst .checkbox-input input[class*="leerlinglijst_teLaat_"]:checked + label span { --dt-cb: #E0B000; }
+    #leerlinglijst .checkbox-input input[class*="leerlinglijst_uitgestuurd_"]:checked + label span { --dt-cb: #A2845E; }
+    #leerlinglijst .checkbox-input input[class*="leerlinglijst_vrijstelling_"]:checked + label span { --dt-cb: #32ADE6; }
+    #leerlinglijst .checkbox-input input[class*="leerlinglijst_huiswerkVergeten_"]:checked + label span, #leerlinglijst .checkbox-input input[class*="leerlinglijst_boekenVergeten_"]:checked + label span, #leerlinglijst .checkbox-input input[class*="leerlinglijst_mobielInKlas_"]:checked + label span { --dt-cb: ${t.muted}; }
+    #leerlinglijst .checkbox-input input[type=checkbox][disabled] + label span { background: ${t.gray6} !important; border-color: transparent !important; opacity: .6; }
+    #leerlinglijst .checkbox-input input[type=checkbox][disabled]:checked + label span { opacity: .55; }
+    #leerlinglijst .suggestion .checkbox-input input[type=checkbox] + label span { border-color: ${t.accent} !important; border-style: dashed !important; }
+    #leerlinglijst .suggestion .checkbox-input input[type=checkbox] + label span:after, #leerlinglijst span.virtualChecked:after { color: ${t.accent} !important; }
+    #leerlinglijst .ui-grid-header-cell:nth-child(6).centered:before { color: ${t.green} !important; }
+    /* Voet met aantallen */
+    #leerlinglijst ui-grid-footer .ui-grid-cell-contents, #leerlinglijst .ui-grid-footer-cell { color: ${t.muted} !important; font: 600 .75rem/30px ${t.font} !important; text-align: center; background: transparent !important; border: 0 !important; }
+    #leerlinglijst .ui-grid-footer-panel { border-top: 1px solid ${t.sepSoft} !important; }
+    #leerlinglijst .verantwoording-no-data { color: ${t.muted} !important; font: 400 .8125rem/1.3 ${t.font} !important; }
     /* ---- Tabellen ---- */
     table.datagrid-table { border-left: 0 !important; }
     table.datagrid-table th, table.datagrid-table thead th, table.datagrid-table tfoot td { background: transparent !important; border: 0 !important; border-bottom: 1px solid ${t.sepSoft} !important; color: ${t.muted} !important; font: 600 .6875rem/36px ${t.font} !important; letter-spacing: .04em; text-transform: uppercase; height: 36px !important; }

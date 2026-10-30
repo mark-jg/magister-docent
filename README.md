@@ -94,6 +94,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.17.0: lesdashboard in de Apple-thema's: de tekstknoppen en keuzemenu's in de kopbalk (leerlingen, verantwoorden, registraties) zijn leesbare capsules met een menu in themastijl; de leerlinglijst van de les is een kaart met rustige koppen, rijen zonder zebra, ronde vinkjes met per registratietype een kleur (present groen, absent rood, ziek paars, te laat geel, uitgestuurd bruin, vrijstelling blauw), gedempte suggesties en een nette telvoet; primaire knoppen in dialogen in accentkleur.
 - 0.16.1: Inzicht: docenten worden ook uit de deelnemers of medewerkers van een afspraak gelezen (naam of code); noemt het rooster geen docenten, dan vervalt het blok per docent en meldt de voettekst dat.
 - 0.16.0: nieuw tabblad "Inzicht" op de verzuimpagina van een leerling: aanwezigheid per vak, per docent, per weekdag en per lesuur (balken met de registratietypen), het verloop per week als lijn, en automatische constateringen (bij welk vak, welke docent of welke dag het verzuim zich concentreert); periode te kiezen (schooljaar, 8 weken, 4 weken). Bijwerken: de repo is openbaar, een GitHub-token is niet meer nodig.
 - 0.15.2: keuzelijsten en leerlinglijsten kregen een vet lettertype door twee te brede themaregels (de naam in de leerlingkiezer en de naam onder een avatar); die gelden nu alleen voor de kop en de profielkaart.
