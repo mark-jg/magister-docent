@@ -31,6 +31,7 @@ html.dt-dark {
 .dt-btn:focus-visible { outline: 2px solid var(--dt-gold); outline-offset: 2px; }
 .dt-btn-primary { background: var(--dt-accent); color: var(--dt-accent-ink); border-color: var(--dt-accent); }
 .dt-btn-sm { padding: 4px 8px; font-size: 12px; }
+.dt-btn[hidden] { display: none !important; }
 
 /* Balk (alleen nog bij snelle aanwezigheid) */
 .dt-table-tools { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 8px 0; padding: 6px 8px; font: 12px var(--dt-font); color: var(--dt-muted); background: color-mix(in srgb, var(--dt-accent) 6%, transparent); border: 1px solid color-mix(in srgb, var(--dt-accent) 20%, transparent); border-radius: var(--dt-radius); }
@@ -138,6 +139,7 @@ html.dt-dark .dt-widget a { color: #8fb6e6; }
 .dt-action kbd { font: 10px ui-monospace, monospace; color: var(--dt-muted); }
 #dt-panel .dt-btn { border-radius: 10px; }
 #dt-panel textarea { border: 0; border-radius: 10px; background: var(--dt-panel-bg); color: var(--dt-fg); }
+#dt-panel .dt-input { border: 0; border-radius: 10px; background: var(--dt-panel-bg); color: var(--dt-fg); color-scheme: light dark; }
 #dt-panel .dt-tablerow { border-bottom-color: color-mix(in srgb, var(--dt-fg) 10%, transparent); }
 
 /* Startscherm: samenvattingschips onder de datum (neutraal; Apple-thema's kleuren ze verder in) */
@@ -163,3 +165,24 @@ html.dt-dark .dt-chip { background: #2b313b; border-color: #3a4150; color: #e8ea
 .dt-jarig-today .dt-jarig-when { color: #FF2D55; font-weight: 700; }
 .dt-jarig-empty { color: #666; font-size: 12px; padding: 2px 4px 6px; }
 html.dt-dark .dt-jarig-row { border-bottom-color: #2b313b; } html.dt-dark .dt-jarig-row a:hover { background: #222831; } html.dt-dark .dt-jarig-sub, html.dt-dark .dt-jarig-when, html.dt-dark .dt-jarig-empty { color: #9aa3b2; }
+
+/* Zijpaneel: periodes */
+.dt-per-list { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.dt-per-row { display: flex; align-items: center; gap: 6px; padding: 6px 4px 6px 8px; border-radius: 10px; }
+.dt-per-row:hover { background: color-mix(in srgb, var(--dt-fg) 5%, transparent); }
+.dt-per-row.is-now { background: color-mix(in srgb, var(--dt-accent) 10%, transparent); }
+.dt-per-name { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.dt-per-name b { font: 600 13px/1.3 var(--dt-font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dt-per-name small { font: 12px/1.3 var(--dt-font); color: var(--dt-muted); }
+.dt-per-now { font: 600 11px/18px var(--dt-font); color: var(--dt-accent); background: color-mix(in srgb, var(--dt-accent) 14%, transparent); border-radius: 999px; padding: 0 7px; }
+.dt-per-act { appearance: none; border: 0; background: transparent; color: var(--dt-muted); width: 26px; height: 26px; border-radius: 50%; display: inline-grid; place-items: center; cursor: pointer; flex: none; }
+.dt-per-act:hover { background: color-mix(in srgb, var(--dt-fg) 8%, transparent); color: var(--dt-fg); }
+.dt-per-act.is-del:hover { color: #FF3B30; }
+.dt-per-empty { margin: 0 0 10px; color: var(--dt-muted); font: 13px/1.4 var(--dt-font); }
+.dt-per-form { display: flex; flex-direction: column; gap: 6px; }
+.dt-per-dates { display: flex; align-items: center; gap: 6px; color: var(--dt-muted); font: 12px var(--dt-font); }
+.dt-per-dates .dt-input { flex: 1; min-width: 0; }
+.dt-input { font: 13px var(--dt-font); height: 32px; padding: 0 10px; border: 1px solid var(--dt-line); border-radius: 8px; background: var(--dt-bg); color: var(--dt-fg); box-sizing: border-box; width: 100%; }
+.dt-input:focus { outline: 2px solid color-mix(in srgb, var(--dt-accent) 45%, transparent); outline-offset: 1px; }
+.dt-per-err { color: #FF3B30; font: 12px/1.3 var(--dt-font); min-height: 0; }
+.dt-per-err:empty { display: none; }

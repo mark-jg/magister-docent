@@ -141,6 +141,22 @@
     },
     deepQuery(selector, root = document) { return DT.deepQueryAll(selector, root)[0] || null; },
 
+    /* Eigen periodes uit de instellingen, gesorteerd, met begin om 00:00 en einde om 23:59:59.
+     * Ongeldige regels (geen datum of einde voor begin) vallen weg. */
+    periodes() {
+      const p = (s) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ""); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; };
+      return (settings?.periodes?.lijst || []).map((x) => {
+        const b = p(x.begin), e = p(x.einde);
+        if (!b || !e || e < b) return null;
+        e.setHours(23, 59, 59, 999);
+        return { id: String(x.id || x.begin), naam: String(x.naam || "Periode").trim() || "Periode", begin: b, einde: e };
+      }).filter(Boolean).sort((a, b) => a.begin - b.begin);
+    },
+    periodeLabel(p, jaar = false) {
+      const f = (d) => d.toLocaleDateString("nl-NL", { day: "numeric", month: "short", ...(jaar ? { year: "numeric" } : {}) });
+      return `${f(p.begin)} – ${f(p.einde)}`;
+    },
+
     /* Reageert op DOM-wijzigingen. MutationObserver ziet geen shadow DOM,
      * daarom wordt er daarnaast periodiek gescand. */
     observe(callback, { debounce = 300, poll = 2000 } = {}) {

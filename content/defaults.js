@@ -15,6 +15,8 @@ globalThis.DT_DEFAULTS = {
   jarig: { enabled: true, dagen: 14 },
   leerlingdash: { enabled: true },
   verzuiminzicht: { enabled: true },
+  /* Eigen periodes (bijv. onderwijsperiodes): { id, naam, begin: "JJJJ-MM-DD", einde: "JJJJ-MM-DD" } */
+  periodes: { enabled: true, lijst: [] },
   melding: { enabled: true, coaches: [], to: "", cc: "", name: "", extra: true, afzender: "" },
   links: [
     { label: "Magister Web", url: "https://accounts.magister.net" },
@@ -42,6 +44,7 @@ globalThis.DT_MODULES_LIST = [
   ["jarig", "Jarig", "Kaart op Vandaag", "#FF2D55"],
   ["leerlingdash", "Leerlingoverzicht", "Bento op de leerlingkaart", "#FF9500"],
   ["verzuiminzicht", "Inzicht verzuim", "Tabblad op Verzuim", "#AF52DE"],
+  ["periodes", "Periodes", "Eigen periodes in verzuimoverzichten", "#5856D6"],
   ["melding", "Mail bij melding", "Concept naar de coach", "#FF3B30"],
   ["ai", "AI-hulp", "Prompt uit tabel of selectie", "#A2845E"],
   ["panel", "Zijpaneel", "Klok, notities, links (Alt+D)", "#636366"]

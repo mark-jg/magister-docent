@@ -88,10 +88,13 @@ DT.register({
     try {
       const today = new Date(), ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       const sj = new Date(today.getFullYear() - (today.getMonth() < 7 ? 1 : 0), 7, 1);
+      /* Eigen periodes die eerder beginnen (tot een jaar terug) ook kunnen tonen */
+      const vroegst = (DT.periodes?.() || []).map((p) => p.begin).filter((b) => b < sj && b > new Date(sj.getTime() - 366 * 864e5)).sort((a, b) => a - b)[0];
+      const vanaf = vroegst || sj;
       const list = (r) => (r && r.status === 200 && r.json) ? (Array.isArray(r.json) ? r.json : r.json.items || []) : null;
       const [v, a] = await Promise.all([
-        DT.api(`/api/m6/leerlingen/${id}/verantwoordingen?begin=${ymd(sj)}&einde=${ymd(today)}`, { full: true, timeout: 20000 }),
-        DT.api(`/api/leerlingen/${id}/afspraken?status=actief&begin=${ymd(sj)}&einde=${ymd(today)}`, { full: true, timeout: 20000 }),
+        DT.api(`/api/m6/leerlingen/${id}/verantwoordingen?begin=${ymd(vanaf)}&einde=${ymd(today)}`, { full: true, timeout: 20000 }),
+        DT.api(`/api/leerlingen/${id}/afspraken?status=actief&begin=${ymd(vanaf)}&einde=${ymd(today)}`, { full: true, timeout: 20000 }),
       ]);
       const regs = list(v), rooster = list(a);
       this._data = { id, at: Date.now(), regs, rooster, err: { regs: v.status, rooster: a.status }, sj: sj.getTime() };
@@ -104,8 +107,12 @@ DT.register({
     const esc = (s) => String(s ?? "").replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
     if (!d.regs && !d.rooster) { p.innerHTML = `<div class="dt-vz-loading">Geen gegevens: registraties ${esc(d.err.regs)}, rooster ${esc(d.err.rooster)}.</div>`; return; }
     const now = new Date();
-    const van = this._periode === "jaar" ? new Date(d.sj) : new Date(now.getFullYear(), now.getMonth(), now.getDate() - (this._periode === "8w" ? 56 : 28));
-    const S = vzStats(d.regs || [], d.rooster || [], van, now);
+    const periodes = DT.periodes?.() || [];
+    let eigen = this._periode.startsWith("p:") ? periodes.find((p) => "p:" + p.id === this._periode) : null;
+    if (this._periode.startsWith("p:") && !eigen) this._periode = "jaar";
+    const van = eigen ? eigen.begin : this._periode === "jaar" ? new Date(d.sj) : new Date(now.getFullYear(), now.getMonth(), now.getDate() - (this._periode === "8w" ? 56 : 28));
+    const tot = eigen && eigen.einde < now ? eigen.einde : now;
+    const S = vzStats(d.regs || [], d.rooster || [], van, tot);
     const pctCol = (pct) => pct >= 90 ? "#34C759" : pct >= 80 ? "#FF9500" : "#FF3B30";
     const SOORT = [["OK", "aanwezig", "#34C759"], ["TL", "te laat", "#FFCC00"], ["ZK", "ziek", "#AF52DE"], ["AB_OK", "absent, geoorloofd", "#FF9500"], ["AB_NO", "absent, ongeoorloofd", "#FF3B30"], ["UI", "uitgestuurd", "#A2845E"]];
     /* Vrijgestelde lessen (met toestemming) staan niet in de balk: die gaat over de lessen die meetellen. */
@@ -171,12 +178,12 @@ DT.register({
     p.innerHTML = `
       <div class="dt-vz-head">
         <div class="dt-vz-title">Inzicht in aanwezigheid</div>
-        <div class="dt-vz-segs">${seg("jaar", "Schooljaar")}${seg("8w", "8 weken")}${seg("4w", "4 weken")}</div>
+        <div class="dt-vz-segs">${seg("jaar", "Schooljaar")}${seg("8w", "8 weken")}${seg("4w", "4 weken")}${periodes.length ? `<select class="dt-vz-psel${eigen ? " is-on" : ""}" aria-label="Eigen periode"><option value="">Periode…</option>${periodes.map((p) => `<option value="p:${esc(p.id)}"${eigen && eigen.id === p.id ? " selected" : ""}>${esc(p.naam)} · ${esc(DT.periodeLabel(p))}</option>`).join("")}</select>` : ""}</div>
       </div>
       ${T.lessen ? `
       <div class="dt-vz-summary">
         <span class="dt-vz-big" style="color:${pctCol(T.pct)}">${T.pct}%</span>
-        <span class="dt-vz-sumtext"><b>aanwezig</b> · ${T.telt - T.afwezig} van ${T.telt} lessen · ${T.afwezig} gemist${T.ongeoorloofd ? ` (${T.ongeoorloofd} ongeoorloofd)` : ""}${T.ziek ? ` · ${T.ziek}× ziek` : ""}${T.teLaat ? ` · ${T.teLaat}× te laat` : ""}${T.vrij ? ` · ${T.vrij}× vrijgesteld (telt niet mee)` : ""}${S.onbekend ? ` · ${S.onbekend} lessen zonder vak in het rooster` : ""}</span>
+        <span class="dt-vz-sumtext">${eigen ? `<b>${esc(eigen.naam)}</b> (${esc(DT.periodeLabel(eigen, true))}) · ` : ""}<b>aanwezig</b> · ${T.telt - T.afwezig} van ${T.telt} lessen · ${T.afwezig} gemist${T.ongeoorloofd ? ` (${T.ongeoorloofd} ongeoorloofd)` : ""}${T.ziek ? ` · ${T.ziek}× ziek` : ""}${T.teLaat ? ` · ${T.teLaat}× te laat` : ""}${T.vrij ? ` · ${T.vrij}× vrijgesteld (telt niet mee)` : ""}${S.onbekend ? ` · ${S.onbekend} lessen zonder vak in het rooster` : ""}</span>
       </div>
       <div class="dt-vz-obs">${obs.map((o) => `<div class="dt-vz-ob">${o}</div>`).join("")}</div>
       <div class="dt-vz-grid">
@@ -189,6 +196,7 @@ DT.register({
       ${legend}` : `<p class="dt-vz-empty">Geen lessen in deze periode.</p>`}
       <div class="dt-vz-foot">Uit de registraties en het rooster van Magister. Afwezig = absent, ziek of uitgestuurd; te laat telt als aanwezig. Een vrijstelling is met toestemming: die les telt niet als gemist en valt buiten het percentage. Vak${S.docenten.length ? " en docent" : ""} uit het rooster; ${d.rooster ? `${(d.rooster || []).length} roosteritems` : "rooster niet beschikbaar"}${d.rooster && !S.docenten.length ? "; het rooster van de leerling noemt geen docenten, daarom is er geen blok per docent" : ""}.</div>`;
     p.querySelectorAll(".dt-vz-seg").forEach((b) => b.addEventListener("click", () => { this._periode = b.dataset.periode; this.render(); }));
+    p.querySelector(".dt-vz-psel")?.addEventListener("change", (e) => { this._periode = e.target.value || "jaar"; this.render(); });
   },
 
   css(root) {
@@ -209,6 +217,8 @@ DT.register({
       .dt-vz-segs { display: inline-flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--dt-vz-group); }
       .dt-vz-seg { appearance: none; border: 0; background: transparent; color: var(--dt-vz-muted); font: 500 .75rem/1 var(--dt-vz-font); padding: .4rem .7rem; border-radius: 7px; cursor: pointer; }
       .dt-vz-seg.is-on { background: var(--dt-vz-surface); color: var(--dt-vz-fg); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.14); }
+      .dt-vz-psel { appearance: none; -webkit-appearance: none; border: 0; background: transparent no-repeat right .45rem center / 10px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5' fill='none' stroke='%23888' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); color: var(--dt-vz-muted); font: 500 .75rem/1 var(--dt-vz-font); padding: .4rem 1.4rem .4rem .7rem; border-radius: 7px; cursor: pointer; max-width: 15rem; }
+      .dt-vz-psel.is-on { background-color: var(--dt-vz-surface); color: var(--dt-vz-fg); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.14); }
       .dt-vz-summary { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: .5rem; }
       .dt-vz-big { font: 700 2.25rem/1 var(--dt-vz-font); letter-spacing: -.04em; }
       .dt-vz-sumtext { font: 400 .875rem/1.4 var(--dt-vz-font); color: var(--dt-vz-muted); } .dt-vz-sumtext b { color: var(--dt-vz-fg); font-weight: 600; }

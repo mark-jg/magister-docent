@@ -89,6 +89,58 @@ DT.register({
           widget("Modules", tiles)
         ]);
       },
+      periodes: () => {
+        /* Eigen periodes: verschijnen als keuze "Periode" in de verzuimoverzichten van Magister. */
+        const lijst = (DT.settings.periodes?.lijst || []).map((x) => ({ ...x }));
+        const save = (l) => DT.saveSettings({ periodes: { lijst: l } });
+        const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        const nu = new Date();
+        let bewerk = null;
+        const naam = DT.el("input", { type: "text", class: "dt-input", placeholder: "Naam, bijv. Periode 1", "aria-label": "Naam van de periode", maxlength: "40" });
+        const begin = DT.el("input", { type: "date", class: "dt-input", "aria-label": "Begindatum" });
+        const einde = DT.el("input", { type: "date", class: "dt-input", "aria-label": "Einddatum" });
+        const fout = DT.el("div", { class: "dt-per-err", role: "alert" });
+        const knop = DT.el("button", { class: "dt-btn dt-btn-sm dt-btn-primary", text: "Toevoegen" });
+        const annuleer = DT.el("button", { class: "dt-btn dt-btn-sm", text: "Annuleren", hidden: "" });
+        const leeg = () => {
+          bewerk = null; knop.textContent = "Toevoegen"; annuleer.hidden = true; fout.textContent = "";
+          const laatste = DT.periodes().at(-1);
+          naam.value = ""; einde.value = "";
+          if (laatste) { const d = new Date(laatste.einde); d.setDate(d.getDate() + 1); begin.value = ymd(d); naam.placeholder = `Naam, bijv. Periode ${DT.periodes().length + 1}`; }
+          else begin.value = "";
+        };
+        knop.addEventListener("click", () => {
+          const n = naam.value.trim(), b = begin.value, e = einde.value;
+          if (!n) return (fout.textContent = "Geef de periode een naam.");
+          if (!b || !e) return (fout.textContent = "Vul een begin- en einddatum in.");
+          if (e < b) return (fout.textContent = "De einddatum ligt voor de begindatum.");
+          const item = { id: bewerk || Date.now().toString(36), naam: n, begin: b, einde: e };
+          save(bewerk ? lijst.map((x) => (String(x.id || x.begin) === bewerk ? item : x)) : [...lijst, item]);
+        });
+        annuleer.addEventListener("click", leeg);
+        const rows = DT.periodes().map((p) => {
+          const actief = nu >= p.begin && nu <= p.einde;
+          const ed = DT.el("button", { class: "dt-per-act", title: `${p.naam} wijzigen`, "aria-label": `${p.naam} wijzigen`, onclick: () => {
+            const raw = lijst.find((x) => String(x.id || x.begin) === p.id); if (!raw) return;
+            bewerk = p.id; naam.value = raw.naam || ""; begin.value = raw.begin; einde.value = raw.einde;
+            knop.textContent = "Opslaan"; annuleer.hidden = false; fout.textContent = ""; naam.focus();
+          } });
+          ed.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>`;
+          const del = DT.el("button", { class: "dt-per-act is-del", title: `${p.naam} verwijderen`, "aria-label": `${p.naam} verwijderen`, onclick: () => {
+            if (confirm(`Periode "${p.naam}" verwijderen?`)) save(lijst.filter((x) => String(x.id || x.begin) !== p.id));
+          } });
+          del.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
+          return DT.el("li", { class: "dt-per-row" + (actief ? " is-now" : "") }, [
+            DT.el("span", { class: "dt-per-name" }, [DT.el("b", { text: p.naam }), DT.el("small", { text: DT.periodeLabel(p, true) })]),
+            actief ? DT.el("span", { class: "dt-per-now", text: "nu" }) : null, ed, del
+          ]);
+        });
+        leeg();
+        return widget("Periodes", DT.el("div", { class: "dt-per" }, [
+          rows.length ? DT.el("ul", { class: "dt-per-list" }, rows) : DT.el("p", { class: "dt-per-empty", text: "Nog geen periodes. Voeg ze hieronder toe." }),
+          DT.el("div", { class: "dt-per-form" }, [naam, DT.el("div", { class: "dt-per-dates" }, [begin, DT.el("span", { text: "t/m" }), einde]), fout, DT.el("div", { class: "dt-row" }, [knop, annuleer])])
+        ]), "Kies ze daarna als \"Periode\" op de verzuimpagina van een leerling, in Verzuim › Inzicht en op het tabblad Inzicht.");
+      },
       modules: () => {
         const acts = [
           ["theme", "Thema", "Alt+T", () => DT.module("theme")?.toggle(DT)],
@@ -104,7 +156,7 @@ DT.register({
       }
     };
 
-    for (const id of ["bediening", "modules", ...widgets.filter((w) => w !== "instellingen")]) {
+    for (const id of ["bediening", "modules", ...(DT.settings.periodes?.enabled !== false ? ["periodes"] : []), ...widgets.filter((w) => w !== "instellingen")]) {
       const b = builders[id]; if (b) body.append(b());
     }
 
@@ -141,6 +193,7 @@ const DT_ICONS = Object.fromEntries(Object.entries({
   jarig: `<path d="M4 20h16M5 20v-7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7"/><path d="M5 15c2 1.5 4 1.5 6 0s4-1.5 6 0M12 7v4"/>`,
   leerlingdash: `<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>`,
   verzuiminzicht: `<path d="M4 19h16M6 15l4-5 3 3 5-7"/>`,
+  periodes: `<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4M7 15h4M13 15h4"/>`,
   melding: `<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 8l9 6 9-6"/>`,
   ai: `<path d="M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4z"/><path d="M18 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/>`,
   theme: `<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>`,

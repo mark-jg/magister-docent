@@ -52,6 +52,7 @@
         "content/modules/jarig.js",
         "content/modules/leerlingdash.js",
         "content/modules/verzuiminzicht.js",
+        "content/modules/periodes.js",
         "content/boot.js"
       ],
       "css": [
