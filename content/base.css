@@ -103,14 +103,19 @@ html.dt-dark .dt-widget a { color: #8fb6e6; }
 .dt-seg { display: inline-flex; padding: 2px; border-radius: 9px; background: var(--dt-panel-bg); }
 .dt-segbtn { font: 500 12px var(--dt-font); padding: 5px 10px; border: 0; border-radius: 7px; background: transparent; color: var(--dt-muted); cursor: pointer; }
 .dt-segbtn.is-on { background: var(--dt-card); color: var(--dt-fg); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.14); }
-.dt-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.dt-tile { --k: #6e6e73; display: grid; grid-template-columns: 30px 1fr; gap: 8px; align-items: center; padding: 9px 10px; border: 0; border-radius: 14px; background: var(--dt-panel-bg); color: var(--dt-fg); text-align: left; cursor: pointer; font: 13px var(--dt-font); min-height: 52px; transition: background .12s, transform .08s; }
+.dt-tiles { display: flex; flex-direction: column; gap: 6px; }
+.dt-tile { --k: #6e6e73; display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; align-items: center; padding: 8px 12px 8px 10px; border: 0; border-radius: 12px; background: var(--dt-panel-bg); color: var(--dt-fg); text-align: left; cursor: pointer; font: 13px var(--dt-font); min-height: 46px; transition: background .12s, transform .08s; }
+.dt-knob { width: 34px; height: 20px; border-radius: 20px; background: #D1D1D6; position: relative; flex: 0 0 auto; transition: background .15s; }
+.dt-knob::before { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .15s; }
+.dt-tile.is-on .dt-knob { background: var(--k); }
+.dt-tile.is-on .dt-knob::before { transform: translateX(14px); }
+.dt-dark .dt-knob { background: #39393D; }
 .dt-tile:active { transform: scale(.98); }
 .dt-tile-ico { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--k) 16%, var(--dt-card)); color: var(--k); }
 .dt-tile.is-on { background: color-mix(in srgb, var(--k) 12%, var(--dt-card)); }
 .dt-tile.is-on .dt-tile-ico { background: var(--k); color: #fff; }
-.dt-tile b { display: block; font-size: 12px; font-weight: 600; line-height: 1.2; }
-.dt-tile small { display: block; font-size: 10.5px; color: var(--dt-muted); line-height: 1.2; margin-top: 1px; }
+.dt-tile b { display: block; font-size: 13px; font-weight: 500; line-height: 1.2; }
+.dt-tile small { display: block; font-size: 11px; color: var(--dt-muted); line-height: 1.2; margin-top: 2px; }
 .dt-tile:not(.is-on) b { color: var(--dt-muted); }
 .dt-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .dt-action { font: 500 11px var(--dt-font); display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 9px 4px 8px; border: 0; border-radius: 14px; background: var(--dt-panel-bg); color: var(--dt-fg); cursor: pointer; }

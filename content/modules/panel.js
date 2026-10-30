@@ -81,7 +81,7 @@ DT.register({
         const tiles = DT.el("div", { class: "dt-tiles" }, M.filter(([id]) => id !== "panel").map(([id, label, sub, k]) => {
           const on = DT.settings[id]?.enabled !== false;
           const b = DT.el("button", { class: "dt-tile" + (on ? " is-on" : ""), style: `--k:${k}`, "aria-pressed": String(on), title: (on ? "Uitzetten: " : "Aanzetten: ") + label, onclick: () => DT.saveSettings({ [id]: { enabled: !on } }) });
-          b.innerHTML = `<span class="dt-tile-ico">${DT_ICONS[id] || ""}</span><span><b>${label}</b><small>${sub}</small></span>`;
+          b.innerHTML = `<span class="dt-tile-ico">${DT_ICONS[id] || ""}</span><span><b>${label}</b><small>${sub}</small></span><span class="dt-knob"></span>`;
           return b;
         }));
         return DT.el("div", { class: "dt-bediening" }, [
