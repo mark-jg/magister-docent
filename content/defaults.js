@@ -13,6 +13,7 @@ globalThis.DT_DEFAULTS = {
   updates: { check: true },
   jarig: { enabled: true, dagen: 14 },
   leerlingdash: { enabled: true },
+  verzuiminzicht: { enabled: true },
   melding: { enabled: true, coaches: [], to: "", cc: "", name: "", extra: true, afzender: "" },
   links: [
     { label: "Magister Web", url: "https://accounts.magister.net" },

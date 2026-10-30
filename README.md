@@ -18,22 +18,14 @@ Werkt ook in Edge (`edge://extensions`).
 De extensie kijkt om de 6 uur op GitHub of er een nieuwere release is (alleen versienummer en downloadlink, er gaat niets over jou mee; uit te zetten bij Instellingen > Updates). Is er een nieuwe versie, dan krijgt het extensie-icoon een gele badge en staat bovenin het menu een blok met:
 
 1. **Nu bijwerken**: opent Instellingen > Updates. De eerste keer kies je daar de map waarin je de extensie hebt uitgepakt (de map met `manifest.json`); die keuze wordt onthouden.
-2. Klik op **Nu bijwerken naar X**. Chrome vraagt om toestemming voor de map (één klik). De extensie haalt de zip op met je token, schrijft de bestanden in de map en herlaadt zichzelf. Herlaad daarna open Magister-tabbladen.
+2. Klik op **Nu bijwerken naar X**. Chrome vraagt om toestemming voor de map (één klik). De extensie haalt de zip op van GitHub, schrijft de bestanden in de map en herlaadt zichzelf. Herlaad daarna open Magister-tabbladen.
 3. Handmatig blijft mogelijk: zip downloaden, uitpakken over de extensiemap en op Herladen klikken.
 
 Er worden alleen bestanden geschreven of overschreven, nooit verwijderd. Het manifest wordt als laatste geschreven, zodat een afgebroken update geen half nieuwe extensie achterlaat.
 
-### GitHub-token (eenmalig)
+### GitHub-token (optioneel)
 
-Omdat de repo privé is, heeft de updatecontrole een token nodig. Zonder token meldt de extensie "de repo is privé; vul een GitHub-token in".
-
-1. Ga naar [github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new) (ingelogd met een account dat toegang heeft tot de repo).
-2. Token name: bijvoorbeeld `magister-docent-tools`. Expiration: kies zelf; na afloop vraagt de extensie om een nieuw token.
-3. Resource owner: `mark-jg`. Repository access: **Only select repositories** → `magister-docent`.
-4. Repository permissions: **Contents: Read-only** (Metadata wordt automatisch meegenomen). Verder niets.
-5. Generate token, kopieer het en plak het in de extensie bij **Instellingen > Updates > GitHub-token**. De controle start direct.
-
-Het token staat alleen in de lokale opslag van de extensie op dat apparaat (niet in de gesynchroniseerde instellingen) en gaat alleen naar `api.github.com`.
+De repo is openbaar, dus controleren en bijwerken werkt zonder token. GitHub beperkt anonieme aanroepen wel tot 60 per uur per adres; wie daar tegenaan loopt (bijvoorbeeld op een gedeeld schoolnetwerk) kan een fine-grained token met alleen **Contents: Read-only** invullen bij **Instellingen > Updates > GitHub-token**. Het token staat alleen in de lokale opslag van de extensie op dat apparaat en gaat alleen naar `api.github.com`.
 
 Chrome laat een uitgepakte extensie zijn eigen map alleen beschrijven als de gebruiker die map zelf aanwijst (File System Access API); daarom die eenmalige keuze en de toestemmingsvraag per update. Wie liever met git werkt: `git clone https://github.com/mark-jg/magister-docent`, die map als uitgepakte extensie laden, en bijwerken met `git pull` plus Herladen.
 
@@ -102,6 +94,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 
 ## Wijzigingen
 
+- 0.16.0: nieuw tabblad "Inzicht" op de verzuimpagina van een leerling: aanwezigheid per vak, per docent, per weekdag en per lesuur (balken met de registratietypen), het verloop per week als lijn, en automatische constateringen (bij welk vak, welke docent of welke dag het verzuim zich concentreert); periode te kiezen (schooljaar, 8 weken, 4 weken). Bijwerken: de repo is openbaar, een GitHub-token is niet meer nodig.
 - 0.15.2: keuzelijsten en leerlinglijsten kregen een vet lettertype door twee te brede themaregels (de naam in de leerlingkiezer en de naam onder een avatar); die gelden nu alleen voor de kop en de profielkaart.
 - 0.15.1: leerlingkaart: de profielkaart met foto en naam staat links naast het overzicht, personalia en privégegevens eronder; de toestemmingen zijn een tegel in het overzicht.
 - 0.15.0: leerlingoverzicht als bento-indeling: aanwezigheid (donut met maandbalken erin) en vandaag (met het rooster erin) als grote vlakken, logboek met de laatste notitie erin, taken, terugkomen en verjaardag ernaast; op smalle schermen twee kolommen. Schil: zijbalk en iconenrail staan nu boven het hoofdvlak, zodat de schaduw doorloopt en de popups en tooltips van het ingeklapte menu niet meer achter het frame vallen.

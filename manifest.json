@@ -49,6 +49,7 @@
         "content/modules/inspector.js",
         "content/modules/jarig.js",
         "content/modules/leerlingdash.js",
+        "content/modules/verzuiminzicht.js",
         "content/boot.js"
       ],
       "css": [

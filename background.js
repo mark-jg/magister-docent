@@ -13,8 +13,9 @@ const REPO_API = `https://api.github.com/repos/${REPO}`;
 const ALARM = "dt-update-check";
 const CHECK_INTERVAL_MIN = 6 * 60;
 
-/* De repo is privé. Een fine-grained token (alleen Contents: lezen op deze repo) staat in
- * chrome.storage.local (dit apparaat, niet gesynchroniseerd) en gaat alleen naar api.github.com. */
+/* De repo is openbaar: controleren en bijwerken werkt zonder token. Een fine-grained token
+ * (alleen Contents: lezen) is optioneel, bijvoorbeeld tegen de limiet van GitHub voor anonieme
+ * aanroepen; het staat in chrome.storage.local (dit apparaat) en gaat alleen naar api.github.com. */
 async function getToken() {
   return ((await chrome.storage.local.get("ghToken")).ghToken || "").trim();
 }
@@ -70,7 +71,7 @@ async function checkForUpdate(force = false) {
       if (!repo.ok) {
         throw new Error(token
           ? "het token geeft geen toegang tot deze repo (controleer repo en rechten)"
-          : "de repo is privé; vul een GitHub-token in bij Instellingen > Updates");
+          : "GitHub gaf geen toegang tot de repo (tijdelijke limiet of de repo is niet bereikbaar); probeer later opnieuw of vul een GitHub-token in bij Instellingen > Updates");
       }
       info = { current, latest: null, available: false, page: RELEASES_PAGE, zip: null, zipApi: null, zipName: null, hasToken: Boolean(token), checkedAt: Date.now(), error: null };
     } else if (!res.ok) {
