@@ -1073,6 +1073,64 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     aside .widget > .content-pane > .content { padding: 0 20px 16px !important; }
     aside .widget > .content-pane form { padding: 0 !important; }
     aside .widget footer.endlink { padding: 6px 20px 14px !important; }
+    /* Zijbalk 'details' (lesdashboard): leerlingpas, registraties, extra informatie en agenda van de leerling */
+    aside .mg-panel .list, aside ag-list .list { margin: 0 -8px !important; background: transparent !important; }
+    aside .mg-panel .list li { border-radius: 10px; }
+    aside .mg-panel .list li::after { left: 8px; right: 8px; }
+    aside .mg-panel .list li a { padding: 0 8px !important; }
+    aside .mg-panel .list li.no-data { background: transparent !important; height: auto !important; line-height: 1.35 !important; padding: 2px 0 6px !important; }
+    aside .mg-panel .list li.no-data::after { display: none; }
+    aside .mg-panel .list li.no-data a, aside .mg-panel .list li.no-data > a { color: ${t.muted} !important; font: 400 .8125rem/1.35 ${t.font} !important; font-style: normal !important; padding: 0 8px !important; height: auto !important; }
+    aside .mg-panel .list li.no-data:hover { background: transparent !important; }
+    aside .mg-panel h3 .panel-icon { color: ${t.orange} !important; margin-right: 6px; vertical-align: -1px; }
+    aside .mg-panel h3 .fold-toggle { color: ${t.muted} !important; }
+    aside .mg-panel form.no-data { background: transparent !important; color: ${t.muted} !important; font-style: normal !important; padding: 0 !important; }
+    aside .mg-panel .input-value { padding: 0 0 12px !important; }
+    aside .mg-panel .input-value:last-child { padding-bottom: 0 !important; }
+    aside .mg-panel .input-value > span:not(.value) { display: block; color: ${t.muted}; font: 400 .8125rem/1.35 ${t.font}; }
+    aside .mg-panel .input-value label { color: ${t.muted} !important; font: 600 .6875rem/1.3 ${t.font} !important; text-transform: uppercase; letter-spacing: .04em; padding: 0 0 6px 2px !important; }
+    aside .mg-panel .input-value span.value { display: block; padding: 8px 12px; background: ${t.dark ? "rgba(255,255,255,.05)" : "rgba(60,60,67,.05)"}; color: ${t.fg}; font: 400 .8125rem/1.35 ${t.font}; }
+    aside .mg-panel .input-value span.value + span.value { box-shadow: inset 0 .5px 0 ${t.sepSoft}; }
+    aside .mg-panel .input-value span.value:first-of-type { border-radius: 10px 10px 0 0; }
+    aside .mg-panel .input-value span.value:last-of-type { border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; }
+    aside .mg-panel .input-value span.value:only-of-type { border-radius: 10px; }
+    aside li.agenda-item { height: auto !important; line-height: 1.3 !important; padding: 8px 0 !important; }
+    aside li.agenda-item > a { display: grid !important; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "time icons" "info info"; align-items: center; gap: 5px 8px; height: auto !important; line-height: 1.3 !important; padding: 0 8px !important; }
+    aside li.agenda-item > a::after { display: none !important; }
+    aside li.agenda-item a span { height: auto !important; line-height: 1.3 !important; }
+    aside li.agenda-item ag-lesblok-tijd { grid-area: time; }
+    aside li.agenda-item span.time { font: 600 .8125rem/1.3 ${t.font} !important; color: ${t.fg} !important; font-variant-numeric: tabular-nums; }
+    aside li.agenda-item .icons-block { grid-area: icons; justify-self: end; display: flex !important; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 4px; float: none !important; height: auto !important; line-height: 1 !important; }
+    aside li.agenda-item .icons-block > span { float: none !important; margin: 0 !important; }
+    aside li.agenda-item .icons-block > span.ng-hide { display: none !important; }
+    aside li.agenda-item .icons-block .dna-badge, aside li.agenda-item .icons-block .text-icon { display: inline-block !important; height: 18px !important; line-height: 18px !important; padding: 0 6px !important; border-radius: 6px !important; font: 600 .625rem/18px ${t.font} !important; letter-spacing: .02em; box-sizing: border-box; }
+    aside li.agenda-item .icons-block .dna-badge-outline { background: transparent !important; border: 1px solid ${rgba(accent, .55)} !important; color: ${t.accent} !important; line-height: 16px !important; }
+    aside li.agenda-item .icons-block .text-icon.permissible { background: ${rgba(t.green, t.dark ? .24 : .16)} !important; color: ${t.dark ? t.green : "#1E7B34"} !important; }
+    aside li.agenda-item .icons-block .text-icon.impermissible { background: ${rgba(t.red, t.dark ? .24 : .14)} !important; color: ${t.dark ? t.red : "#C4271D"} !important; }
+    aside li.agenda-item ag-lesblok-informatie { grid-area: info; display: flex; align-items: center; gap: 8px; min-width: 0; }
+    aside li.agenda-item span.nrblock { float: none !important; flex: none; margin: 0 !important; height: 20px !important; line-height: 20px !important; }
+    aside li.agenda-item ag-lesblok-informatie .classroom { display: flex !important; align-items: baseline; gap: 3px; min-width: 0; overflow: hidden; white-space: nowrap; color: ${t.muted} !important; font: 400 .75rem/1.3 ${t.font} !important; }
+    aside li.agenda-item ag-lesblok-informatie .classroom > span { display: block !important; flex: 0 0 auto; max-width: none !important; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    aside li.agenda-item ag-lesblok-informatie .classroom > span.vakOfAfspraak { flex: 0 1 auto; }
+    aside li.agenda-item ag-lesblok-informatie .vakOfAfspraak { color: ${t.fg} !important; font-weight: 500; }
+    aside .student-pass { display: grid !important; grid-template-columns: 64px minmax(0, 1fr); column-gap: 14px; align-content: start; background: transparent !important; border: 0 !important; box-shadow: none !important; min-height: 0 !important; padding: 16px !important; }
+    aside .student-pass::before, aside .student-pass::after { display: none !important; }
+    aside .student-pass > * { grid-column: 2; margin: 0 !important; padding: 0 !important; }
+    aside .student-pass > figure { grid-column: 1; grid-row: 1 / span 6; width: 64px !important; height: 84px !important; float: none !important; border: 0 !important; border-radius: 12px !important; box-shadow: none !important; overflow: hidden; position: relative; background: ${t.gray6} !important; }
+    aside .student-pass > figure::before { left: 0 !important; top: 0 !important; width: 64px !important; height: 84px !important; line-height: 84px !important; font-size: 30px !important; color: ${t.muted} !important; }
+    aside .student-pass > figure span.img { float: none !important; width: 100% !important; height: 100% !important; }
+    aside .student-pass > h2:first-of-type, aside .student-pass > strong { color: ${t.fg} !important; font: 600 1.0625rem/1.25 ${t.font} !important; letter-spacing: -.01em; }
+    aside .student-pass > p { font: 400 .75rem/1.4 ${t.font} !important; color: ${t.muted} !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    aside .student-pass > p[title="stamnummer"] { padding-top: 4px !important; font-variant-numeric: tabular-nums; }
+    aside .student-pass > p a { color: ${t.accent} !important; text-decoration: none !important; }
+    aside .student-pass > p a:hover { text-decoration: underline !important; }
+    aside .student-pass > h2:nth-of-type(2) { justify-self: start; margin-top: 8px !important; padding: 0 8px !important; border-radius: 999px; background: ${t.tint} !important; color: ${t.accent} !important; font: 600 .75rem/22px ${t.font} !important; }
+    aside .student-pass > p:nth-of-type(3) { white-space: normal; margin-top: 4px !important; }
+    aside .student-pass > div { grid-column: 1 / -1; margin-top: 12px !important; padding-top: 10px !important; border-top: .5px solid ${t.sepSoft}; }
+    aside .student-pass > div p { margin: 0 !important; padding: 0 !important; }
+    aside .student-pass > div a { color: ${t.accent} !important; text-decoration: none !important; font: 500 .8125rem/1.3 ${t.font} !important; }
+    aside .student-pass > div a::after { content: "›"; margin-left: 4px; }
+    aside .student-pass > h2:only-of-type { grid-row: 1; }
     /* Minikalender (datepicker): geen celranden, vandaag in accent, keuze als gevulde cirkel */
     div.calendar table, div[uib-datepicker] table, .content-pane div.calendar table { border: 0 !important; border-collapse: separate !important; border-spacing: 0 2px !important; }
     div.calendar, div[uib-datepicker] { padding: 6px 8px 2px !important; max-width: none !important; }

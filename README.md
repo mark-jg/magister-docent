@@ -95,6 +95,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 ## Wijzigingen
 
 - 0.19.3: standaard Magister-thema: de samenvattingschips op Vandaag en de kaart Jarig hebben nu een eigen neutrale opmaak, het leerlingoverzicht en het tabblad Inzicht volgen het lettertype van de pagina, en de knop Inzicht ziet er standaard uit als Magisters tabbladen (onderstreping); de Apple-thema's kleuren alles verder in.
+- 0.19.4: Apple-thema's: het zijpaneel "details" in het lesdashboard is opnieuw opgemaakt. De leerlingpas is een nette kaart met foto, naam, klaschip en "meer details", registraties staan in gegroepeerde rijen, en de agenda van de leerling toont tijd en badges op de eerste regel en lesuur met omschrijving op de tweede. Het lipje "Docent Tools" is een smal randje dat bij aanwijzen uitschuift en de zijbalk niet meer overlapt.
 - 0.19.2: moduletegels in het zijpaneel staan onder elkaar, met een schakelaar rechts.
 - 0.19.1: zijpaneel in de opmaak van het bedieningspaneel: lichtgrijze ondergrond, witte kaarten met zachte schaduw, kopjes in kleine kapitalen, moduletegels en een actierij met iconen en sneltoetsen; versie in de kop.
 - 0.19.0: omgedraaid na gebruik: het zijpaneel (Alt+D) is nu het volledige bedieningspaneel (thema, modules aan/uit, acties, klok, links, notities, tabellen); de popup bij het extensie-icoon is minimaal: bijwerken (direct, zonder instellingenpagina), de tab van het zijpaneel tonen of verbergen, ontwikkelaarsmodus, en de weg naar zijpaneel en instellingen.

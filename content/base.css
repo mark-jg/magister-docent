@@ -82,9 +82,12 @@ html.dt-dark .dt-widget a { color: #8fb6e6; }
 .dt-row { display: flex; gap: 6px; flex-wrap: wrap; }
 
 /* Paneel-handvat */
-#dt-handle { position: fixed; top: 50%; right: 0; transform: translateY(-50%); z-index: 2147481000; writing-mode: vertical-rl; background: var(--dt-accent); color: var(--dt-accent-ink); font: 12px var(--dt-font); padding: 10px 5px; border-radius: 6px 0 0 6px; cursor: pointer; opacity: .85; }
-#dt-handle:hover { opacity: 1; }
-#dt-handle.dt-left { right: auto; left: 0; border-radius: 0 6px 6px 0; writing-mode: vertical-lr; }
+#dt-handle { position: fixed; top: 50%; right: 0; transform: translate(calc(100% - 6px), -50%); z-index: 2147481000; writing-mode: vertical-rl; background: var(--dt-accent); color: var(--dt-accent-ink); font: 12px var(--dt-font); padding: 10px 5px; border-radius: 6px 0 0 6px; cursor: pointer; opacity: .55; transition: transform .18s ease, opacity .18s ease; }
+#dt-handle::before { content: ""; position: absolute; top: -12px; bottom: -12px; left: -10px; width: 16px; }
+#dt-handle:hover, #dt-handle:focus-visible { transform: translate(0, -50%); opacity: 1; }
+#dt-handle.dt-left { right: auto; left: 0; transform: translate(calc(-100% + 6px), -50%); border-radius: 0 6px 6px 0; writing-mode: vertical-lr; }
+#dt-handle.dt-left::before { left: auto; right: -10px; }
+#dt-handle.dt-left:hover, #dt-handle.dt-left:focus-visible { transform: translate(0, -50%); }
 
 /* Inspector */
 .dt-inspect-hover { outline: 2px dashed var(--dt-gold) !important; outline-offset: 1px !important; cursor: crosshair !important; }
