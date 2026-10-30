@@ -1379,6 +1379,7 @@ function appleShadowCss(p, dark, accent) {
     .dt-vz-tabbtn:hover { background: ${t.hover} !important; color: ${t.fg} !important; }
     .dt-vz-tabbtn.is-active { background: ${t.tint} !important; color: ${t.accent} !important; font-weight: 600 !important; }
     .dt-vz-tabbtn.is-active::after { display: none !important; }
+    .dt-vz-ziek:not(.is-nul) { color: ${t.dark ? "#DA8FFF" : "#8E3BB8"} !important; background: ${rgba("#AF52DE", t.dark ? .26 : .13)} !important; }
     :host(dna-tab-bar) .wrapper { padding-block-end: var(--_spacing, 2px) !important; }
     :host(dna-button.upload-button) button, :host(dna-button.upload-button) .button, :host(dna-button.upload-button) a { border: 0 !important; background: transparent !important; color: #fff !important; padding: 0 !important; }
     /* Avatar met naam en hint eronder (profielkaart) */
