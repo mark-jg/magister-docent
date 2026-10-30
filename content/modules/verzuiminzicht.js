@@ -177,12 +177,12 @@ DT.register({
       <div class="dt-vz-grid">
         <section class="dt-vz-card dt-vz-wide"><h4>Verloop per week</h4>${lijn || `<p class="dt-vz-empty">Nog te weinig weken voor een verloop.</p>`}</section>
         <section class="dt-vz-card"><h4>Per vak</h4>${rows(S.vakken)}</section>
-        <section class="dt-vz-card"><h4>Per docent</h4>${rows(S.docenten)}</section>
+        ${S.docenten.length ? `<section class="dt-vz-card"><h4>Per docent</h4>${rows(S.docenten)}</section>` : ""}
         <section class="dt-vz-card"><h4>Per weekdag</h4>${rows(S.dagen, { max: 7 })}</section>
         <section class="dt-vz-card"><h4>Per lesuur (begintijd)</h4>${rows(S.uren, { max: 12 })}</section>
       </div>
       ${legend}` : `<p class="dt-vz-empty">Geen lessen in deze periode.</p>`}
-      <div class="dt-vz-foot">Uit de registraties en het rooster van Magister. Afwezig = absent, ziek, uitgestuurd of vrijstelling; te laat telt als aanwezig. Vak en docent komen uit het rooster; ${d.rooster ? `${(d.rooster || []).length} roosteritems` : "rooster niet beschikbaar"}.</div>`;
+      <div class="dt-vz-foot">Uit de registraties en het rooster van Magister. Afwezig = absent, ziek, uitgestuurd of vrijstelling; te laat telt als aanwezig. Vak${S.docenten.length ? " en docent" : ""} uit het rooster; ${d.rooster ? `${(d.rooster || []).length} roosteritems` : "rooster niet beschikbaar"}${d.rooster && !S.docenten.length ? "; het rooster van de leerling noemt geen docenten, daarom is er geen blok per docent" : ""}.</div>`;
     p.querySelectorAll(".dt-vz-seg").forEach((b) => b.addEventListener("click", () => { this._periode = b.dataset.periode; this.render(); }));
   },
 
@@ -243,7 +243,7 @@ function vzStats(regs, rooster, van, tot) {
   for (const a of rooster) {
     const b = new Date(a.start || a.begin), e = new Date(a.einde || a.eind);
     if (isNaN(b) || isNaN(e) || e > tot || b < van || a.status === 5 || a.isVervallen === true) continue;
-    const l = { id: a.id, begin: b, vak: names(a.vakken, ["naam", "omschrijving", "code"]).join(", ") || a.omschrijving || "Onbekend", docent: names(a.docenten, ["naam", "code"]).join(", ") || "", cat: "OK", extra: 0 };
+    const l = { id: a.id, begin: b, vak: names(a.vakken, ["naam", "omschrijving", "code"]).join(", ") || a.omschrijving || "Onbekend", docent: docentenVan(a), cat: "OK", extra: 0 };
     lessen.push(l); if (a.id != null) byId.set(String(a.id), l); byStart.set(b.getTime(), l);
   }
   let onbekend = 0;
@@ -279,6 +279,25 @@ function vzStats(regs, rooster, van, tot) {
     uren: [...uren.entries()].sort((a, b) => a[0] - b[0]).map(([, g]) => fin(g)),
     weken: [...weken.values()].map(fin).sort((a, b) => a.y - b.y || a.week - b.week),
   };
+}
+
+/* Docenten van een afspraak: Magister levert ze als docenten (naam of code), als deelnames
+ * (deelnemers met rol/type docent) of als medewerkers; de eerste gevulde bron wint. */
+function docentenVan(a) {
+  const naam = (x) => {
+    if (!x) return ""; if (typeof x === "string") return x;
+    const p = x.persoon || x.medewerker || x.docent || x;
+    const vol = p.volledigeNaam || p.weergavenaam || p.naam || p.displayName;
+    if (vol) return String(vol);
+    const delen = [p.voorletters || p.roepnaam, p.tussenvoegsel, p.achternaam].filter(Boolean);
+    return delen.length ? delen.join(" ") : String(p.code || p.afkorting || "");
+  };
+  const isDocent = (x) => { const t = String(x?.type ?? x?.rol ?? x?.soort ?? "").toLowerCase(); return !t || /docent|medewerker|leraar|personeel|staff|teacher/.test(t) || t === "2"; };
+  for (const bron of [a.docenten, a.medewerkers, a.leraren, (a.deelnames || a.deelnemers || []).filter(isDocent)]) {
+    const n = (Array.isArray(bron) ? bron : []).map(naam).filter(Boolean);
+    if (n.length) return [...new Set(n)].join(", ");
+  }
+  return "";
 }
 
 function isoWeek(d) {
