@@ -89,13 +89,19 @@ DT.register({
           widget("Modules", tiles)
         ]);
       },
-      modules: () => widget("Acties", DT.el("div", { class: "dt-row" }, [
-        DT.el("button", { class: "dt-btn dt-btn-sm", text: "Thema wisselen", title: "Alt+T", onclick: () => DT.module("theme")?.toggle(DT) }),
-        DT.el("button", { class: "dt-btn dt-btn-sm", text: "Tabellen naar Excel", title: "Alt+E", onclick: () => DT.module("tables")?.exportAll(DT) }),
-        DT.el("button", { class: "dt-btn dt-btn-sm", text: "Mail coach", title: "Alt+M", onclick: () => DT.module("melding")?.trigger(DT) }),
-        DT.el("button", { class: "dt-btn dt-btn-sm", text: "Instellingen", onclick: () => chrome.runtime.sendMessage({ type: "openOptions" }) }),
-        DT.settings.developer?.enabled ? DT.el("button", { class: "dt-btn dt-btn-sm", text: "Inspector", title: "Alt+I", onclick: () => { this.toggle(false); DT.module("inspector")?.start(DT); } }) : null
-      ]))
+      modules: () => {
+        const acts = [
+          ["theme", "Thema", "Alt+T", () => DT.module("theme")?.toggle(DT)],
+          ["export", "Excel", "Alt+E", () => DT.module("tables")?.exportAll(DT)],
+          ["mail", "Mail coach", "Alt+M", () => DT.module("melding")?.trigger(DT)],
+          DT.settings.developer?.enabled ? ["inspector", "Inspector", "Alt+I", () => { this.toggle(false); DT.module("inspector")?.start(DT); }] : ["options", "Instellingen", "", () => chrome.runtime.sendMessage({ type: "openOptions" })]
+        ];
+        return widget("Acties", DT.el("div", { class: "dt-actions" }, acts.map(([icon, label, kbd, go]) => {
+          const b = DT.el("button", { class: "dt-action", title: kbd ? `${label} (${kbd})` : label, onclick: go });
+          b.innerHTML = `<span class="dt-action-ico">${DT_ICONS[icon] || ""}</span><span>${label}</span>${kbd ? `<kbd>${kbd}</kbd>` : ""}`;
+          return b;
+        })));
+      }
     };
 
     for (const id of ["bediening", "modules", ...widgets.filter((w) => w !== "instellingen")]) {
@@ -104,7 +110,7 @@ DT.register({
 
     this._panel.replaceChildren(
       DT.el("div", { class: "dt-panel-head" }, [
-        DT.el("h2", { text: "Docent Tools" }),
+        DT.el("h2", {}, ["Docent Tools", DT.el("small", { text: `v${DT.version || ""}` })]),
         DT.el("button", { class: "dt-btn dt-btn-sm", text: "Sluiten", "aria-label": "Paneel sluiten", onclick: () => this.toggle(false) })
       ]),
       body
@@ -137,4 +143,9 @@ const DT_ICONS = Object.fromEntries(Object.entries({
   verzuiminzicht: `<path d="M4 19h16M6 15l4-5 3 3 5-7"/>`,
   melding: `<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 8l9 6 9-6"/>`,
   ai: `<path d="M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4z"/><path d="M18 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/>`,
+  theme: `<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>`,
+  export: `<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>`,
+  mail: `<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 8l9 6 9-6"/>`,
+  options: `<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>`,
+  inspector: `<path d="M4 4h6v2H6v4H4zM14 4h6v6h-2V6h-4zM4 14h2v4h4v2H4zM18 14h2v6h-6v-2h4z"/>`,
 }).map(([k, d]) => [k, `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`]));
