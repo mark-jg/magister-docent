@@ -132,6 +132,9 @@ chrome.runtime.onInstalled.addListener(async ({ reason, previousVersion }) => {
 /* ---------- Berichten van popup, instellingen en content ---------- */
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   switch (msg?.type) {
+    case "openPopup":
+      (chrome.action.openPopup ? chrome.action.openPopup() : Promise.reject()).catch(() => chrome.runtime.openOptionsPage());
+      break;
     case "openOptions":
       chrome.runtime.openOptionsPage();
       return false;

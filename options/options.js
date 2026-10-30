@@ -4,7 +4,20 @@ let settings;
 const get = (obj, path) => path.split(".").reduce((o, k) => (o ? o[k] : undefined), obj);
 const set = (obj, path, val) => { const ks = path.split("."); const last = ks.pop(); const o = ks.reduce((o, k) => (o[k] ??= {}), obj); o[last] = val; };
 
+function fillPresets() {
+  const sel = document.getElementById("presetSelect"); if (!sel || sel.options.length) return;
+  for (const [label, dark] of [["Licht", false], ["Donker", true], ["Zelf instellen", null]]) {
+    const g = document.createElement("optgroup"); g.label = label;
+    for (const [v, l, d] of globalThis.DT_PRESETS_LIST) if (d === dark) { const o = document.createElement("option"); o.value = v; o.textContent = l; g.append(o); }
+    sel.append(g);
+  }
+}
+function syncDev() {
+  const on = settings.developer?.enabled === true;
+  document.querySelectorAll(".dev-only").forEach((el) => { el.hidden = !on; });
+}
 async function load() {
+  fillPresets();
   const stored = (await chrome.storage.sync.get("settings")).settings || {};
   settings = merge(structuredClone(DEFAULTS), stored);
   for (const el of document.querySelectorAll("[data-path]")) {
@@ -22,6 +35,7 @@ async function load() {
     save();
   }
   renderCoaches();
+  syncDev();
   const ex = document.getElementById("extraList");
   ex.value = (settings.theme.extra || []).map((x) => `${x.role} | ${x.sel}`).join("\n");
   ex.oninput = () => {
@@ -75,6 +89,7 @@ document.addEventListener("input", (e) => {
   else v = el.value;
   set(settings, el.dataset.path, v);
   save();
+  if (el.dataset.path === "developer.enabled") syncDev();
 });
 
 document.getElementById("addLink").onclick = () => { settings.links.push({ label: "", url: "" }); renderLinks(); };

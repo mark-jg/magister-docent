@@ -19,6 +19,7 @@ DT.register({
 
   start(DT) {
     if (this._active) return;
+    if (!DT.settings.developer?.enabled) { DT.toast?.("De Inspector staat onder Instellingen > Ontwikkelaar; zet die eerst aan.", "info"); return; }
     this._active = true;
     this._bar = DT.el("div", { id: "dt-inspect-bar" }, [
       DT.el("span", { text: "Inspector:" }),

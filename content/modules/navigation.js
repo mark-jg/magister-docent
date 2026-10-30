@@ -71,7 +71,7 @@ DT.register({
       { label: "Tabellen naar Excel", hint: "Alt+E", go: () => DT.module("tables")?.exportAll(DT) },
       { label: "Zoeken (leerling, groep, stamnummer)", hint: "Alt+S", go: () => this.focusSearch(DT) },
       { label: "Naar AI-assistent", hint: "", go: () => DT.module("ai")?.open(DT) },
-      { label: "Inspector", hint: "Alt+I", go: () => DT.module("inspector")?.start(DT) },
+      ...(DT.settings.developer?.enabled ? [{ label: "Inspector", hint: "Alt+I", go: () => DT.module("inspector")?.start(DT) }] : []),
       { label: "Instellingen", hint: "", go: () => chrome.runtime.sendMessage({ type: "openOptions" }) },
       ...Object.entries(DT.module("theme")?.presets || {}).map(([id, p]) => ({
         label: `Thema: ${p.label}`, hint: p.dark === null ? "" : (p.dark ? "donker" : "licht"),
