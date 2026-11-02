@@ -98,10 +98,14 @@ DT.register({
 
   /* Cijferrij voor een groep uit vzStats: lessen (tellen mee), aanwezig, gemist, ongeoorloofd, ziek, te laat, vrijgesteld, % */
   cijfers(g) {
-    if (!g) return ["", "", "", "", "", "", "", "", ""];
-    return [g.lessen, g.telt, g.telt - g.afwezig, g.afwezig, g.ongeoorloofd, g.ziek, g.teLaat, g.vrij, g.telt > 0 ? this.pct(g.pct) : ""];
+    if (!g) return ["", "", "", "", "", "", "", "", "", "", ""];
+    const p = g.per || {};
+    return [g.lessen, g.telt, g.telt - g.afwezig, g.teLaat, g.afwezig, p.ZK || 0, p.AB_OK || 0, p.AB_NO || 0, p.UI || 0, g.vrij, g.telt > 0 ? this.pct(g.pct) : ""];
   },
-  KOP: ["Lessen in rooster", "Lessen (tellen mee)", "Aanwezig", "Gemist", "Ongeoorloofd", "Ziek", "Te laat", "Vrijgesteld", "Aanwezig %"],
+  /* Kolommen die optellen: lessen in rooster = tellen mee + vrijgesteld; tellen mee = aanwezig + gemist;
+   * gemist = ziek + absent geoorloofd + absent ongeoorloofd + uitgestuurd; te laat is een deel van aanwezig. */
+  KB: [10, 11, 9, 9, 8, 7, 10, 11, 10, 10, 11], // kolombreedtes bij KOP
+  KOP: ["Lessen in rooster", "Lessen (tellen mee)", "Aanwezig", "waarvan te laat", "Gemist", "Ziek", "Absent geoorloofd", "Absent ongeoorloofd", "Uitgestuurd", "Vrijgesteld", "Aanwezig %"],
 
   blad(rows, breedtes, { filter = true } = {}) {
     const ws = XLSX.utils.aoa_to_sheet(rows, { dateNF: "dd-mm-yyyy" });
@@ -119,8 +123,10 @@ DT.register({
   toelichting(extra = []) {
     return [["Toelichting"], [""],
       ["Bron", "Registraties en rooster uit Magister, opgehaald met je eigen sessie."],
-      ["Afwezig (gemist)", "Absent, ziek of uitgestuurd."],
-      ["Te laat", "Telt als aanwezig, maar wordt apart geteld."],
+      ["Gemist", "Ziek + absent geoorloofd + absent ongeoorloofd + uitgestuurd (tellen precies op)."],
+      ["waarvan te laat", "Te laat telt als aanwezig; deze kolom is een deel van Aanwezig."],
+      ["Optellen", "Lessen in rooster = lessen (tellen mee) + vrijgesteld; lessen (tellen mee) = aanwezig + gemist."],
+      ["Onbekend (niet in rooster)", "Een registratie bij een les die niet (meer) in het rooster van de leerling staat en ook los niet op te halen was."],
       ["Vrijgesteld", "Met toestemming; telt niet mee in het percentage."],
       ["Lessen in rooster", "Alle lessen in het rooster van de leerling in de periode (afspraken met onderwijstijd), inclusief vrijgestelde lessen."],
       ["Lessen (tellen mee)", "Lessen die meetellen: alle lessen in het rooster (afspraken met onderwijstijd, zoals Magister ze voor verantwoorden gebruikt) min de vrijgestelde lessen. Persoonlijke afspraken, gesprekken en activiteiten tellen niet mee."],
@@ -142,14 +148,14 @@ DT.register({
     ];
     const groep = (titel, lijst) => [[titel, ...this.KOP], ...lijst.map((g) => [g.sub ? `${g.label} (${g.sub})` : g.label, ...this.cijfers(g)])];
     const bladen = [
-      ["Samenvatting", this.blad(sam, [16, 26, 10, 10, 12, 10, 8, 10, 12], { filter: false })],
-      ["Per vak", this.blad(groep("Vak", S.vakken), [34, 8, 10, 8, 13, 7, 8, 12, 12])],
+      ["Samenvatting", this.blad(sam, [16, 26, ...this.KB.slice(1)], { filter: false })],
+      ["Per vak", this.blad(groep("Vak", S.vakken), [34, ...this.KB])],
     ];
-    if (S.docenten.length) bladen.push(["Per docent", this.blad(groep("Docent", S.docenten), [30, 8, 10, 8, 13, 7, 8, 12, 12])]);
-    bladen.push(["Per weekdag", this.blad(groep("Weekdag", S.dagen), [14, 8, 10, 8, 13, 7, 8, 12, 12])]);
-    bladen.push(["Per lesuur", this.blad(groep("Begintijd", S.uren), [12, 8, 10, 8, 13, 7, 8, 12, 12])]);
-    bladen.push(["Per week", this.blad([["Jaar", "Week", ...this.KOP], ...S.weken.map((w) => [w.y, w.week, ...this.cijfers(w)])], [8, 7, 8, 10, 8, 13, 7, 8, 12, 12])]);
-    bladen.push(["Per maand", this.blad([["Jaar", "Maand", ...this.KOP], ...S.maanden.map((m) => [m.y, m.label, ...this.cijfers(m)])], [8, 8, 8, 10, 8, 13, 7, 8, 12, 12])]);
+    if (S.docenten.length) bladen.push(["Per docent", this.blad(groep("Docent", S.docenten), [30, ...this.KB])]);
+    bladen.push(["Per weekdag", this.blad(groep("Weekdag", S.dagen), [14, ...this.KB])]);
+    bladen.push(["Per lesuur", this.blad(groep("Begintijd", S.uren), [12, ...this.KB])]);
+    bladen.push(["Per week", this.blad([["Jaar", "Week", ...this.KOP], ...S.weken.map((w) => [w.y, w.week, ...this.cijfers(w)])], [8, 7, ...this.KB])]);
+    bladen.push(["Per maand", this.blad([["Jaar", "Maand", ...this.KOP], ...S.maanden.map((m) => [m.y, m.label, ...this.cijfers(m)])], [8, 8, ...this.KB])]);
     const CAT = { OK: "aanwezig", TL: "te laat", ZK: "ziek", AB_OK: "absent, geoorloofd", AB_NO: "absent, ongeoorloofd", UI: "uitgestuurd", VR: "vrijgesteld" };
     const tijd = (d) => d && !isNaN(d) ? `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` : "";
     bladen.push(["Lessen", this.blad([["Datum", "Begin", "Einde", "Vak", "Docent", "Telt als", "Registraties"],
@@ -257,7 +263,9 @@ DT.register({
       await wacht(150);
       const a = await api(`/api/leerlingen/${id}/afspraken?status=actief&begin=${this.ymd(van)}&einde=${this.ymd(tot)}`);
       await wacht(150);
-      return { regs: lijst(v), rooster: lijst(a), status: v.status !== 200 ? v.status : a.status };
+      const regs = lijst(v), rooster = lijst(a);
+      if (regs && rooster) rooster.push(...await vzLosseLessen(id, regs, rooster, api));
+      return { regs, rooster, status: v.status !== 200 ? v.status : a.status };
     };
     const uit = [];
     let i = 0;
@@ -285,7 +293,7 @@ DT.register({
     /* Blad 1: per leerling */
     const kop = ["Leerling", "Stamnummer", "Klas", ...this.KOP, ...(vergelijk ? ["Dit jaar % t/m vandaag", "Vorig jaar % t/m zelfde datum", "Verschil (procentpunt)"] : [])];
     const rijen = uit.map(({ l, S, V, status }) => {
-      const basis = [l.naam, l.stam, l.klas, ...(S ? this.cijfers(S.totaal) : [`niet op te halen (${status === 429 ? "Magister: te veel aanvragen" : status})`, "", "", "", "", "", "", "", ""])];
+      const basis = [l.naam, l.stam, l.klas, ...(S ? this.cijfers(S.totaal) : [`niet op te halen (${status === 429 ? "Magister: te veel aanvragen" : status})`, ...Array(this.KOP.length - 1).fill("")])];
       if (!vergelijk) return basis;
       const a = V?.nu && V.nu.telt ? V.nu.pct : null, b = V?.vorig && V.vorig.telt ? V.vorig.pct : null;
       return [...basis, a == null ? "" : this.pct(a), b == null ? "geen gegevens" : this.pct(b), a != null && b != null ? a - b : ""];
@@ -293,10 +301,11 @@ DT.register({
     const ok = uit.filter((x) => x.S && x.S.totaal.telt > 0).map((x) => x.S.totaal);
     const som = (k) => ok.reduce((s, t) => s + t[k], 0);
     const telt = som("telt"), afw = som("afwezig");
-    const totaal = [titel && /^Selectie/.test(titel) ? "Totaal selectie" : "Klas totaal", "", "", som("lessen"), telt, telt - afw, afw, som("ongeoorloofd"), som("ziek"), som("teLaat"), som("vrij"), telt ? this.pct(Math.round(100 * (telt - afw) / telt)) : ""];
+    const perT = (k) => ok.reduce((x, t) => x + ((t.per || {})[k] || 0), 0);
+    const totaal = [titel && /^Selectie/.test(titel) ? "Totaal selectie" : "Klas totaal", "", "", som("lessen"), telt, telt - afw, som("teLaat"), afw, perT("ZK"), perT("AB_OK"), perT("AB_NO"), perT("UI"), som("vrij"), telt ? this.pct(Math.round(100 * (telt - afw) / telt)) : ""];
     const gem = ok.length ? Math.round(ok.reduce((s, t) => s + t.pct, 0) / ok.length) : null;
-    const blad1 = this.blad([kop, ...rijen, [], totaal, ["Gemiddelde per leerling", "", "", "", "", "", "", "", "", "", "", gem == null ? "" : this.pct(gem)]],
-      [28, 11, 9, 10, 12, 10, 8, 13, 7, 8, 12, 12, ...(vergelijk ? [20, 26, 20] : [])]);
+    const blad1 = this.blad([kop, ...rijen, [], totaal, ["Gemiddelde per leerling", "", "", ...Array(this.KOP.length - 1).fill(""), gem == null ? "" : this.pct(gem)]],
+      [28, 11, 9, ...this.KB, ...(vergelijk ? [20, 26, 20] : [])]);
     blad1["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rijen.length, c: kop.length - 1 } }) };
 
     /* Blad 2: aanwezig % per vak per leerling */

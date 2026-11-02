@@ -107,6 +107,7 @@ DT.register({
         DT.api(`/api/leerlingen/${id}/afspraken?status=actief&begin=${ymd(vanaf)}&einde=${ymd(today)}`, { full: true, timeout: 20000 }),
       ]);
       const regs = list(v), rooster = list(a);
+      if (regs && rooster) rooster.push(...await vzLosseLessen(id, regs, rooster, (u) => DT.api(u, { full: true, timeout: 10000 })));
       this._data = { id, at: Date.now(), regs, rooster, err: { regs: v.status, rooster: a.status }, sj: sj.getTime(), jaren: "laden" };
       this.render();
       this.loadJaren(DT, id, sj);
@@ -125,7 +126,9 @@ DT.register({
         DT.api(`/api/m6/leerlingen/${id}/verantwoordingen?begin=${ymd(van)}&einde=${ymd(tot)}`, { full: true, timeout: 25000 }),
         DT.api(`/api/leerlingen/${id}/afspraken?status=actief&begin=${ymd(van)}&einde=${ymd(tot)}`, { full: true, timeout: 25000 }),
       ]);
-      jaren.push({ k, van: van.getTime(), tot: tot.getTime() + 864e5 - 1, regs: list(v), rooster: list(a), status: { regs: v.status, rooster: a.status } });
+      const regsJ = list(v), roosterJ = list(a);
+      if (regsJ && roosterJ && roosterJ.length) roosterJ.push(...await vzLosseLessen(id, regsJ, roosterJ, (u) => DT.api(u, { full: true, timeout: 10000 })));
+      jaren.push({ k, van: van.getTime(), tot: tot.getTime() + 864e5 - 1, regs: regsJ, rooster: roosterJ, status: { regs: v.status, rooster: a.status } });
     }
     if (this._data && this._data.id === id) { this._data.jaren = jaren; if (this._active) this.render(); }
   },
@@ -379,6 +382,22 @@ DT.register({
   }
 });
 
+/* Registraties bij lessen die niet in het rooster van de leerling staan (bijv. na een wissel van
+ * lesgroep, of een les die later is vervallen) los ophalen, zodat vak en docent bekend zijn in plaats
+ * van "Onbekend". Hooguit 80 per keer; api is DT.api of een variant die opnieuw probeert. */
+async function vzLosseLessen(id, regs, rooster, api, max = 80) {
+  const bekend = new Set((rooster || []).map((a) => String(a.id)));
+  const mis = [...new Set((regs || []).map((it) => (it.afspraak || it.appointment || it).id).filter((x) => x != null && !bekend.has(String(x))))].slice(0, max);
+  const uit = [];
+  for (const aid of mis) {
+    const r = await api(`/api/leerlingen/${id}/afspraken/${aid}`);
+    const a = r && r.status === 200 && r.json ? (r.json.items ? r.json.items[0] : r.json) : null;
+    if (a && (a.start || a.begin)) uit.push({ ...a, id: a.id ?? aid, _metRegistratie: true });
+    await new Promise((res) => setTimeout(res, 80));
+  }
+  return uit;
+}
+
 /* Statistiek: per les één categorie (afwezigheidstype > te laat > aanwezig), gegroepeerd. */
 function vzStats(regs, rooster, van, tot) {
   const ABSENT = new Set(["AB", "ZK", "UI"]);
@@ -395,8 +414,8 @@ function vzStats(regs, rooster, van, tot) {
   const metOnderwijstijd = rooster.some((a) => a && a.onderwijstijd != null);
   for (const a of rooster) {
     const b = new Date(a.start || a.begin), e = new Date(a.einde || a.eind);
-    if (isNaN(b) || isNaN(e) || e > tot || b < van || a.status === 5 || a.isVervallen === true) continue;
-    if (metOnderwijstijd && a.onderwijstijd == null) continue;
+    if (isNaN(b) || isNaN(e) || e > tot || b < van) continue;
+    if (!a._metRegistratie && (a.status === 5 || a.isVervallen === true || (metOnderwijstijd && a.onderwijstijd == null))) continue;
     const l = { id: a.id, begin: b, einde: e, vak: names(a.vakken, ["naam", "omschrijving", "code"]).join(", ") || a.omschrijving || "Onbekend", docent: docentenVan(a), cat: "OK", extra: 0, regs: "" };
     lessen.push(l); if (a.id != null) byId.set(String(a.id), l); byStart.set(b.getTime(), l);
   }
@@ -408,7 +427,7 @@ function vzStats(regs, rooster, van, tot) {
     const raw = it.verantwoordingen || it.registraties || it.registrations || (it.verantwoording ? [it.verantwoording] : []);
     const rs = raw.map((r) => ({ type: norm(r.reden?.verantwoordingType ?? r.verantwoordingType ?? r.reden?.code ?? r.attendanceTypeCode ?? r.code ?? r.type ?? ""), ok: r.reden?.isGeoorloofd ?? r.isGeoorloofd ?? r.geoorloofd ?? r.approved ?? true }));
     let l = (a.id != null && byId.get(String(a.id))) || byStart.get(b.getTime());
-    if (!l) { l = { id: a.id, begin: b, einde: e, vak: a.omschrijving || "Onbekend", docent: "", cat: "OK", extra: 0, regs: "" }; lessen.push(l); onbekend++; }
+    if (!l) { l = { id: a.id, begin: b, einde: e, vak: a.omschrijving || "Onbekend (niet in rooster)", docent: "", cat: "OK", extra: 0, regs: "" }; lessen.push(l); onbekend++; }
     /* Voor de export: alle registraties van de les als tekst, met (on)geoorloofd */
     const NAAM = { AB: "absent", TL: "te laat", ZK: "ziek", UI: "uitgestuurd", VR: "vrijstelling", MV: "materiaal vergeten", HV: "huiswerk vergeten", MK: "mobiel in klas", ON: "onbekend" };
     l.regs = rs.filter((r) => r.type).map((r) => (NAAM[r.type] || r.type.toLowerCase()) + (["AB", "TL", "UI"].includes(r.type) ? (r.ok ? " (geoorloofd)" : " (ongeoorloofd)") : "")).join(", ");
