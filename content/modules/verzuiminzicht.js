@@ -389,9 +389,14 @@ function vzStats(regs, rooster, van, tot) {
   /* Rooster: lessen in de periode, op id en op begintijd */
   const byId = new Map(), byStart = new Map();
   const lessen = [];
+  /* Alleen echte lessen: Magister geeft lessen "onderwijstijd" (zo bepaalt het ook of een les verantwoord
+   * moet worden). Persoonlijke afspraken, gesprekken en activiteiten hebben die niet. Kent het rooster
+   * dat veld helemaal niet, dan tellen alle afspraken mee. */
+  const metOnderwijstijd = rooster.some((a) => a && a.onderwijstijd != null);
   for (const a of rooster) {
     const b = new Date(a.start || a.begin), e = new Date(a.einde || a.eind);
     if (isNaN(b) || isNaN(e) || e > tot || b < van || a.status === 5 || a.isVervallen === true) continue;
+    if (metOnderwijstijd && a.onderwijstijd == null) continue;
     const l = { id: a.id, begin: b, einde: e, vak: names(a.vakken, ["naam", "omschrijving", "code"]).join(", ") || a.omschrijving || "Onbekend", docent: docentenVan(a), cat: "OK", extra: 0, regs: "" };
     lessen.push(l); if (a.id != null) byId.set(String(a.id), l); byStart.set(b.getTime(), l);
   }

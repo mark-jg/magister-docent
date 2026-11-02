@@ -98,10 +98,10 @@ DT.register({
 
   /* Cijferrij voor een groep uit vzStats: lessen (tellen mee), aanwezig, gemist, ongeoorloofd, ziek, te laat, vrijgesteld, % */
   cijfers(g) {
-    if (!g) return ["", "", "", "", "", "", "", ""];
-    return [g.telt, g.telt - g.afwezig, g.afwezig, g.ongeoorloofd, g.ziek, g.teLaat, g.vrij, g.telt > 0 ? this.pct(g.pct) : ""];
+    if (!g) return ["", "", "", "", "", "", "", "", ""];
+    return [g.lessen, g.telt, g.telt - g.afwezig, g.afwezig, g.ongeoorloofd, g.ziek, g.teLaat, g.vrij, g.telt > 0 ? this.pct(g.pct) : ""];
   },
-  KOP: ["Lessen", "Aanwezig", "Gemist", "Ongeoorloofd", "Ziek", "Te laat", "Vrijgesteld", "Aanwezig %"],
+  KOP: ["Lessen in rooster", "Lessen (tellen mee)", "Aanwezig", "Gemist", "Ongeoorloofd", "Ziek", "Te laat", "Vrijgesteld", "Aanwezig %"],
 
   blad(rows, breedtes, { filter = true } = {}) {
     const ws = XLSX.utils.aoa_to_sheet(rows, { dateNF: "dd-mm-yyyy" });
@@ -122,7 +122,9 @@ DT.register({
       ["Afwezig (gemist)", "Absent, ziek of uitgestuurd."],
       ["Te laat", "Telt als aanwezig, maar wordt apart geteld."],
       ["Vrijgesteld", "Met toestemming; telt niet mee in het percentage."],
-      ["Lessen", "Lessen die meetellen: alle lessen in het rooster min de vrijgestelde lessen."],
+      ["Lessen in rooster", "Alle lessen in het rooster van de leerling in de periode (afspraken met onderwijstijd), inclusief vrijgestelde lessen."],
+      ["Lessen (tellen mee)", "Lessen die meetellen: alle lessen in het rooster (afspraken met onderwijstijd, zoals Magister ze voor verantwoorden gebruikt) min de vrijgestelde lessen. Persoonlijke afspraken, gesprekken en activiteiten tellen niet mee."],
+      ["Verschil tussen leerlingen", "Ook binnen één klas kan het aantal lessen verschillen: vrijstellingen, keuzedelen of andere lesgroepen, stage/BPV en later instromen."],
       ["Aanwezig %", "(Lessen − gemist) / lessen."],
       ...extra,
       ["Gemaakt op", new Date().toLocaleString("nl-NL")], ["Gemaakt met", `Docent Tools voor Magister ${DT.version || ""}`]];
@@ -237,11 +239,24 @@ DT.register({
   async klasBestand(DT, { lln, titel }, periode, vergelijk, voortgang) {
     const now = new Date();
     const lijst = (r) => (r && r.status === 200 && r.json) ? (Array.isArray(r.json) ? r.json : r.json.items || []) : null;
+    /* Magister begrenst het aantal aanvragen (429 = te veel tegelijk). Daarom na elkaar, met een
+     * korte pauze, en bij 429/503 wachten en opnieuw proberen (steeds langer). */
+    const wacht = (ms) => new Promise((r) => setTimeout(r, ms));
+    const api = async (url) => {
+      let r;
+      for (let poging = 0; poging < 6; poging++) {
+        r = await DT.api(url, { full: true, timeout: 25000 });
+        if (r.status !== 429 && r.status !== 503) return r;
+        voortgang(i, lln.length, `even wachten, Magister vraagt om rustiger aan te doen…`);
+        await wacht(1500 * 2 ** poging);
+      }
+      return r;
+    };
     const haal = async (id, van, tot) => {
-      const [v, a] = await Promise.all([
-        DT.api(`/api/m6/leerlingen/${id}/verantwoordingen?begin=${this.ymd(van)}&einde=${this.ymd(tot)}`, { full: true, timeout: 25000 }),
-        DT.api(`/api/leerlingen/${id}/afspraken?status=actief&begin=${this.ymd(van)}&einde=${this.ymd(tot)}`, { full: true, timeout: 25000 }),
-      ]);
+      const v = await api(`/api/m6/leerlingen/${id}/verantwoordingen?begin=${this.ymd(van)}&einde=${this.ymd(tot)}`);
+      await wacht(150);
+      const a = await api(`/api/leerlingen/${id}/afspraken?status=actief&begin=${this.ymd(van)}&einde=${this.ymd(tot)}`);
+      await wacht(150);
       return { regs: lijst(v), rooster: lijst(a), status: v.status !== 200 ? v.status : a.status };
     };
     const uit = [];
@@ -264,13 +279,13 @@ DT.register({
         i++; voortgang(i, lln.length, l.naam);
       }
     };
-    await Promise.all([doe(), doe(), doe()]);
+    await Promise.all([doe(), doe()]);
     uit.sort((a, b) => lln.indexOf(a.l) - lln.indexOf(b.l));
 
     /* Blad 1: per leerling */
     const kop = ["Leerling", "Stamnummer", "Klas", ...this.KOP, ...(vergelijk ? ["Dit jaar % t/m vandaag", "Vorig jaar % t/m zelfde datum", "Verschil (procentpunt)"] : [])];
     const rijen = uit.map(({ l, S, V, status }) => {
-      const basis = [l.naam, l.stam, l.klas, ...(S ? this.cijfers(S.totaal) : [`niet op te halen (${status})`, "", "", "", "", "", "", ""])];
+      const basis = [l.naam, l.stam, l.klas, ...(S ? this.cijfers(S.totaal) : [`niet op te halen (${status === 429 ? "Magister: te veel aanvragen" : status})`, "", "", "", "", "", "", "", ""])];
       if (!vergelijk) return basis;
       const a = V?.nu && V.nu.telt ? V.nu.pct : null, b = V?.vorig && V.vorig.telt ? V.vorig.pct : null;
       return [...basis, a == null ? "" : this.pct(a), b == null ? "geen gegevens" : this.pct(b), a != null && b != null ? a - b : ""];
@@ -278,10 +293,10 @@ DT.register({
     const ok = uit.filter((x) => x.S && x.S.totaal.telt > 0).map((x) => x.S.totaal);
     const som = (k) => ok.reduce((s, t) => s + t[k], 0);
     const telt = som("telt"), afw = som("afwezig");
-    const totaal = [titel && /^Selectie/.test(titel) ? "Totaal selectie" : "Klas totaal", "", "", telt, telt - afw, afw, som("ongeoorloofd"), som("ziek"), som("teLaat"), som("vrij"), telt ? this.pct(Math.round(100 * (telt - afw) / telt)) : ""];
+    const totaal = [titel && /^Selectie/.test(titel) ? "Totaal selectie" : "Klas totaal", "", "", som("lessen"), telt, telt - afw, afw, som("ongeoorloofd"), som("ziek"), som("teLaat"), som("vrij"), telt ? this.pct(Math.round(100 * (telt - afw) / telt)) : ""];
     const gem = ok.length ? Math.round(ok.reduce((s, t) => s + t.pct, 0) / ok.length) : null;
-    const blad1 = this.blad([kop, ...rijen, [], totaal, ["Gemiddelde per leerling", "", "", "", "", "", "", "", "", "", gem == null ? "" : this.pct(gem)]],
-      [28, 11, 9, 8, 10, 8, 13, 7, 8, 12, 12, ...(vergelijk ? [20, 26, 20] : [])]);
+    const blad1 = this.blad([kop, ...rijen, [], totaal, ["Gemiddelde per leerling", "", "", "", "", "", "", "", "", "", "", gem == null ? "" : this.pct(gem)]],
+      [28, 11, 9, 10, 12, 10, 8, 13, 7, 8, 12, 12, ...(vergelijk ? [20, 26, 20] : [])]);
     blad1["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rijen.length, c: kop.length - 1 } }) };
 
     /* Blad 2: aanwezig % per vak per leerling */

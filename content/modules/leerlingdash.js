@@ -89,9 +89,11 @@ DT.register({
       const items = list(v), rooster = list(a);
       if (!items || !rooster || !rooster.length) return null;
       const perMaand = {}; let totaal = 0;
+      const metOT = rooster.some((y) => y && y.onderwijstijd != null);
       for (const x of rooster) {
         const b = new Date(x.start || x.begin), e = new Date(x.einde || x.eind);
         if (isNaN(b) || isNaN(e) || e > tot || x.status === 5 || x.isVervallen === true) continue;
+        if (metOT && x.onderwijstijd == null) continue; // alleen lessen
         const k = `${b.getFullYear()}-${b.getMonth()}`; perMaand[k] = (perMaand[k] || 0) + 1; totaal++;
       }
       const att = aanwezigheid(items, totaal, van, tot, perMaand);
@@ -121,9 +123,11 @@ DT.register({
       const l = list(r);
       if (l) {
         lessenPerMaand = {}; lessenTotaal = 0;
+        const metOT = l.some((x) => x && x.onderwijstijd != null); // alleen lessen tellen als het rooster onderwijstijd kent
         for (const a of l) {
           const b = new Date(a.start || a.begin), e = new Date(a.einde || a.eind);
           if (isNaN(b) || isNaN(e) || e > today || a.status === 5 || a.isVervallen === true) continue;
+          if (metOT && a.onderwijstijd == null) continue; // alleen lessen
           const k = `${b.getFullYear()}-${b.getMonth()}`; lessenPerMaand[k] = (lessenPerMaand[k] || 0) + 1; lessenTotaal++;
         }
       }
