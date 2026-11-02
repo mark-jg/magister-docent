@@ -220,22 +220,41 @@
    * Magister houdt de selectie in zijn eigen store en toont de lijst met virtueel scrollen (alleen
    * zichtbare rijen bestaan). Daarom: de zoekresultaten uit /api/leerlingen/zoeken bewaren en de
    * vinkjes volgen die je zet. "Alles selecteren" = alle leerlingen van de zoekopdracht. */
-  const llZoek = { key: null, total: 0, byId: new Map(), selected: new Set(), all: false, uit: new Set() };
+  const llZoek = { key: null, total: 0, byId: new Map(), selected: new Set(), all: false, uit: new Set(), los: new Map() };
   function llZoekAntwoord(url, body) {
     let j = body; try { if (typeof body === "string") j = JSON.parse(body); } catch { return; }
     if (!j || !Array.isArray(j.items)) return;
     const u = new URL(url, location.href);
     const key = [...u.searchParams].filter(([k]) => !["top", "skip", "orderby", "velden"].includes(k)).map((x) => x.join("=")).sort().join("&");
-    if (key !== llZoek.key) { llZoek.key = key; llZoek.byId.clear(); llZoek.selected.clear(); llZoek.uit.clear(); llZoek.all = false; }
+    if (key !== llZoek.key) { llZoek.key = key; llZoek.byId.clear(); llZoek.selected.clear(); llZoek.uit.clear(); llZoek.los.clear(); llZoek.all = false; }
     if (typeof j.totalCount === "number") llZoek.total = j.totalCount;
     for (const it of j.items) if (it && it.id != null) llZoek.byId.set(it.id, it);
   }
   const llNaam = (x) => [x.roepnaam, x.tussenvoegsel, x.achternaam].filter(Boolean).join(" ");
+  /* Stand van een vinkje, op meerdere manieren (eigenschap, attribuut, aria, ingebouwd invoerveld) */
+  const llAan = (cb) => {
+    if (!cb) return null;
+    if (typeof cb.checked === "boolean") return cb.checked;
+    const at = cb.getAttribute("checked"); if (at !== null) return at !== "false";
+    const ar = cb.getAttribute("aria-checked") || cb.shadowRoot?.querySelector("[aria-checked]")?.getAttribute("aria-checked"); if (ar) return ar === "true";
+    const inp = cb.shadowRoot?.querySelector("input[type=checkbox]") || cb.querySelector("input[type=checkbox]"); if (inp) return inp.checked;
+    return null;
+  };
+  const llVak = (el) => el?.closest?.("td.select, th.select")?.querySelector("dna-checkbox, input[type=checkbox], [role=checkbox]") || null;
+  /* Rij -> { code, naam } uit de cellen, en -> leerling uit de bewaarde zoekresultaten */
+  const llCellen = (tr) => {
+    const code = (tr.querySelector("td.stamnummer")?.textContent || "").trim();
+    const av = tr.querySelector("td.naam dna-avatar");
+    const naam = ((av && (av.displayName || av.getAttribute("display-name") || av.getAttribute("displayname"))) || tr.querySelector("td.naam")?.textContent || "").replace(/\s+/g, " ").trim();
+    return { code, naam };
+  };
   const llRij = (tr) => {
-    const code = tr.querySelector("td.stamnummer")?.textContent.trim();
-    if (code) for (const x of llZoek.byId.values()) if (String(x.code) === code) return x;
-    const naam = tr.querySelector("td.naam")?.textContent.replace(/\s+/g, " ").trim();
-    if (naam) for (const x of llZoek.byId.values()) { const n = llNaam(x), m = [x.achternaam, x.tussenvoegsel, x.roepnaam].filter(Boolean).join(" "); if (naam.includes(n) || naam.includes(m) || (x.achternaam && naam.includes(x.achternaam) && x.roepnaam && naam.includes(x.roepnaam))) return x; }
+    const { code, naam } = llCellen(tr);
+    if (code) for (const x of llZoek.byId.values()) if (String(x.code ?? x.stamnummer) === code) return x;
+    if (naam) for (const x of llZoek.byId.values()) {
+      const n = llNaam(x), m = [x.achternaam, x.tussenvoegsel, x.roepnaam].filter(Boolean).join(" "), k = `${[x.tussenvoegsel, x.achternaam].filter(Boolean).join(" ")}, ${x.roepnaam}`;
+      if (naam.includes(n) || naam.includes(m) || naam.includes(k) || (x.achternaam && x.roepnaam && naam.includes(x.achternaam) && naam.includes(x.roepnaam))) return x;
+    }
     return null;
   };
   const llZet = (x, aan) => {
@@ -243,31 +262,45 @@
     if (llZoek.all) { if (aan) llZoek.uit.delete(x.id); else llZoek.uit.add(x.id); }
     else if (aan) llZoek.selected.add(x.id); else llZoek.selected.delete(x.id);
   };
-  /* Zichtbare rijen bijwerken uit de vinkjes zelf (vangt ook resets door Magister op) */
+  const llRijen = () => [...document.querySelectorAll("td.select")].map((td) => td.closest("tr")).filter((tr) => tr && !tr.closest("thead"));
+  /* Zichtbare rijen bijwerken uit de vinkjes zelf; geeft aangevinkte rijen die (nog) niet te koppelen zijn terug */
   const llScan = () => {
-    const kop = document.querySelector("th.select dna-checkbox");
-    if (kop && kop.checked === false && kop.indeterminate === false && llZoek.all) { llZoek.all = false; llZoek.uit.clear(); llZoek.selected.clear(); }
-    for (const cb of document.querySelectorAll("tbody td.select dna-checkbox, tr td.select dna-checkbox")) {
-      const tr = cb.closest("tr"); if (!tr || tr.closest("thead")) continue;
-      if (typeof cb.checked === "boolean") llZet(llRij(tr), cb.checked);
+    const kop = llVak(document.querySelector("th.select"));
+    const kopAan = llAan(kop);
+    if (kopAan === true && !(kop && kop.indeterminate)) { if (!llZoek.all) { llZoek.all = true; llZoek.uit.clear(); llZoek.selected.clear(); } }
+    else if (kopAan === false && !(kop && kop.indeterminate) && !kop?.hasAttribute?.("indeterminate") && llZoek.all) { llZoek.all = false; llZoek.uit.clear(); llZoek.selected.clear(); llZoek.los.clear(); }
+    let aangevinkt = 0, rijen = 0;
+    for (const tr of llRijen()) {
+      rijen++;
+      const aan = llAan(llVak(tr.querySelector("td.select")));
+      if (aan === null) continue;
+      if (aan) aangevinkt++;
+      const x = llRij(tr);
+      if (x) { llZet(x, aan); continue; }
+      /* Niet te koppelen (zoekresultaat niet gezien): op stamnummer/naam onthouden, ook buiten beeld */
+      const c = llCellen(tr), k = c.code || c.naam;
+      if (k) { if (aan) llZoek.los.set(k, c); else llZoek.los.delete(k); }
     }
+    return { los: [...llZoek.los.values()], aangevinkt, rijen, kopAan };
   };
   if (/\/op-leerlingen\//.test(location.pathname)) {
-    document.addEventListener("change", (e) => {
-      const cb = e.target && e.target.closest ? e.target.closest("dna-checkbox") : null;
-      if (!cb || !cb.closest("td.select, th.select")) return;
-      setTimeout(() => {
-        if (cb.closest("thead") || cb.closest("th.select")) { llZoek.all = !!cb.checked; llZoek.uit.clear(); llZoek.selected.clear(); }
-        else llZet(llRij(cb.closest("tr")), !!cb.checked);
-      }, 0);
-    }, true);
+    const opVinkje = (e) => {
+      const td = e.target && e.target.closest ? e.target.closest("td.select, th.select") : null;
+      if (!td) return;
+      setTimeout(() => { try { llScan(); } catch {} }, 60);
+      setTimeout(() => { try { llScan(); } catch {} }, 400);
+    };
+    document.addEventListener("change", opVinkje, true);
+    document.addEventListener("click", opVinkje, true);
+    document.addEventListener("keyup", (e) => { if (e.key === " " || e.key === "Enter") opVinkje(e); }, true);
   }
   window.addEventListener("message", (e) => {
     if (!(e.data && e.data.type === "dt:llsel:get" && trusted(e))) return;
-    try { llScan(); } catch {}
+    let scan = { los: [], aangevinkt: 0, rijen: 0, kopAan: null };
+    try { scan = llScan(); } catch {}
     const ids = llZoek.all ? [...llZoek.byId.keys()].filter((id) => !llZoek.uit.has(id)) : [...llZoek.selected];
     const lln = ids.map((id) => llZoek.byId.get(id)).filter(Boolean).map((x) => ({ id: x.id, naam: llNaam(x), achternaam: x.achternaam || "", stam: x.code ?? x.stamnummer ?? "", klas: Array.isArray(x.klassen) ? x.klassen.join(", ") : (x.klassen || x.stamklas || "") }));
     const verwacht = llZoek.all ? Math.max(0, llZoek.total - llZoek.uit.size) : lln.length;
-    reply(e, { type: "dt:llsel:result", id: e.data.id, lln, verwacht, geladen: llZoek.byId.size, totaal: llZoek.total });
+    reply(e, { type: "dt:llsel:result", id: e.data.id, lln, los: scan.los, verwacht, geladen: llZoek.byId.size, totaal: llZoek.total, zichtbaar: scan.rijen, zichtbaarAan: scan.aangevinkt, alles: llZoek.all, kopAan: scan.kopAan });
   });
 })();

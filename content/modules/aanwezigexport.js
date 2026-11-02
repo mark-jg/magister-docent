@@ -32,6 +32,21 @@ DT.register({
     });
   },
 
+  /* Aangevinkte rijen die niet aan een bewaard zoekresultaat te koppelen zijn, opzoeken via
+   * Magisters zoek-API (op stamnummer, anders op naam). */
+  async aanvullen(DT, sel) {
+    const lln = [...(sel.lln || [])], ids = new Set(lln.map((x) => x.id));
+    const peil = this.ymd(new Date());
+    for (const r of sel.los || []) {
+      const q = r.code || r.naam; if (!q) continue;
+      const res = await DT.api(`/api/leerlingen/zoeken?q=${encodeURIComponent(q)}&top=10&skip=0&peildatum=${peil}`, { full: true, timeout: 10000 });
+      const items = res.status === 200 && res.json ? (res.json.items || []) : [];
+      const x = items.find((i) => r.code && String(i.code ?? i.stamnummer) === r.code) || (items.length === 1 ? items[0] : null);
+      if (x && !ids.has(x.id)) { ids.add(x.id); lln.push({ id: x.id, naam: this.naam(x), achternaam: x.achternaam || "", stam: x.code ?? x.stamnummer ?? "", klas: Array.isArray(x.klassen) ? x.klassen.join(", ") : (x.klassen || "") }); }
+    }
+    return lln.sort((a, b) => a.achternaam.localeCompare(b.achternaam, "nl") || a.naam.localeCompare(b.naam, "nl"));
+  },
+
   async knopOverzicht(DT) {
     const top = document.querySelector("ll-top-bar");
     if (!top) { this._knop?.remove(); this._knop = null; return; }
@@ -40,15 +55,21 @@ DT.register({
       b.innerHTML = `<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M8 2.5v7.5M4.5 6.8 8 10.3l3.5-3.5M3 13.5h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Aanwezigheid naar Excel</span><small></small>`;
       b.addEventListener("click", async () => {
         const sel = await this.selectie();
-        if (!sel.lln.length) return DT.toast("Vink eerst de leerlingen aan die je in het overzicht wilt hebben.", "info", 4000);
-        if (sel.verwacht > sel.lln.length) DT.toast(`Van ${sel.verwacht - sel.lln.length} aangevinkte leerlingen zijn de gegevens nog niet geladen; scroll door de lijst of vink ze opnieuw aan.`, "info", 6000);
-        this.klas(DT, { lln: sel.lln, titel: "Selectie uit het leerlingenoverzicht" });
+        const lln = await this.aanvullen(DT, sel);
+        if (!lln.length) {
+          console.info("[Docent Tools] selectie leerlingenoverzicht", sel);
+          return DT.toast(sel.zichtbaarAan
+            ? `Er zijn ${sel.zichtbaarAan} leerlingen aangevinkt, maar ze konden niet worden opgezocht (zoekresultaten gezien: ${sel.geladen}). Meld dit met een paginarapport van deze lijst (Alt+I, R).`
+            : `Vink eerst de leerlingen aan die je in het overzicht wilt hebben. (Zichtbare rijen: ${sel.zichtbaar}, zoekresultaten gezien: ${sel.geladen}.)`, sel.zichtbaarAan ? "err" : "info", 7000);
+        }
+        if (sel.verwacht > lln.length) DT.toast(`Van ${sel.verwacht - lln.length} aangevinkte leerlingen zijn de gegevens nog niet geladen; scroll door de lijst of vink ze opnieuw aan.`, "info", 6000);
+        this.klas(DT, { lln, titel: "Selectie uit het leerlingenoverzicht" });
       });
       this.cssOverzicht();
       top.prepend(b); this._knop = b;
     }
     const sel = await this.selectie();
-    const n = sel.lln.length;
+    const n = Math.max(sel.lln.length + (sel.los || []).length, sel.zichtbaarAan || 0, sel.alles ? sel.verwacht : 0);
     this._knop.classList.toggle("is-leeg", !n);
     this._knop.querySelector("small").textContent = n ? `${n} geselecteerd` : "vink leerlingen aan";
   },
