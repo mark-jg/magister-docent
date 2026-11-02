@@ -48,6 +48,7 @@
       if (res.ok && sameApi(url) && (init?.headers || input?.headers)) {
         const h = {}; new Headers(init?.headers || input.headers).forEach((v, k) => { h[k] = v; }); lastHeaders = h;
       }
+      if (res.ok && /\/api\/leerlingen\/zoeken\?/.test(url)) res.clone().text().then((t) => llZoekAntwoord(url, t)).catch(() => {});
       if (/magister\.net/.test(new URL(url, location.href).host) && /api|\.json|graphql/i.test(url)) {
         res.clone().text().then((t) => record((init && init.method) || "GET", url, res.status, t, performance.now() - t0)).catch(() => {});
       }
@@ -62,6 +63,8 @@
     const t0 = performance.now();
     this.addEventListener("loadend", () => {
       try {
+        if (this.__dt && /\/api\/leerlingen\/zoeken\?/.test(this.__dt.u) && this.status === 200 && (this.responseType === "" || this.responseType === "text")) llZoekAntwoord(this.__dt.u, this.responseText);
+        else if (this.__dt && /\/api\/leerlingen\/zoeken\?/.test(this.__dt.u) && this.status === 200 && this.responseType === "json") llZoekAntwoord(this.__dt.u, this.response);
         if (this.__dt && /api|\.json|graphql/i.test(this.__dt.u) && (this.responseType === "" || this.responseType === "text")) record(this.__dt.m, this.__dt.u, this.status, this.responseText, performance.now() - t0, this.status === 0 ? "mislukt" : undefined);
         if (this.__dt && this.status >= 200 && this.status < 300 && sameApi(this.__dt.u) && Object.keys(this.__dt.h).length) lastHeaders = { ...this.__dt.h };
       } catch {}
@@ -211,5 +214,60 @@
       }
     } catch (err) { error = String(err && err.message || err); }
     reply(e, { type: "dt:periode:result", id, ok, error });
+  });
+
+  /* ---- Leerlingenoverzicht (op-leerlingen): zoekresultaten en selectie ----
+   * Magister houdt de selectie in zijn eigen store en toont de lijst met virtueel scrollen (alleen
+   * zichtbare rijen bestaan). Daarom: de zoekresultaten uit /api/leerlingen/zoeken bewaren en de
+   * vinkjes volgen die je zet. "Alles selecteren" = alle leerlingen van de zoekopdracht. */
+  const llZoek = { key: null, total: 0, byId: new Map(), selected: new Set(), all: false, uit: new Set() };
+  function llZoekAntwoord(url, body) {
+    let j = body; try { if (typeof body === "string") j = JSON.parse(body); } catch { return; }
+    if (!j || !Array.isArray(j.items)) return;
+    const u = new URL(url, location.href);
+    const key = [...u.searchParams].filter(([k]) => !["top", "skip", "orderby", "velden"].includes(k)).map((x) => x.join("=")).sort().join("&");
+    if (key !== llZoek.key) { llZoek.key = key; llZoek.byId.clear(); llZoek.selected.clear(); llZoek.uit.clear(); llZoek.all = false; }
+    if (typeof j.totalCount === "number") llZoek.total = j.totalCount;
+    for (const it of j.items) if (it && it.id != null) llZoek.byId.set(it.id, it);
+  }
+  const llNaam = (x) => [x.roepnaam, x.tussenvoegsel, x.achternaam].filter(Boolean).join(" ");
+  const llRij = (tr) => {
+    const code = tr.querySelector("td.stamnummer")?.textContent.trim();
+    if (code) for (const x of llZoek.byId.values()) if (String(x.code) === code) return x;
+    const naam = tr.querySelector("td.naam")?.textContent.replace(/\s+/g, " ").trim();
+    if (naam) for (const x of llZoek.byId.values()) { const n = llNaam(x), m = [x.achternaam, x.tussenvoegsel, x.roepnaam].filter(Boolean).join(" "); if (naam.includes(n) || naam.includes(m) || (x.achternaam && naam.includes(x.achternaam) && x.roepnaam && naam.includes(x.roepnaam))) return x; }
+    return null;
+  };
+  const llZet = (x, aan) => {
+    if (!x) return;
+    if (llZoek.all) { if (aan) llZoek.uit.delete(x.id); else llZoek.uit.add(x.id); }
+    else if (aan) llZoek.selected.add(x.id); else llZoek.selected.delete(x.id);
+  };
+  /* Zichtbare rijen bijwerken uit de vinkjes zelf (vangt ook resets door Magister op) */
+  const llScan = () => {
+    const kop = document.querySelector("th.select dna-checkbox");
+    if (kop && kop.checked === false && kop.indeterminate === false && llZoek.all) { llZoek.all = false; llZoek.uit.clear(); llZoek.selected.clear(); }
+    for (const cb of document.querySelectorAll("tbody td.select dna-checkbox, tr td.select dna-checkbox")) {
+      const tr = cb.closest("tr"); if (!tr || tr.closest("thead")) continue;
+      if (typeof cb.checked === "boolean") llZet(llRij(tr), cb.checked);
+    }
+  };
+  if (/\/op-leerlingen\//.test(location.pathname)) {
+    document.addEventListener("change", (e) => {
+      const cb = e.target && e.target.closest ? e.target.closest("dna-checkbox") : null;
+      if (!cb || !cb.closest("td.select, th.select")) return;
+      setTimeout(() => {
+        if (cb.closest("thead") || cb.closest("th.select")) { llZoek.all = !!cb.checked; llZoek.uit.clear(); llZoek.selected.clear(); }
+        else llZet(llRij(cb.closest("tr")), !!cb.checked);
+      }, 0);
+    }, true);
+  }
+  window.addEventListener("message", (e) => {
+    if (!(e.data && e.data.type === "dt:llsel:get" && trusted(e))) return;
+    try { llScan(); } catch {}
+    const ids = llZoek.all ? [...llZoek.byId.keys()].filter((id) => !llZoek.uit.has(id)) : [...llZoek.selected];
+    const lln = ids.map((id) => llZoek.byId.get(id)).filter(Boolean).map((x) => ({ id: x.id, naam: llNaam(x), achternaam: x.achternaam || "", stam: x.code ?? x.stamnummer ?? "", klas: Array.isArray(x.klassen) ? x.klassen.join(", ") : (x.klassen || x.stamklas || "") }));
+    const verwacht = llZoek.all ? Math.max(0, llZoek.total - llZoek.uit.size) : lln.length;
+    reply(e, { type: "dt:llsel:result", id: e.data.id, lln, verwacht, geladen: llZoek.byId.size, totaal: llZoek.total });
   });
 })();

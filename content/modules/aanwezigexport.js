@@ -13,8 +13,59 @@
  * Alles via je eigen Magister-sessie; er gaat niets naar buiten. */
 DT.register({
   id: "aanwezigexport",
-  init() {},
-  destroy() { this._dlg?.remove(); },
+  init(DT) {
+    /* Leerlingenoverzicht (frame /op-leerlingen/): knop boven de lijst voor de aangevinkte leerlingen */
+    if (/\/op-leerlingen\//.test(location.pathname)) {
+      this._stop = DT.observe(() => this.knopOverzicht(DT), { debounce: 400, poll: 1500 });
+    }
+  },
+  destroy() { this._dlg?.remove(); this._stop && this._stop(); this._knop?.remove(); this._knop = null; },
+
+  /* Selectie uit het leerlingenoverzicht opvragen (netlog.js houdt die bij in de pagina) */
+  selectie() {
+    return new Promise((resolve) => {
+      const id = Math.random().toString(36).slice(2);
+      const h = (e) => { if (e.source === window && e.data?.type === "dt:llsel:result" && e.data.id === id) { window.removeEventListener("message", h); resolve(e.data); } };
+      window.addEventListener("message", h);
+      window.postMessage({ type: "dt:llsel:get", id }, "*");
+      setTimeout(() => { window.removeEventListener("message", h); resolve({ lln: [], verwacht: 0 }); }, 3000);
+    });
+  },
+
+  async knopOverzicht(DT) {
+    const top = document.querySelector("ll-top-bar");
+    if (!top) { this._knop?.remove(); this._knop = null; return; }
+    if (!this._knop || !this._knop.isConnected) {
+      const b = DT.el("button", { class: "dt-llx", type: "button", title: "Aanwezigheid van de aangevinkte leerlingen naar Excel" });
+      b.innerHTML = `<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M8 2.5v7.5M4.5 6.8 8 10.3l3.5-3.5M3 13.5h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Aanwezigheid naar Excel</span><small></small>`;
+      b.addEventListener("click", async () => {
+        const sel = await this.selectie();
+        if (!sel.lln.length) return DT.toast("Vink eerst de leerlingen aan die je in het overzicht wilt hebben.", "info", 4000);
+        if (sel.verwacht > sel.lln.length) DT.toast(`Van ${sel.verwacht - sel.lln.length} aangevinkte leerlingen zijn de gegevens nog niet geladen; scroll door de lijst of vink ze opnieuw aan.`, "info", 6000);
+        this.klas(DT, { lln: sel.lln, titel: "Selectie uit het leerlingenoverzicht" });
+      });
+      this.cssOverzicht();
+      top.prepend(b); this._knop = b;
+    }
+    const sel = await this.selectie();
+    const n = sel.lln.length;
+    this._knop.classList.toggle("is-leeg", !n);
+    this._knop.querySelector("small").textContent = n ? `${n} geselecteerd` : "vink leerlingen aan";
+  },
+
+  cssOverzicht() {
+    if (document.getElementById("dt-llx-style")) return;
+    const st = document.createElement("style"); st.id = "dt-llx-style";
+    st.textContent = `
+      .dt-llx { appearance: none; display: inline-flex; align-items: center; gap: 6px; margin: .5rem 0 0; height: 32px; padding: 0 14px; border: 0; border-radius: 999px; cursor: pointer;
+        background: #34C759; color: #fff; font: 600 13px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+      .dt-llx:hover { filter: brightness(.95); }
+      .dt-llx small { font-weight: 500; opacity: .85; padding-left: 6px; border-left: 1px solid rgba(255,255,255,.45); }
+      .dt-llx.is-leeg { background: rgba(120,120,128,.14); color: inherit; box-shadow: none; }
+      .dt-llx.is-leeg small { border-left-color: rgba(120,120,128,.35); }
+    `;
+    document.head.append(st);
+  },
 
   /* ---------- gedeeld ---------- */
   ymd(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; },
@@ -116,9 +167,9 @@ DT.register({
   },
 
   /* Venster: periode kiezen, eventueel vergelijken met vorig jaar, daarna voortgang. */
-  async klas(DT) {
+  async klas(DT, bron = null) {
     if (this._dlg) return;
-    const res = await this.klasLeerlingen(DT);
+    const res = bron || await this.klasLeerlingen(DT);
     if (res.fout) return DT.toast(res.fout, "err", 5000);
     const keuzes = this.periodeKeuzes(DT);
     const dlg = DT.el("div", { class: "dt-xk", role: "dialog", "aria-modal": "true", "aria-label": "Aanwezigheid klas naar Excel" });
@@ -151,7 +202,7 @@ DT.register({
       }
     });
     dlg.append(DT.el("div", { class: "dt-xk-card" }, [
-      DT.el("h2", { text: "Aanwezigheid klas naar Excel" }),
+      DT.el("h2", { text: bron ? "Aanwezigheid naar Excel" : "Aanwezigheid klas naar Excel" }),
       DT.el("p", { class: "dt-xk-sub", text: `${res.lln.length} leerlingen${res.titel ? ` · ${res.titel}` : ""}` }),
       DT.el("label", { class: "dt-xk-field" }, [DT.el("span", { text: "Periode" }), sel]),
       DT.el("label", { class: "dt-xk-check", for: "dt-xk-vgl" }, [vgl, DT.el("span", { text: "Ook vergelijken met vorig schooljaar (tot dezelfde datum)" })]),
@@ -206,7 +257,7 @@ DT.register({
     const ok = uit.filter((x) => x.S && x.S.totaal.telt > 0).map((x) => x.S.totaal);
     const som = (k) => ok.reduce((s, t) => s + t[k], 0);
     const telt = som("telt"), afw = som("afwezig");
-    const totaal = ["Klas totaal", "", "", telt, telt - afw, afw, som("ongeoorloofd"), som("ziek"), som("teLaat"), som("vrij"), telt ? this.pct(Math.round(100 * (telt - afw) / telt)) : ""];
+    const totaal = [titel && /^Selectie/.test(titel) ? "Totaal selectie" : "Klas totaal", "", "", telt, telt - afw, afw, som("ongeoorloofd"), som("ziek"), som("teLaat"), som("vrij"), telt ? this.pct(Math.round(100 * (telt - afw) / telt)) : ""];
     const gem = ok.length ? Math.round(ok.reduce((s, t) => s + t.pct, 0) / ok.length) : null;
     const blad1 = this.blad([kop, ...rijen, [], totaal, ["Gemiddelde per leerling", "", "", "", "", "", "", "", "", "", gem == null ? "" : this.pct(gem)]],
       [28, 11, 9, 8, 10, 8, 13, 7, 8, 12, 12, ...(vergelijk ? [20, 26, 20] : [])]);
@@ -222,7 +273,8 @@ DT.register({
       [28, ...vakken.flatMap(() => [12, 10])]);
 
     const per = periode.kort || periode.naam.replace(/[()]/g, "");
-    this.schrijf(DT, `Aanwezigheid klas ${titel ? titel.replace(/^\S+\s+\S+\s+\S+\s+/, "") + " " : ""}${per}`, [
+    const naamBestand = titel && /^Selectie/.test(titel) ? `Aanwezigheid ${lln.length} leerlingen ${per}` : `Aanwezigheid klas ${titel ? titel.replace(/^\S+\s+\S+\s+\S+\s+/, "") + " " : ""}${per}`;
+    this.schrijf(DT, naamBestand, [
       ["Per leerling", blad1],
       ["Aanwezig per vak", blad2],
       ["Gemist en ziek per vak", blad3],
