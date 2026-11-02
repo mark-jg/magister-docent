@@ -146,6 +146,7 @@ DT.register({
           ["theme", "Thema", "Alt+T", () => DT.module("theme")?.toggle(DT)],
           ["export", "Excel", "Alt+E", () => DT.module("tables")?.exportAll(DT)],
           ["mail", "Mail coach", "Alt+M", () => DT.module("melding")?.trigger(DT)],
+          ...(DT.settings.aanwezigexport?.enabled !== false ? [["aanwezigexport", "Klas → Excel", "", () => { this.toggle(false); DT.module("aanwezigexport")?.klas(DT); }]] : []),
           DT.settings.developer?.enabled ? ["inspector", "Inspector", "Alt+I", () => { this.toggle(false); DT.module("inspector")?.start(DT); }] : ["options", "Instellingen", "", () => chrome.runtime.sendMessage({ type: "openOptions" })]
         ];
         return widget("Acties", DT.el("div", { class: "dt-actions" }, acts.map(([icon, label, kbd, go]) => {
@@ -193,6 +194,7 @@ const DT_ICONS = Object.fromEntries(Object.entries({
   jarig: `<path d="M4 20h16M5 20v-7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7"/><path d="M5 15c2 1.5 4 1.5 6 0s4-1.5 6 0M12 7v4"/>`,
   leerlingdash: `<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>`,
   verzuiminzicht: `<path d="M4 19h16M6 15l4-5 3 3 5-7"/>`,
+  aanwezigexport: `<rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 8l4 5M12 8l-4 5M14 9h3M14 13h3M8 17h9"/>`,
   periodes: `<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4M7 15h4M13 15h4"/>`,
   melding: `<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 8l9 6 9-6"/>`,
   ai: `<path d="M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4z"/><path d="M18 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/>`,

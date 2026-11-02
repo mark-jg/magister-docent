@@ -130,6 +130,45 @@ DT.register({
     if (this._data && this._data.id === id) { this._data.jaren = jaren; if (this._active) this.render(); }
   },
 
+  /* Vergelijkingsrijen: dit schooljaar en de vorige (uit d.jaren), elk tot dezelfde datum en
+   * (voor vorige jaren) over het hele jaar. Gebruikt door het tabblad Vergelijken en de export. */
+  vergelijkRijen(d, now = new Date()) {
+    const eindVandaag = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const sjNaam = (t) => { const y = new Date(t).getFullYear(); return `${y}–${y + 1}`; };
+    const Sj = vzStats(d.regs || [], d.rooster || [], new Date(d.sj), now);
+    const rijen = [{ naam: sjNaam(d.sj), sub: "dit schooljaar", zelfde: Sj.totaal, heel: null, S: Sj, rooster: !!(d.rooster && d.rooster.length), kleur: "var(--dt-vz-accent)" }];
+    const KLEUR = ["#8E8E93", "#C7C7CC"];
+    for (const j of Array.isArray(d.jaren) ? d.jaren : []) {
+      const heeft = (j.regs && j.regs.length) || (j.rooster && j.rooster.length);
+      if (!heeft) { rijen.push({ naam: sjNaam(j.van), leeg: true, status: j.status }); continue; }
+      const zelfdeTot = new Date(eindVandaag); zelfdeTot.setFullYear(eindVandaag.getFullYear() - j.k);
+      const heel = vzStats(j.regs || [], j.rooster || [], new Date(j.van), new Date(j.tot));
+      const zelfde = vzStats(j.regs || [], j.rooster || [], new Date(j.van), zelfdeTot);
+      rijen.push({ naam: sjNaam(j.van), sub: j.k === 1 ? "vorig schooljaar" : "twee jaar terug", zelfde: zelfde.totaal, heel: heel.totaal, S: heel, rooster: !!(j.rooster && j.rooster.length), kleur: KLEUR[j.k - 1], dash: j.k === 2 });
+    }
+    return { rijen, KLEUR };
+  },
+
+  /* Gekozen periode op het tabblad Inzicht: { naam, van, tot } */
+  gekozenPeriode(d, now = new Date()) {
+    const periodes = DT.periodes?.() || [];
+    const eigen = this._periode.startsWith("p:") ? periodes.find((p) => "p:" + p.id === this._periode) : null;
+    if (eigen) return { naam: eigen.naam, van: eigen.begin, tot: eigen.einde < now ? eigen.einde : now };
+    if (this._periode === "8w" || this._periode === "4w") return { naam: `Laatste ${this._periode === "8w" ? 8 : 4} weken`, van: new Date(now.getFullYear(), now.getMonth(), now.getDate() - (this._periode === "8w" ? 56 : 28)), tot: now };
+    const y = new Date(d.sj).getFullYear();
+    return { naam: `Schooljaar ${y}–${y + 1}`, van: new Date(d.sj), tot: now };
+  },
+
+  async exportExcel() {
+    const d = this._data; if (!d) return;
+    const now = new Date(), per = this.gekozenPeriode(d, now);
+    const S = vzStats(d.regs || [], d.rooster || [], per.van, per.tot);
+    const pers = await DT.api(`/api/leerlingen/${d.id}`, { full: true, timeout: 10000 });
+    const exp = DT.module?.("aanwezigexport");
+    if (!exp) return DT.toast?.("Zet de module Aanwezigheid naar Excel aan in het zijpaneel", "err");
+    exp.leerlingBestand(DT, { persoon: pers.status === 200 ? pers.json : null, id: d.id, periode: per, S, vergelijk: Array.isArray(d.jaren) ? this.vergelijkRijen(d, now).rijen : null });
+  },
+
   render() {
     const d = this._data, p = this._panel; if (!d || !p) return;
     const esc = (s) => String(s ?? "").replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
@@ -206,20 +245,8 @@ DT.register({
     let vergelijk = "";
     if (d.jaren === "laden") vergelijk = `<section class="dt-vz-card dt-vz-wide dt-vz-cmpcard"><h4>Per schooljaar</h4><p class="dt-vz-empty">Vorige schooljaren ophalen…</p></section>`;
     else if (Array.isArray(d.jaren)) {
-      const eindVandaag = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      const { rijen, KLEUR } = this.vergelijkRijen(d, now);
       const datumKort = now.toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
-      const sjNaam = (t) => { const y = new Date(t).getFullYear(); return `${y}–${y + 1}`; };
-      const Sj = vzStats(d.regs || [], d.rooster || [], new Date(d.sj), now);
-      const rijen = [{ naam: sjNaam(d.sj), sub: "dit schooljaar", zelfde: Sj.totaal, heel: null, S: Sj, rooster: !!(d.rooster && d.rooster.length), kleur: "var(--dt-vz-accent)" }];
-      const KLEUR = ["#8E8E93", "#C7C7CC"];
-      for (const j of d.jaren) {
-        const heeft = (j.regs && j.regs.length) || (j.rooster && j.rooster.length);
-        if (!heeft) { rijen.push({ naam: sjNaam(j.van), leeg: true, status: j.status }); continue; }
-        const zelfdeTot = new Date(eindVandaag); zelfdeTot.setFullYear(eindVandaag.getFullYear() - j.k);
-        const heel = vzStats(j.regs || [], j.rooster || [], new Date(j.van), new Date(j.tot));
-        const zelfde = vzStats(j.regs || [], j.rooster || [], new Date(j.van), zelfdeTot);
-        rijen.push({ naam: sjNaam(j.van), sub: j.k === 1 ? "vorig schooljaar" : "twee jaar terug", zelfde: zelfde.totaal, heel: heel.totaal, S: heel, rooster: !!(j.rooster && j.rooster.length), kleur: KLEUR[j.k - 1], dash: j.k === 2 });
-      }
       const pc = (T, r) => r.rooster && T && T.telt ? `<b style="color:${pctCol(T.pct)}">${T.pct}%</b>` : `<span class="dt-vz-dim" title="Rooster van dat jaar niet beschikbaar; zonder rooster is er geen percentage">–</span>`;
       const vorig = rijen[1] && !rijen[1].leeg && rijen[1].rooster ? rijen[1] : null;
       const delta = vorig && rijen[0].rooster && rijen[0].zelfde.telt ? rijen[0].zelfde.pct - vorig.zelfde.pct : null;
@@ -251,9 +278,10 @@ DT.register({
 
     if (this._view === "vergelijk") {
       p.innerHTML = `
-        <div class="dt-vz-head"><div class="dt-vz-title">Vergelijken met vorige schooljaren</div></div>
+        <div class="dt-vz-head"><div class="dt-vz-title">Vergelijken met vorige schooljaren</div><button type="button" class="dt-vz-xls" title="Naar Excel: samenvatting, per vak, docent, dag, lesuur, week en maand, alle lessen en de vergelijking met vorige schooljaren"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M8 2.5v7.5M4.5 6.8 8 10.3l3.5-3.5M3 13.5h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Excel</button></div>
         <div class="dt-vz-grid">${vergelijk || `<p class="dt-vz-empty">Geen gegevens om te vergelijken.</p>`}</div>
         <div class="dt-vz-foot">Uit de registraties en het rooster van Magister, per schooljaar van 1 augustus tot en met 31 juli. Afwezig = absent, ziek of uitgestuurd; te laat telt als aanwezig; een vrijstelling telt niet mee. Zonder rooster van een schooljaar is er geen percentage.</div>`;
+      p.querySelector(".dt-vz-xls")?.addEventListener("click", () => this.exportExcel());
       return;
     }
 
@@ -261,7 +289,8 @@ DT.register({
     p.innerHTML = `
       <div class="dt-vz-head">
         <div class="dt-vz-title">Inzicht in aanwezigheid</div>
-        <div class="dt-vz-segs">${seg("jaar", "Schooljaar")}${seg("8w", "8 weken")}${seg("4w", "4 weken")}${periodes.length ? `<select class="dt-vz-psel${eigen ? " is-on" : ""}" aria-label="Eigen periode"><option value="">Periode…</option>${periodes.map((p) => `<option value="p:${esc(p.id)}"${eigen && eigen.id === p.id ? " selected" : ""}>${esc(p.naam)} · ${esc(DT.periodeLabel(p))}</option>`).join("")}</select>` : ""}</div>
+        <span class="dt-vz-headr">
+        <div class="dt-vz-segs">${seg("jaar", "Schooljaar")}${seg("8w", "8 weken")}${seg("4w", "4 weken")}${periodes.length ? `<select class="dt-vz-psel${eigen ? " is-on" : ""}" aria-label="Eigen periode"><option value="">Periode…</option>${periodes.map((p) => `<option value="p:${esc(p.id)}"${eigen && eigen.id === p.id ? " selected" : ""}>${esc(p.naam)} · ${esc(DT.periodeLabel(p))}</option>`).join("")}</select>` : ""}</div><button type="button" class="dt-vz-xls" title="Naar Excel: samenvatting, per vak, docent, dag, lesuur, week en maand, alle lessen en de vergelijking met vorige schooljaren"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M8 2.5v7.5M4.5 6.8 8 10.3l3.5-3.5M3 13.5h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Excel</button></span>
       </div>
       ${T.lessen ? `
       <div class="dt-vz-summary">
@@ -279,6 +308,7 @@ DT.register({
       ${legend}` : `<p class="dt-vz-empty">Geen lessen in deze periode.</p>`}
       <div class="dt-vz-foot">Uit de registraties en het rooster van Magister. Afwezig = absent, ziek of uitgestuurd; te laat telt als aanwezig. Een vrijstelling is met toestemming: die les telt niet als gemist en valt buiten het percentage. Vak${S.docenten.length ? " en docent" : ""} uit het rooster; ${d.rooster ? `${(d.rooster || []).length} roosteritems` : "rooster niet beschikbaar"}${d.rooster && !S.docenten.length ? "; het rooster van de leerling noemt geen docenten, daarom is er geen blok per docent" : ""}.</div>`;
     p.querySelectorAll(".dt-vz-seg").forEach((b) => b.addEventListener("click", () => { this._periode = b.dataset.periode; this.render(); }));
+    p.querySelector(".dt-vz-xls")?.addEventListener("click", () => this.exportExcel());
     p.querySelector(".dt-vz-psel")?.addEventListener("change", (e) => { this._periode = e.target.value || "jaar"; this.render(); });
   },
 
@@ -340,6 +370,9 @@ DT.register({
       .dt-vz-cmpzin { margin: 0 0 12px; font: 400 .8125rem/1.4 var(--dt-vz-font); }
       .dt-vz-cmpgraf { margin-top: 14px; }
       .dt-vz-cmpnoot { margin: 10px 0 0; font: 400 .6875rem/1.4 var(--dt-vz-font); color: var(--dt-vz-muted); }
+      .dt-vz-headr { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+      .dt-vz-xls { appearance: none; display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 12px; border: 0; border-radius: 999px; cursor: pointer; background: color-mix(in srgb, #34C759 14%, transparent); color: #1E7B34; font: 600 .75rem/1 var(--dt-vz-font); }
+      .dt-vz-xls:hover { background: color-mix(in srgb, #34C759 22%, transparent); }
       .dt-vz-foot { margin-top: 12px; font: 400 .6875rem/1.4 var(--dt-vz-font); color: var(--dt-vz-muted); }
     `;
     root.append(st);
@@ -359,7 +392,7 @@ function vzStats(regs, rooster, van, tot) {
   for (const a of rooster) {
     const b = new Date(a.start || a.begin), e = new Date(a.einde || a.eind);
     if (isNaN(b) || isNaN(e) || e > tot || b < van || a.status === 5 || a.isVervallen === true) continue;
-    const l = { id: a.id, begin: b, vak: names(a.vakken, ["naam", "omschrijving", "code"]).join(", ") || a.omschrijving || "Onbekend", docent: docentenVan(a), cat: "OK", extra: 0 };
+    const l = { id: a.id, begin: b, einde: e, vak: names(a.vakken, ["naam", "omschrijving", "code"]).join(", ") || a.omschrijving || "Onbekend", docent: docentenVan(a), cat: "OK", extra: 0, regs: "" };
     lessen.push(l); if (a.id != null) byId.set(String(a.id), l); byStart.set(b.getTime(), l);
   }
   let onbekend = 0;
@@ -370,7 +403,10 @@ function vzStats(regs, rooster, van, tot) {
     const raw = it.verantwoordingen || it.registraties || it.registrations || (it.verantwoording ? [it.verantwoording] : []);
     const rs = raw.map((r) => ({ type: norm(r.reden?.verantwoordingType ?? r.verantwoordingType ?? r.reden?.code ?? r.attendanceTypeCode ?? r.code ?? r.type ?? ""), ok: r.reden?.isGeoorloofd ?? r.isGeoorloofd ?? r.geoorloofd ?? r.approved ?? true }));
     let l = (a.id != null && byId.get(String(a.id))) || byStart.get(b.getTime());
-    if (!l) { l = { id: a.id, begin: b, vak: a.omschrijving || "Onbekend", docent: "", cat: "OK", extra: 0 }; lessen.push(l); onbekend++; }
+    if (!l) { l = { id: a.id, begin: b, einde: e, vak: a.omschrijving || "Onbekend", docent: "", cat: "OK", extra: 0, regs: "" }; lessen.push(l); onbekend++; }
+    /* Voor de export: alle registraties van de les als tekst, met (on)geoorloofd */
+    const NAAM = { AB: "absent", TL: "te laat", ZK: "ziek", UI: "uitgestuurd", VR: "vrijstelling", MV: "materiaal vergeten", HV: "huiswerk vergeten", MK: "mobiel in klas", ON: "onbekend" };
+    l.regs = rs.filter((r) => r.type).map((r) => (NAAM[r.type] || r.type.toLowerCase()) + (["AB", "TL", "UI"].includes(r.type) ? (r.ok ? " (geoorloofd)" : " (ongeoorloofd)") : "")).join(", ");
     const abs = rs.find((r) => ABSENT.has(r.type));
     /* Vrijstelling is met toestemming: geen verzuim, en de les valt buiten het percentage. */
     l.cat = abs ? (abs.type === "AB" ? (abs.ok ? "AB_OK" : "AB_NO") : abs.type) : rs.some((r) => r.type === "VR") ? "VR" : (rs.some((r) => r.type === "TL") ? "TL" : "OK");
@@ -398,6 +434,7 @@ function vzStats(regs, rooster, van, tot) {
     uren: [...uren.entries()].sort((a, b) => a[0] - b[0]).map(([, g]) => fin(g)),
     weken: [...weken.values()].map(fin).sort((a, b) => a.y - b.y || a.week - b.week),
     maanden: [...maanden.values()].map(fin).sort((a, b) => a.y - b.y || a.m - b.m),
+    lessen: lessen.slice().sort((a, b) => a.begin - b.begin),
   };
 }
 

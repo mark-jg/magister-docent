@@ -86,8 +86,10 @@ DT.register({
     const toets = DT.el("button", { class: "dt-btn dt-btn-sm dt-att-kbdbtn", title: "Toetsenbordmodus (" + (mac ? "⌥A" : "Alt+A") + ")", onclick: () => this.startKeyboard(DT, 0) },
       [DT.el("span", { text: "Toetsenbord" }), DT.el("span", { class: "dt-att-shortcut" }, [kbd(mac ? "⌥" : "Alt"), kbd("A")])]);
 
+    const xls = DT.el("button", { class: "dt-btn dt-btn-sm dt-att-xls", title: "Aanwezigheidspercentages van alle leerlingen van deze les naar Excel", onclick: () => DT.module("aanwezigexport") ? DT.module("aanwezigexport").klas(DT) : DT.toast("Zet de module Aanwezigheid naar Excel aan in het zijpaneel", "err") }, [DT.el("span", { text: "Klas naar Excel" })]);
+    xls.insertAdjacentHTML("afterbegin", '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M8 2.5v7.5M4.5 6.8 8 10.3l3.5-3.5M3 13.5h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>');
     const bar = DT.el("div", { class: "dt-table-tools dt-att-bar", "aria-label": "Docent Tools: snelle aanwezigheid" }, [
-      alle, toets, zoek, legend
+      alle, toets, xls, zoek, legend
     ]);
     host.insertBefore(bar, host.firstChild);
   },

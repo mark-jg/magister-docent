@@ -53,6 +53,7 @@
         "content/modules/leerlingdash.js",
         "content/modules/verzuiminzicht.js",
         "content/modules/periodes.js",
+        "content/modules/aanwezigexport.js",
         "content/boot.js"
       ],
       "css": [
