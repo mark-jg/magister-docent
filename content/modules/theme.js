@@ -1297,7 +1297,7 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     ui-view.dt-ld-on > .sidecolumn aside .widget .list li.no-data { padding-left: 8px !important; padding-right: 8px !important; }
     /* Frame van het leerlingenoverzicht tot de onderrand van het venster (Magister laat 24px marge plus 9px
      * onder het inline-frame vrij); de marge van 24px zit daarna binnen het frame, zodat schaduwen zichtbaar blijven */
-    ui-view[name="main"]:has(#guest-app-frame[src*="/op-leerlingen/"]) { padding-bottom: 0 !important; }
+    ui-view[name="main"]:has(#guest-app-frame[src*="/op-leerlingen/"]) { padding-top: 16px !important; padding-bottom: 0 !important; }
     mg-guest-app .fill-viewport > #guest-app-frame[src*="/op-leerlingen/"] { display: block !important; height: 100% !important; }
     /* ---- Leerlingenoverzicht: zelfde kaartopbouw als het lesdashboard (vlak .dt-ll-kop, maat via leerlingenKopPass) ---- */
     html.dt-ll-on body > .dt-ll-kop { position: absolute; top: 8px; z-index: 0; box-sizing: border-box; pointer-events: none; border-radius: ${t.glass ? "22px" : "16px"}; background: ${ldCard}; box-shadow: ${ldShadow}; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} }
