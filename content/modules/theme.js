@@ -40,7 +40,7 @@ DT.register({
   init(DT) {
     this._stopObs = DT.observe(() => { this.applyExtraInline(DT); this.injectShadow(DT, this._vars); this.recolor(DT); this.agendaPass(DT); }, { debounce: 600, poll: 2500 });
     /* Lesdashboardkaart los en snel, anders verspringt de kop pas seconden na het laden */
-    this._stopKop = DT.observe(() => lesdashKopPass(document, !!this.preset(DT).look), { debounce: 60, poll: 1000 });
+    this._stopKop = DT.observe(() => { const on = !!this.preset(DT).look; lesdashKopPass(document, on); leerlingenKopPass(document, on); }, { debounce: 60, poll: 1000 });
     this._style = DT.el("style", { id: "dt-theme-style" });
     document.head.append(this._style);
     this._mq = window.matchMedia("(prefers-color-scheme: dark)");
@@ -54,6 +54,7 @@ DT.register({
     this._stopKop && this._stopKop();
     this._style?.remove();
     lesdashKopPass(document, false);
+    leerlingenKopPass(document, false);
     document.documentElement.classList.remove("dt-dark");
     clearRootVars();
     this._unsub && this._unsub();
@@ -594,6 +595,54 @@ function lesdashKopPass(root, on) {
   }
   const bar = main.querySelector("#leerlinglijst > .dt-att-bar");
   if (bar && !bar.dataset.dtKopRo) { bar.dataset.dtKopRo = "1"; ldKopRO.observe(bar); }
+  meet();
+}
+
+/* Leerlingenoverzicht (frame /op-leerlingen): kruimelpad, titel, tabbladen en werkbalk op één kaart
+ * boven de tabel, filterpaneel op dezelfde hoogte ernaast. Zelfde opzet als het lesdashboard. */
+let llKopRO = null, llKopPage = null;
+function leerlingenKopPass(root, on) {
+  const page = on ? root.querySelector("ll-students-overview-page .zoeken-page") : null;
+  const links = page?.querySelector(":scope > .left-side");
+  const top = links?.querySelector("ll-top-bar");
+  const html = root.documentElement;
+  if (!page || !links || !top) {
+    root.querySelectorAll(".dt-ll-kop").forEach((k) => k.remove());
+    if (html.classList.contains("dt-ll-on")) { html.classList.remove("dt-ll-on"); for (const k of ["--dt-ll-rm", "--dt-ll-up", "--dt-ll-ft", "--dt-ll-fl", "--dt-ll-fw", "--dt-ll-fh", "--dt-ll-ph"]) html.style.removeProperty(k); }
+    if (llKopRO) { llKopRO.disconnect(); llKopRO = null; llKopPage = null; }
+    return;
+  }
+  let kop = root.querySelector("body > .dt-ll-kop");
+  if (!kop) { kop = root.createElement("div"); kop.className = "dt-ll-kop"; kop.setAttribute("aria-hidden", "true"); root.body.prepend(kop); }
+  html.classList.add("dt-ll-on");
+  const meet = () => {
+    if (!kop.isConnected) return;
+    const win = root.defaultView, sx = win.scrollX, sy = win.scrollY;
+    const lr = links.getBoundingClientRect(), pr = page.getBoundingClientRect(), tr = top.getBoundingClientRect();
+    const kopTop = parseFloat(win.getComputedStyle(kop).top) || 8;
+    const rm = Math.round(html.clientWidth - lr.right);
+    const up = Math.round(pr.top + sy - kopTop);
+    const zet = (k, v) => { if (html.style.getPropertyValue(k) !== v) html.style.setProperty(k, v); };
+    zet("--dt-ll-rm", `${rm}px`); zet("--dt-ll-up", `${up}px`);
+    /* Magister zet het filterpaneel met position: fixed en rekent zelf de plek uit; wij leggen het naast
+     * de kaart: zelfde bovenkant, 16px tussenruimte, onderkant gelijk met de tabel. */
+    /* Hoogte: de kaart duwt de tabel omlaag; de pagina blijft binnen het venster met 16px ruimte onderaan */
+    zet("--dt-ll-ph", `${Math.max(300, Math.round(win.innerHeight - pr.top - 16))}px`);
+    const tabel = links.querySelector(".table-container") || links;
+    const onder = tabel.getBoundingClientRect().bottom;
+    zet("--dt-ll-ft", `${kopTop - sy}px`);
+    zet("--dt-ll-fl", `${Math.round(lr.right + 16)}px`);
+    zet("--dt-ll-fw", `${Math.max(200, Math.round(pr.right - lr.right - 16))}px`);
+    zet("--dt-ll-fh", `${Math.max(200, Math.round(onder - (kopTop - sy)))}px`);
+    for (const [k, v] of [["left", `${Math.round(lr.left + sx)}px`], ["width", `${Math.round(lr.width)}px`], ["height", `${Math.round(tr.bottom + sy + 16 - kopTop)}px`]]) if (kop.style[k] !== v) kop.style[k] = v;
+  };
+  if (llKopPage !== page) {
+    llKopRO?.disconnect();
+    llKopRO = new (root.defaultView.ResizeObserver)(() => root.defaultView.requestAnimationFrame(meet));
+    llKopRO.observe(page); llKopRO.observe(links); llKopRO.observe(top);
+    const tc = links.querySelector(".result-container"); if (tc) llKopRO.observe(tc);
+    llKopPage = page;
+  }
   meet();
 }
 
@@ -1245,6 +1294,52 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     ui-view.dt-ld-on > .sidecolumn aside .widget footer.endlink { padding: 0 16px 16px !important; }
     ui-view.dt-ld-on > .sidecolumn aside .widget .list li > a > span.value, ui-view.dt-ld-on > .sidecolumn aside .widget .list li .single-line > span.value:first-child { padding-left: 0 !important; }
     ui-view.dt-ld-on > .sidecolumn aside .widget .list li.no-data { padding-left: 8px !important; padding-right: 8px !important; }
+    /* ---- Leerlingenoverzicht: zelfde kaartopbouw als het lesdashboard (vlak .dt-ll-kop, maat via leerlingenKopPass) ---- */
+    html.dt-ll-on body > .dt-ll-kop { position: absolute; top: 8px; z-index: 0; box-sizing: border-box; pointer-events: none; border-radius: ${t.glass ? "22px" : "16px"}; background: ${ldCard}; box-shadow: ${ldShadow}; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} }
+    html.dt-ll-on app-root > dna-breadcrumbs, html.dt-ll-on app-root > dna-page-header, html.dt-ll-on app-leerlingen-root > dna-tabs { position: relative !important; z-index: 1; margin-right: calc(var(--dt-ll-rm, 296px) + 16px) !important; }
+    html.dt-ll-on app-root > dna-breadcrumbs { margin-top: 14px !important; margin-left: 10px !important; }
+    html.dt-ll-on app-root > dna-page-header { margin-left: 16px !important; margin-top: -2px !important; }
+    html.dt-ll-on app-leerlingen-root > dna-tabs { margin-left: 16px !important; margin-top: 8px !important; margin-bottom: 0 !important; width: fit-content; max-width: calc(100% - var(--dt-ll-rm, 296px) - 32px); }
+    html.dt-ll-on app-leerlingen-root > dna-tabs dna-tab-bar { padding: 2px !important; background: ${t.dark ? "rgba(118,118,128,.24)" : "rgba(118,118,128,.12)"} !important; box-shadow: none !important; }
+    html.dt-ll-on app-leerlingen-root > dna-tabs dna-tab-button { height: 26px !important; --padding: 0 14px !important; --_padding: 0 14px !important; font-size: .8125rem !important; line-height: 26px !important; padding-block: 0 !important; }
+    html.dt-ll-on .zoeken-page { position: relative; z-index: 1; padding-top: 10px !important; }
+    html.dt-ll-on .zoeken-page > .left-side { margin-right: 16px !important; }
+    html.dt-ll-on .zoeken-page > .left-side > .tag-container { padding: 0 16px !important; height: auto !important; }
+    /* Werkbalk: Excel-knop en Magisters knoppenrij op één regel; filterlabels (als die er zijn) eronder */
+    html.dt-ll-on ll-top-bar { display: flex !important; flex-wrap: wrap; align-items: center; column-gap: 8px; row-gap: 8px; min-height: 30px; }
+    html.dt-ll-on ll-top-bar > .dt-llx { order: 0; margin: 0 !important; height: 30px !important; }
+    html.dt-ll-on ll-top-bar > ll-action-bar { order: 1; flex: 1 1 540px; min-width: 0; display: block !important; }
+    html.dt-ll-on ll-top-bar > ll-filter-tag-bar { order: 2; flex-basis: 100%; }
+    html.dt-ll-on ll-top-bar > ll-filter-tag-bar:empty { display: none !important; }
+    html.dt-ll-on ll-action-bar .header { margin: 0 !important; height: 30px; align-items: center; gap: 8px; flex-wrap: nowrap !important; }
+    html.dt-ll-on ll-action-bar .action-buttons { width: auto !important; flex: none !important; }
+    html.dt-ll-on ll-action-bar .action-buttons dna-button-bar { display: flex !important; flex-wrap: nowrap !important; gap: 6px; align-items: center; }
+    html.dt-ll-on ll-action-bar .student-count { flex: 1; text-align: center; white-space: nowrap; }
+    html.dt-ll-on ll-action-bar dna-button[has-icon] { width: 30px !important; height: 30px !important; --padding-v: 0 !important; --padding-h: 0 !important; --_padding-v: 0 !important; --_padding-h: 0 !important; --icon-size: 15px !important; --_icon-size: 15px !important; --border-radius: 999px !important; --_border-radius: 999px !important; --background: ${t.tint} !important; --_background: ${t.tint} !important; --color: ${t.accent} !important; --_color: ${t.accent} !important; border-radius: 999px; background: ${t.tint}; display: inline-grid !important; place-items: center; }
+    html.dt-ll-on ll-action-bar dna-button[has-icon]:hover { --background: ${t.tintStrong} !important; --_background: ${t.tintStrong} !important; background: ${t.tintStrong}; }
+    html.dt-ll-on ll-action-bar dna-overlay-trigger { display: inline-flex !important; align-items: center; height: 30px; margin: 0 !important; }
+    html.dt-ll-on ll-action-bar .student-count { font: 500 .8125rem/30px ${t.font} !important; color: ${t.muted} !important; }
+    html.dt-ll-on ll-action-bar .sorting { height: 30px; align-items: center; gap: 8px; flex-wrap: nowrap !important; white-space: nowrap; flex: none; }
+    html.dt-ll-on ll-action-bar .sorting .sort-label { font: 400 .8125rem/30px ${t.font} !important; color: ${t.muted} !important; }
+    html.dt-ll-on ll-action-bar .sorting dna-select { --height: 30px !important; --_height: 30px !important; height: 30px; margin: 0 !important; }
+    html.dt-ll-on .result-container { margin-top: 28px !important; }
+    html.dt-ll-on .table-container { border-radius: ${t.glass ? "22px" : "16px"} !important; box-shadow: ${ldShadow} !important; }
+    /* Filterpaneel: begint op de hoogte van de kaart, zelfde kaartstijl */
+    html.dt-ll-on .right-side .filter-container { padding: 0 !important; top: var(--dt-ll-ft, 8px) !important; height: var(--dt-ll-fh) !important; max-height: none !important; }
+    html.dt-ll-on .right-side .filter-container:not(.collapsed) { left: var(--dt-ll-fl) !important; width: var(--dt-ll-fw) !important; }
+    html.dt-ll-on .zoeken-page { height: var(--dt-ll-ph, auto) !important; box-sizing: border-box; }
+    html.dt-ll-on .zoeken-page > .left-side { height: 100% !important; min-height: 0; }
+    html.dt-ll-on .zoeken-page > .left-side > .result-container { flex: 1 1 auto; min-height: 0; height: auto !important; }
+    html.dt-ll-on .result-container > ll-result-table, html.dt-ll-on .result-container .table-container { height: 100% !important; max-height: none !important; }
+    html.dt-ll-on .right-side dna-card.filter-card { height: 100% !important; box-sizing: border-box; }
+    /* Ingeklapt: alleen een ronde glasknop met het pijltje (zoals het zijpaneel van het lesdashboard) */
+    html.dt-ll-on .right-side .filter-container.collapsed { width: 46px !important; height: 46px !important; }
+    html.dt-ll-on .right-side .filter-container.collapsed dna-card.filter-card { position: relative; width: 46px !important; height: 46px !important; --padding: 0 !important; --_padding: 0 !important; --border-radius: 999px !important; --_border-radius: 999px !important; border-radius: 999px !important; overflow: hidden; }
+    html.dt-ll-on .right-side .filter-container.collapsed dna-card-title { position: absolute !important; inset: 0; width: auto !important; margin: 0 !important; padding: 0 !important; display: block !important; }
+    html.dt-ll-on .right-side .filter-container.collapsed dna-card-title > span { display: none !important; }
+    html.dt-ll-on .right-side .filter-container.collapsed dna-card-title .collapse-icon { position: absolute !important; inset: 0; width: 46px !important; height: 46px !important; display: grid !important; place-items: center; cursor: pointer; margin: 0 !important; color: ${t.accent} !important; }
+    html.dt-ll-on .right-side dna-card.filter-card { --border-radius: ${t.glass ? "22px" : "16px"} !important; --_border-radius: ${t.glass ? "22px" : "16px"} !important; --background: ${ldCard} !important; --_background: ${ldCard} !important; --box-shadow: ${ldShadow} !important; --_box-shadow: ${ldShadow} !important; --padding: 16px !important; --_padding: 16px !important; border-radius: ${t.glass ? "22px" : "16px"} !important; }
+    html.dt-ll-on .right-side dna-card-title { --title-font-size: .9375rem !important; --_title-font-size: .9375rem !important; --title-line-height: 30px !important; --_title-line-height: 30px !important; font-size: .9375rem !important; font-weight: 600 !important; }
     aside .widget > .content-pane { border-radius: 20px !important; box-shadow: ${t.card} !important; }
     aside .widget > .content-pane h3 { height: 48px !important; line-height: 48px !important; padding-left: 20px !important; font-size: 1.0625rem !important; border-bottom: 0 !important; }
     aside .widget > .content-pane > .content { padding: 0 20px 16px !important; }
