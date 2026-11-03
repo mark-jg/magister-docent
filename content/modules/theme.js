@@ -50,6 +50,7 @@ DT.register({
   destroy(DT) {
     this._stopObs && this._stopObs();
     this._style?.remove();
+    lesdashKopPass(document, false);
     document.documentElement.classList.remove("dt-dark");
     clearRootVars();
     this._unsub && this._unsub();
@@ -213,6 +214,7 @@ DT.register({
     const mode = p.look ? (DT.settings.theme.agendaKleur || "vak") : "geen";
     agendaColorPass(document, mode, this.isDark(DT));
     if (p.look) { agendaToolbarPass(document); dashboardPass(document, this.isDark(DT)); }
+    lesdashKopPass(document, !!p.look);
   },
 
   /* Themavariabelen ook binnen elke shadow root zetten (componenten die ze op :host herdefiniëren). */
@@ -520,6 +522,53 @@ function agendaToolbarPass(root) {
     const links = bar.querySelector(".head-bar-links");
     if (links) links.after(fresh); else bar.prepend(fresh);
   }
+}
+
+/* Lesdashboard: titelbalk, tabbladen en werkbalk op één kaart. De kaart is een los vlak achter die
+ * drie (ze staan in Magister op verschillende plekken in de pagina). Breedte en hoogte volgen de
+ * inhoudskolom: die verandert als het zijpaneel in- of uitklapt, daarom een ResizeObserver. */
+let ldKopRO = null, ldKopMain = null;
+function lesdashKopPass(root, on) {
+  const uiv = root.querySelector('ui-view[name="main"]');
+  const main = on && uiv ? uiv.querySelector(":scope > section.ld-section") : null;
+  const hb = main ? uiv.querySelector(":scope > .head-bar") : null;
+  if (!main || !hb) {
+    root.querySelectorAll(".dt-ld-kop").forEach((k) => k.remove());
+    root.querySelectorAll(".dt-ld-on").forEach((u) => { u.classList.remove("dt-ld-on"); u.style.removeProperty("--dt-kop-l"); u.style.removeProperty("--dt-kop-r"); });
+    if (ldKopRO) { ldKopRO.disconnect(); ldKopRO = null; ldKopMain = null; }
+    return;
+  }
+  let kop = uiv.querySelector(":scope > .dt-ld-kop");
+  if (!kop) { kop = document.createElement("div"); kop.className = "dt-ld-kop"; kop.setAttribute("aria-hidden", "true"); uiv.prepend(kop); }
+  uiv.classList.add("dt-ld-on");
+  const meet = () => {
+    if (!kop.isConnected) return;
+    const ur = uiv.getBoundingClientRect(), mr = main.getBoundingClientRect(), ms = getComputedStyle(main);
+    const binnenL = ur.left + uiv.clientLeft, binnenR = binnenL + uiv.clientWidth;
+    const l = Math.round(mr.left + parseFloat(ms.paddingLeft) - binnenL);
+    const r = Math.round(binnenR - (mr.right - parseFloat(ms.paddingRight)));
+    const top = parseFloat(getComputedStyle(kop).top) || 28;
+    let onder = 0;
+    for (const el of main.querySelectorAll(":scope > ld-menu .page-nav > ul.tabs, :scope > .verantwoord-container, #leerlinglijst > .dt-att-bar")) {
+      if (!el.offsetParent) continue;
+      onder = Math.max(onder, el.getBoundingClientRect().bottom);
+    }
+    const h = onder ? Math.round(onder - ur.top - uiv.clientTop + uiv.scrollTop + 10 - top) : 0;
+    const zet = (k, v) => { if (uiv.style.getPropertyValue(k) !== v) uiv.style.setProperty(k, v); };
+    zet("--dt-kop-l", `${l}px`); zet("--dt-kop-r", `${r}px`);
+    const css = `left:${l}px;right:${r}px;height:${Math.max(h, 52)}px`;
+    if (kop.style.cssText !== css) kop.style.cssText = css;
+  };
+  if (ldKopMain !== main) {
+    ldKopRO?.disconnect();
+    ldKopRO = new ResizeObserver(() => requestAnimationFrame(meet));
+    ldKopRO.observe(main); ldKopRO.observe(uiv);
+    const menu = main.querySelector(":scope > ld-menu"); if (menu) ldKopRO.observe(menu);
+    ldKopMain = main;
+  }
+  const bar = main.querySelector("#leerlinglijst > .dt-att-bar");
+  if (bar && !bar.dataset.dtKopRo) { bar.dataset.dtKopRo = "1"; ldKopRO.observe(bar); }
+  meet();
 }
 
 /* Startscherm: samenvattingsregel onder de datum (lessen vandaag, volgende les, meldingen die aandacht vragen). */
@@ -1098,6 +1147,31 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     aside .head-bar .tabs li.active { border: 0 !important; }
     aside .head-bar .tabs li.active a { background: ${t.surface} !important; box-shadow: 0 1px 3px rgba(0,0,0,.14), 0 0 0 .5px rgba(0,0,0,.04) !important; font-weight: 600 !important; }
     aside .widget { padding: 12px 0 0 !important; background: transparent !important; }
+    /* Inklapknop van het zijpaneel als ronde knop; ingeklapt blijft alleen die knop over */
+    aside .head-bar mg-sidebar-toggle-button { flex: none; display: block !important; }
+    aside .head-bar .toggle-button { width: 32px !important; height: 32px !important; padding: 0 !important; border: 0 !important; border-radius: 50% !important; background: ${t.tint} !important; color: ${t.accent} !important; display: grid !important; place-items: center; cursor: pointer; box-shadow: none !important; transition: background .12s, transform .2s; }
+    aside .head-bar .toggle-button:hover { background: ${t.tintStrong} !important; }
+    aside .head-bar .toggle-button i { font-size: 15px !important; line-height: 1 !important; color: inherit !important; }
+    .hide-sidebar-contents aside .head-bar .tabs, .collapse-sidebar aside .head-bar .tabs { display: none !important; }
+    .collapse-sidebar aside .head-bar { justify-content: center; background: transparent !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; border-radius: 0 !important; height: 52px !important; }
+    .collapse-sidebar aside .head-bar .toggle-button { width: 38px !important; height: 38px !important; background: ${t.glass ? t.glassStrong : t.surface} !important; box-shadow: ${t.glass ? `${t.glassEdge}, 0 4px 14px rgba(31,41,61,.12)` : t.card} !important; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} }
+    .collapse-sidebar aside .head-bar .toggle-button:hover { background: ${t.tintStrong} !important; }
+    .collapse-sidebar aside { overflow: visible !important; }
+    ui-view.dt-ld-on > .aside-toggle-slide { display: none !important; }
+    /* Lesdashboard: titel, tabbladen en werkbalk als één kaart (vlak .dt-ld-kop, maat via lesdashKopPass) */
+    ui-view.dt-ld-on > .dt-ld-kop { position: absolute; top: 28px; box-sizing: border-box; pointer-events: none; border-radius: ${t.glass ? "22px" : "16px"}; background: ${t.glass ? `linear-gradient(180deg, ${t.dark ? "rgba(255,255,255,.07)" : "rgba(255,255,255,.55)"}, transparent 60%), ${t.glassBg}` : t.surface}; box-shadow: ${t.glass ? `${t.glassEdge}, ${t.glassShadow}` : t.card}; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} transition: right .2s linear, height .15s ease; }
+    ui-view.dt-ld-on > .head-bar { top: 36px !important; left: calc(var(--dt-kop-l, 330px) + 14px) !important; right: calc(var(--dt-kop-r, 24px) + 10px) !important; margin: 0 !important; background: transparent !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; border-radius: 0 !important; transition: right .2s linear; }
+    ui-view.dt-ld-on > .head-bar h1, ui-view.dt-ld-on > .head-bar h1 a { margin-left: 0 !important; padding-left: 0 !important; }
+    ui-view.dt-ld-on > section.ld-section { padding-top: 48px !important; }
+    ui-view.dt-ld-on > section.ld-section > .verantwoord-container { margin-left: 14px !important; }
+    ui-view.dt-ld-on > section.ld-section > ld-menu .page-nav { margin: 6px 10px 22px !important; }
+    ui-view.dt-ld-on > section.ld-section:has(#leerlinglijst > .dt-att-bar) > ld-menu .page-nav { margin-bottom: 10px !important; }
+    ui-view.dt-ld-on > section.ld-section > ld-menu .page-nav > ul.tabs { width: fit-content !important; background: ${t.dark ? "rgba(118,118,128,.24)" : "rgba(118,118,128,.12)"} !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar { padding: 0 10px !important; margin: 0 0 22px !important; }
+    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-btn:not(.dt-btn-primary) { background: ${t.dark ? "rgba(118,118,128,.24)" : "rgba(118,118,128,.12)"} !important; box-shadow: none !important; }
+    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-btn:not(.dt-btn-primary):hover { background: ${t.dark ? "rgba(118,118,128,.34)" : "rgba(118,118,128,.2)"} !important; }
+    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-att-input { background: ${t.dark ? "rgba(118,118,128,.24)" : "rgba(118,118,128,.12)"} !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+    ui-view.dt-ld-on > .sidecolumn aside { top: 28px !important; }
     aside .widget > .content-pane { border-radius: 20px !important; box-shadow: ${t.card} !important; }
     aside .widget > .content-pane h3 { height: 48px !important; line-height: 48px !important; padding-left: 20px !important; font-size: 1.0625rem !important; border-bottom: 0 !important; }
     aside .widget > .content-pane > .content { padding: 0 20px 16px !important; }
