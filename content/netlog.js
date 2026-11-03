@@ -94,7 +94,20 @@
    * Antwoord: status en veldnamen (shape), of met full=true de hele JSON. */
   window.addEventListener("message", async (e) => {
     if (!(e.data && e.data.type === "dt:api:get" && trusted(e))) return;
-    const { id, url, full } = e.data;
+    const { id, url, full, blob } = e.data;
+    /* blob=true: een afbeelding (bijv. een pasfoto) als data-URL teruggeven. */
+    if (blob) {
+      try {
+        const res = await of(url, { method: "GET", credentials: "include", headers: { ...(lastHeaders || {}), Accept: "image/*" } });
+        let data = null;
+        if (res.ok && /^image\//.test(res.headers.get("content-type") || "")) {
+          const b = await res.blob();
+          data = await new Promise((ok) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = () => ok(null); fr.readAsDataURL(b); });
+        }
+        reply(e, { type: "dt:api:result", id, status: res.status, data });
+      } catch (err) { reply(e, { type: "dt:api:result", id, status: 0, error: String(err) }); }
+      return;
+    }
     try {
       const t0 = performance.now();
       const res = await of(url, { method: "GET", credentials: "include", headers: { Accept: "application/json", ...(lastHeaders || {}) } });

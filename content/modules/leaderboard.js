@@ -14,6 +14,10 @@
  *
  * Digibord: knop die alleen de top 3 schermvullend toont, met een langzamere onthulling (3, 2, 1) voor
  * de klas. Bewust geen hele klas en geen dalers: alleen voornamen, aanwezigheid en wie gestegen is.
+ *
+ * Foto's (knop, standaard uit): pasfoto's uit Magister (/api/leerlingen/{id}/foto) in plaats van
+ * initialen, op de pagina en op het digibord. Opgehaald via het netwerk-script als data-URL, alleen in
+ * het geheugen van dit tabblad.
  * Alles via je eigen Magister-sessie; er gaat niets naar buiten. */
 DT.register({
   id: "leaderboard",
@@ -21,6 +25,8 @@ DT.register({
   _view: null,
   _cache: new Map(),   // "klas|maandag" -> { lln, rijen, klaar }
   _gen: 0,
+  _foto: new Map(),    // leerling-id -> data-URL of null (geen foto)
+  _fotosAan: false,
 
   init(DT) {
     if (!DT.isTop) return;
@@ -87,6 +93,11 @@ DT.register({
     this._bordKnop = DT.el("button", { class: "dt-lb-nu dt-lb-bordknop", type: "button", disabled: "", title: "Top 3 schermvullend tonen, bijvoorbeeld op het digibord",
       html: `<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="8.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 11v2.5M5 13.5h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>Digibord</span>` });
     this._bordKnop.addEventListener("click", () => this.bord(DT));
+    try { this._fotosAan = localStorage.getItem("dt-lb-fotos") === "1"; } catch {}
+    this._fotoKnop = DT.el("button", { class: "dt-lb-nu dt-lb-fotoknop", type: "button", "aria-pressed": String(this._fotosAan),
+      title: "Pasfoto's uit Magister tonen in plaats van initialen. Houd je aan de afspraken van je school over beeldmateriaal, zeker op het digibord.",
+      html: `<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="6.3" r="2.3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3.8 13.5c.8-2 2.4-3 4.2-3s3.4 1 4.2 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>Foto's</span>` });
+    this._fotoKnop.addEventListener("click", () => this.fotos(DT, !this._fotosAan));
     this._vorige = DT.el("button", { class: "dt-lb-pijl", type: "button", "aria-label": "Vorige week", html: `<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>` });
     this._volgende = DT.el("button", { class: "dt-lb-pijl", type: "button", "aria-label": "Volgende week", html: `<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>` });
     this._vorige.addEventListener("click", () => this.kies(DT, { week: this.plus(this._ma, -7) }));
@@ -99,7 +110,7 @@ DT.register({
       DT.el("div", { class: "dt-lb-kop dt-lb-card" }, [
         DT.el("nav", { class: "dt-lb-crumbs", "aria-label": "Kruimelpad" }, [terug, DT.el("span", { "aria-hidden": "true", text: "›" }), DT.el("span", { text: "Leaderboard" })]),
         DT.el("h1", { html: `Leaderboard<span class="dt-lb-punt">.</span>` }),
-        DT.el("div", { class: "dt-lb-bediening" }, [this._klassen, DT.el("div", { class: "dt-lb-weeknav" }, [this._nu, this._vorige, this._week, this._volgende, this._bordKnop])]),
+        DT.el("div", { class: "dt-lb-bediening" }, [this._klassen, DT.el("div", { class: "dt-lb-weeknav" }, [this._nu, this._vorige, this._week, this._volgende, this._fotoKnop, this._bordKnop])]),
       ]),
       this._status, this._podium,
       DT.el("div", { class: "dt-lb-card dt-lb-tabel" }, [
@@ -260,6 +271,7 @@ DT.register({
     if (c.klaar && met.length) {
       if (this._podiumVan !== c) this.podium(c, met, { pct, lessen, open, trend });
       this._bordData = { met, vorig, klas: this._klas, week: this._week.textContent };
+      if (this._fotosAan && !c.fotos) { c.fotos = true; this.laadFotos(DT, [...met, ...zonder].map((r) => r.l)); }
     } else { this._podiumVan = null; this._podium.replaceChildren(); this._bordData = null; }
     this._bordKnop.disabled = !this._bordData;
 
@@ -267,7 +279,7 @@ DT.register({
       const li = DT.el("li", { class: `dt-lb-rij${leeg ? " is-leeg" : ""}${!leeg && r.plek <= 3 ? " is-top" : ""}`, tabindex: "0", title: "Leerlingkaart openen" }, [
         DT.el("span", { class: "dt-lb-plek", text: leeg ? "–" : String(r.plek) }),
         leeg ? DT.el("span") : trend(r),
-        DT.el("span", { class: "dt-lb-avatar", text: r.l.init }),
+        this.avatar(r.l),
         DT.el("span", { class: "dt-lb-naam", text: r.l.naam }),
         leeg ? DT.el("span", { class: "dt-lb-geen", text: r.fout ? "niet op te halen" : "geen lessen" })
           : DT.el("span", { class: "dt-lb-balk" }, [DT.el("span", {}, DT.el("i", { style: `width:${Math.round(r.pct * 100)}%` })), DT.el("b", { text: pct(r) })]),
@@ -294,7 +306,7 @@ DT.register({
       const groot = DT.el("span", { class: "dt-lb-groot", text: rustig ? pct(r) : "0%" });
       const top = DT.el(een ? "button" : "div", { class: "dt-lb-top", ...(een ? { type: "button", title: "Leerlingkaart openen" } : { title: g.map((x) => x.l.naam).join("\n") }) }, [
         ...(n === 1 ? [DT.el("span", { class: "dt-lb-kroon", "aria-hidden": "true", html: `<svg viewBox="0 0 24 16" width="30" height="20"><path d="M2 14 1 3l6 5 5-7 5 7 6-5-1 11z" fill="#F7C948" stroke="#D99A00" stroke-width="1.2" stroke-linejoin="round"/><circle cx="12" cy="9.5" r="1.6" fill="#fff" opacity=".85"/></svg>` })] : []),
-        DT.el("span", { class: "dt-lb-avatars" }, [...g.slice(0, 4).map((x) => DT.el("span", { class: "dt-lb-avatar", text: x.l.init })), ...(g.length > 4 ? [DT.el("span", { class: "dt-lb-avatar dt-lb-meer", text: `+${g.length - 4}` })] : [])]),
+        DT.el("span", { class: "dt-lb-avatars" }, [...g.slice(0, 4).map((x) => this.avatar(x.l)), ...(g.length > 4 ? [DT.el("span", { class: "dt-lb-avatar dt-lb-meer", text: `+${g.length - 4}` })] : [])]),
         DT.el("span", { class: "dt-lb-naam", text: een ? r.l.naam : namen(g) }),
         groot,
         DT.el("span", { class: "dt-lb-sub", text: `${lessen(r)} lessen${r.T.teLaat ? ` · ${r.T.teLaat}× te laat` : ""}${een ? "" : ` · ${g.length} leerlingen`}` }),
@@ -309,9 +321,16 @@ DT.register({
   },
 
   /* ---------- digibord: alleen de top 3, schermvullend ---------- */
-  bord(DT) {
+  async bord(DT) {
     const d = this._bordData;
-    if (!d || this._bord) return;
+    if (!d || this._bord || this._bordStart) return;
+    /* Met foto's aan eerst de foto's van het podium ophalen (meestal al binnen), dan pas tonen. */
+    if (this._fotosAan) {
+      this._bordStart = true; this._bordKnop.classList.add("is-bezig");
+      await Promise.race([this.laadFotos(DT, d.met.filter((r) => r.plek <= 3).map((r) => r.l)), new Promise((r) => setTimeout(r, 4000))]);
+      this._bordStart = false; this._bordKnop.classList.remove("is-bezig");
+      if (!this._view) return;
+    }
     this.css();
     const laag = DT.el("div", { class: "dt-lb-bord", role: "dialog", "aria-modal": "true", "aria-label": `Meest aanwezig ${d.klas}` });
     const inhoud = DT.el("div", { class: "dt-lb-bord-inhoud" });
@@ -350,17 +369,20 @@ DT.register({
     const dubbel = new Set(top.map(vn).filter((v, i, a) => a.indexOf(v) !== i));
     const roep = (r) => dubbel.has(vn(r)) ? `${vn(r)} ${r.l.naam.split(" ").slice(-1)[0][0]}.` : vn(r);
     const START = { 3: 1400, 2: 2600, 1: 4000 };   // ms: wanneer de leerlingen van die plaats verschijnen
+    const KROON = `<svg viewBox="0 0 64 46" aria-hidden="true"><defs><linearGradient id="dt-lb-goud" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE9A0"/><stop offset=".55" stop-color="#FFC93C"/><stop offset="1" stop-color="#E29B00"/></linearGradient></defs><path d="M7 36 4 11l14.5 11.5L32 5l13.5 17.5L60 11l-3 25z" fill="url(#dt-lb-goud)" stroke="#B87A00" stroke-width="1.4" stroke-linejoin="round"/><rect x="7" y="36" width="50" height="7" rx="2.5" fill="url(#dt-lb-goud)" stroke="#B87A00" stroke-width="1.4"/><circle cx="4" cy="11" r="3.2" fill="#FFE9A0" stroke="#B87A00" stroke-width="1.2"/><circle cx="32" cy="5" r="3.6" fill="#FFE9A0" stroke="#B87A00" stroke-width="1.2"/><circle cx="60" cy="11" r="3.2" fill="#FFE9A0" stroke="#B87A00" stroke-width="1.2"/><circle cx="32" cy="27" r="3.8" fill="#FF4F75"/><circle cx="19.5" cy="29.5" r="2.5" fill="#5AC8FA"/><circle cx="44.5" cy="29.5" r="2.5" fill="#5AC8FA"/><path d="M10 34.5h44" stroke="#fff" stroke-opacity=".45" stroke-width="1.2" stroke-linecap="round"/></svg>`;
     const kolom = (g) => {
-      const r = g[0], n = r.plek, max = n === 1 ? 8 : 5;
-      const namen = g.length <= max ? g.map(roep) : [...g.slice(0, max - 1).map(roep), `en ${g.length - max + 1} anderen`];
+      const r = g[0], n = r.plek, max = n === 1 ? 8 : 6;
+      const zicht = g.length <= max ? g : g.slice(0, max - 1), rest = g.length - zicht.length;
+      const maat = g.length === 1 ? "is-1" : g.length <= 3 ? "is-3" : g.length <= 6 ? "is-6" : "is-9";
       const groot = DT.el("span", { class: "dt-lb-groot", text: rustig ? `${Math.floor(r.pct * 100)}%` : "0%" });
       const stijgers = g.filter((x) => vorig?.has(x.l.id) && vorig.get(x.l.id) > x.plek);
-      if (!rustig) this.telOp(groot, Math.floor(r.pct * 100), START[n]);
+      if (!rustig) this.telOp(groot, Math.floor(r.pct * 100), START[n] + 200);
+      const persoon = (av, naam, i) => DT.el("span", { class: "dt-lb-persoon", style: `animation-delay:${START[n] + i * 110}ms` }, [av, DT.el("span", { class: "dt-lb-voornaam", text: naam })]);
+      const mensen = [...zicht.map((x, i) => persoon(this.avatar(x.l), roep(x), i)), ...(rest ? [persoon(DT.el("span", { class: "dt-lb-avatar dt-lb-meer", text: `+${rest}` }), "anderen", zicht.length)] : [])];
       return DT.el("div", { class: `dt-lb-plaats dt-lb-p${n}` }, [
         DT.el("div", { class: "dt-lb-top" }, [
-          ...(n === 1 ? [DT.el("span", { class: "dt-lb-kroon", "aria-hidden": "true", html: `<svg viewBox="0 0 24 16"><path d="M2 14 1 3l6 5 5-7 5 7 6-5-1 11z" fill="#F7C948" stroke="#D99A00" stroke-width="1" stroke-linejoin="round"/><circle cx="12" cy="9.5" r="1.6" fill="#fff" opacity=".85"/></svg>` })] : []),
-          DT.el("span", { class: "dt-lb-avatars" }, [...g.slice(0, 5).map((x) => DT.el("span", { class: "dt-lb-avatar", text: x.l.init })), ...(g.length > 5 ? [DT.el("span", { class: "dt-lb-avatar", text: `+${g.length - 5}` })] : [])]),
-          DT.el("span", { class: "dt-lb-namen" }, namen.map((t) => DT.el("span", { text: t }))),
+          ...(n === 1 ? [DT.el("span", { class: "dt-lb-kroon", html: KROON })] : []),
+          DT.el("div", { class: `dt-lb-mensen ${maat}` }, mensen),
           groot,
           ...(stijgers.length === 1 && g.length === 1 ? [DT.el("span", { class: "dt-lb-stijger", text: `▲ ${vorig.get(r.l.id) - r.plek} ${vorig.get(r.l.id) - r.plek === 1 ? "plaats" : "plaatsen"} gestegen` })] : []),
         ]),
@@ -391,6 +413,46 @@ DT.register({
     }
     laag.append(bak);
     setTimeout(() => bak.remove(), 6200);
+  },
+
+  /* ---------- foto's ---------- */
+  avatar(l, cls = "") {
+    const a = DT.el("span", { class: `dt-lb-avatar ${cls}`.trim(), "data-lb-id": String(l.id), text: l.init });
+    this.fotoIn(a);
+    return a;
+  },
+
+  fotoIn(a) {
+    const url = this._fotosAan ? this._foto.get(a.dataset.lbId) : null;
+    const img = a.querySelector("img");
+    if (url && !img) { a.classList.add("has-foto"); a.append(DT.el("img", { src: url, alt: "" })); }
+    else if (!url && img) { a.classList.remove("has-foto"); img.remove(); }
+  },
+
+  fotos(DT, aan) {
+    this._fotosAan = aan;
+    try { localStorage.setItem("dt-lb-fotos", aan ? "1" : "0"); } catch {}
+    this._fotoKnop?.setAttribute("aria-pressed", String(aan));
+    document.querySelectorAll(".dt-lb-avatar[data-lb-id]").forEach((a) => this.fotoIn(a));
+    const c = this._cache.get(`${this._klas}|${this.ymd(this._ma)}`);
+    if (aan && c?.klaar && this._bordData) { c.fotos = true; this.laadFotos(DT, [...this._bordData.met.map((r) => r.l), ...c.lln]); }
+  },
+
+  /* Na elkaar ophalen; wat binnen is, verschijnt meteen overal waar die leerling staat. */
+  async laadFotos(DT, lln) {
+    for (const l of lln) {
+      const k = String(l.id);
+      if (!this._fotosAan) return;
+      if (this._foto.has(k)) continue;
+      if (this._fotoBezig?.has(k)) { await this._fotoBezig.get(k); continue; }
+      const p = DT.api(`/api/leerlingen/${encodeURIComponent(l.id)}/foto?redirect_type=body`, { blob: true, timeout: 10000 }).then((r) => {
+        if (r.status) this._foto.set(k, r.data || null);
+        document.querySelectorAll(`.dt-lb-avatar[data-lb-id="${k}"]`).forEach((a) => this.fotoIn(a));
+      });
+      (this._fotoBezig ||= new Map()).set(k, p);
+      await p; this._fotoBezig.delete(k);
+      await new Promise((r) => setTimeout(r, 50));
+    }
   },
 
   telOp(el, doel, wacht) {
@@ -519,7 +581,12 @@ DT.register({
       .dt-lb-num { color: var(--dt-muted); font-variant-numeric: tabular-nums; }
       .dt-lb-geen { color: var(--dt-muted); font-style: italic; }
       .dt-lb-rij.is-leeg .dt-lb-naam { color: var(--dt-muted); }
-      .dt-lb-bordknop { display: inline-flex; gap: 6px; margin-left: 6px; }
+      .dt-lb-bordknop, .dt-lb-fotoknop { display: inline-flex; gap: 6px; }
+      .dt-lb-fotoknop { margin-left: 6px; }
+      .dt-lb-fotoknop[aria-pressed="true"] { background: var(--dt-accent); color: #fff; }
+      .dt-lb-bordknop.is-bezig { opacity: .6; cursor: progress; }
+      .dt-lb-avatar { position: relative; overflow: hidden; }
+      .dt-lb-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
       .dt-lb-bordknop:disabled { opacity: .4; cursor: default; }
       .dt-lb-bord { position: fixed; inset: 0; z-index: 2147482000; overflow: hidden; color: #fff; font-family: var(--dt-font); cursor: none;
         background: radial-gradient(120% 90% at 50% 0%, #2A3F8F 0%, #141B3D 55%, #0A0E22 100%); }
@@ -529,27 +596,39 @@ DT.register({
         -webkit-mask: radial-gradient(closest-side, #000 20%, transparent 75%); mask: radial-gradient(closest-side, #000 20%, transparent 75%); }
       .dt-lb-bord-inhoud { position: relative; height: 100%; display: flex; flex-direction: column; align-items: center; padding: 5vh 4vw 0; box-sizing: border-box; }
       .dt-lb-bord-kop { text-align: center; animation: dt-lb-in .8s cubic-bezier(.2,.9,.3,1.2) .1s both; }
-      .dt-lb-bord-label { display: inline-block; padding: .35em 1em; border-radius: 999px; background: rgba(255,255,255,.12); font-size: clamp(14px, 1.5vw, 24px); font-weight: 600; letter-spacing: .02em; }
-      .dt-lb-bord h1 { margin: .25em 0 0; font-size: clamp(40px, 6.5vw, 110px); line-height: 1; font-weight: 800; letter-spacing: -.03em;
-        background: linear-gradient(180deg, #fff 30%, #FFE08A); -webkit-background-clip: text; background-clip: text; color: transparent; }
+      .dt-lb-bord-label { display: inline-block; padding: .4em 1.1em; border-radius: 999px; background: rgba(255,255,255,.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); font-size: clamp(13px, 1.25vw, 22px); font-weight: 600; letter-spacing: .04em; color: rgba(255,255,255,.82); }
+      .dt-lb-bord h1 { margin: .3em 0 0; padding-bottom: .08em; font-size: clamp(36px, 5.2vw, 96px); line-height: 1.12; font-weight: 800; letter-spacing: -.035em;
+        background: linear-gradient(180deg, #FFFFFF 35%, #FFE7A3); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 6px 28px rgba(255,201,60,.22)); }
       .dt-lb-bord-podium { flex: 1; width: min(1400px, 92vw); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2.5vw; align-items: end; }
       .dt-lb-bord .dt-lb-plaats { display: flex; flex-direction: column; align-items: center; gap: 2vh; min-width: 0; }
-      .dt-lb-bord .dt-lb-top { display: flex; flex-direction: column; align-items: center; gap: .8vh; text-align: center; position: relative; max-width: 100%; animation: dt-lb-in .8s cubic-bezier(.2,.9,.3,1.3) both; }
+      .dt-lb-bord .dt-lb-top { display: flex; flex-direction: column; align-items: center; gap: 1.4vh; text-align: center; position: relative; max-width: 100%; padding: 0; animation: dt-lb-in .8s cubic-bezier(.2,.9,.3,1.3) both; }
       .dt-lb-bord .dt-lb-p3 .dt-lb-top { animation-delay: 1.4s; } .dt-lb-bord .dt-lb-p2 .dt-lb-top { animation-delay: 2.6s; } .dt-lb-bord .dt-lb-p1 .dt-lb-top { animation-delay: 4s; }
-      .dt-lb-bord .dt-lb-blok { width: 100%; border-radius: 2vw 2vw 0 0; display: flex; justify-content: center; padding-top: 2vh; box-sizing: border-box; font-size: clamp(48px, 7vw, 130px); font-weight: 800; color: #fff;
+      .dt-lb-bord .dt-lb-top { animation-name: dt-lb-vervagin; }
+      @keyframes dt-lb-vervagin { from { opacity: 0; } to { opacity: 1; } }
+      .dt-lb-bord .dt-lb-blok::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1.4vh; background: rgba(255,255,255,.3); }
+      .dt-lb-bord .dt-lb-blok { width: 100%; border-radius: 1.6vw 1.6vw 0 0; display: flex; justify-content: center; padding-top: 2vh; box-sizing: border-box; font-size: clamp(48px, 7vw, 130px); font-weight: 800; color: #fff;
         text-shadow: 0 2px 6px rgba(0,0,0,.25); transform-origin: bottom; position: relative; overflow: hidden; animation: dt-lb-groei 1s cubic-bezier(.2,.9,.3,1.1) both; box-shadow: inset 0 2px 0 rgba(255,255,255,.35); }
       .dt-lb-bord .dt-lb-p1 .dt-lb-blok { height: 34vh; background: linear-gradient(180deg, #FFD54A, #E0A800); animation-delay: 3.2s; }
       .dt-lb-bord .dt-lb-p2 .dt-lb-blok { height: 25vh; background: linear-gradient(180deg, #D5DAE1, #9AA1AB); animation-delay: 1.8s; }
       .dt-lb-bord .dt-lb-p3 .dt-lb-blok { height: 18vh; background: linear-gradient(180deg, #E3A872, #B87333); animation-delay: .6s; }
       .dt-lb-bord .dt-lb-p1 .dt-lb-blok::after { content: ""; position: absolute; inset: 0 auto 0 0; width: 35%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent); transform: translateX(-120%) skewX(-20deg); animation: dt-lb-glans 1.4s ease-in-out 4.6s both; }
-      .dt-lb-bord .dt-lb-kroon { position: absolute; top: -6.5vh; left: 50%; margin-left: 0; width: 6vw; min-width: 56px; transform: translateX(-50%); animation: dt-lb-kroonbord .8s cubic-bezier(.3,1.6,.5,1) 4.7s both; }
-      .dt-lb-bord .dt-lb-kroon svg { width: 100%; height: auto; display: block; filter: drop-shadow(0 4px 10px rgba(247,201,72,.5)); }
-      .dt-lb-bord .dt-lb-avatars { display: flex; justify-content: center; }
-      .dt-lb-bord .dt-lb-avatar { width: 6vw; height: 6vw; min-width: 56px; min-height: 56px; border-radius: 50%; display: grid; place-items: center; font-size: clamp(18px, 2vw, 38px); font-weight: 700;
-        background: rgba(255,255,255,.16); color: #fff; box-shadow: 0 0 0 4px #141B3D; text-transform: uppercase; }
-      .dt-lb-bord .dt-lb-avatar + .dt-lb-avatar { margin-left: -1.4vw; }
-      .dt-lb-bord .dt-lb-p1 .dt-lb-avatar { width: 7.5vw; height: 7.5vw; background: rgba(255,213,74,.25); }
-      .dt-lb-namen { display: flex; flex-wrap: wrap; justify-content: center; gap: .1em .6em; font-size: clamp(18px, 2.2vw, 42px); font-weight: 700; letter-spacing: -.01em; line-height: 1.15; }
+      .dt-lb-bord .dt-lb-kroon { position: static; margin: 0 0 -.4vh; width: clamp(48px, 5vw, 96px); animation: dt-lb-kroonbord .9s cubic-bezier(.3,1.5,.5,1) 4.9s both; }
+      .dt-lb-bord .dt-lb-kroon svg { width: 100%; height: auto; display: block; filter: drop-shadow(0 6px 16px rgba(255,201,60,.45)); }
+      .dt-lb-mensen { --schaal: 1; display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 1.6vh 1.6vw; max-width: 100%; }
+      .dt-lb-mensen.is-1 { --av: calc(clamp(84px, 10vw, 190px) * var(--schaal)); }
+      .dt-lb-mensen.is-3 { --av: calc(clamp(64px, 7vw, 132px) * var(--schaal)); }
+      .dt-lb-mensen.is-6 { --av: calc(clamp(52px, 5.2vw, 100px) * var(--schaal)); }
+      .dt-lb-mensen.is-9 { --av: calc(clamp(44px, 4.2vw, 82px) * var(--schaal)); }
+      .dt-lb-bord .dt-lb-p1 .dt-lb-mensen:not(.is-1) { --schaal: 1.18; }
+      .dt-lb-bord .dt-lb-p2 .dt-lb-mensen, .dt-lb-bord .dt-lb-p3 .dt-lb-mensen { --schaal: .82; }
+      .dt-lb-persoon { display: flex; flex-direction: column; align-items: center; gap: 1vh; min-width: 0; animation: dt-lb-pop .7s cubic-bezier(.2,.9,.3,1.35) both; }
+      .dt-lb-bord .dt-lb-avatar { --ring: #D5DAE1; width: var(--av); height: var(--av); border-radius: 50%; display: grid; place-items: center; font-size: calc(var(--av) * .34); font-weight: 700; letter-spacing: .02em; text-transform: uppercase;
+        color: #fff; background: linear-gradient(160deg, #4C5DB8, #283270); box-shadow: 0 0 0 calc(var(--av) * .045) var(--ring), 0 0 0 calc(var(--av) * .045 + 5px) rgba(10,14,34,.55), 0 14px 34px rgba(0,0,0,.4); margin: 0; }
+      .dt-lb-bord .dt-lb-p1 .dt-lb-avatar { --ring: #FFC93C; box-shadow: 0 0 0 calc(var(--av) * .05) var(--ring), 0 0 calc(var(--av) * .35) rgba(255,201,60,.35), 0 14px 34px rgba(0,0,0,.4); }
+      .dt-lb-bord .dt-lb-p3 .dt-lb-avatar { --ring: #E3A872; }
+      .dt-lb-bord .dt-lb-avatar.dt-lb-meer { background: rgba(255,255,255,.1); font-size: calc(var(--av) * .3) !important; }
+      .dt-lb-voornaam { font-size: clamp(15px, calc(var(--av) * .21), 34px); font-weight: 700; letter-spacing: -.01em; line-height: 1.1; max-width: calc(var(--av) * 1.9); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .dt-lb-mensen.is-1 .dt-lb-voornaam { font-size: clamp(22px, 2.6vw, 48px); max-width: none; }
       .dt-lb-bord .dt-lb-groot { font-size: clamp(28px, 3.6vw, 68px); font-weight: 800; color: rgba(255,255,255,.92); font-variant-numeric: tabular-nums; }
       .dt-lb-bord .dt-lb-p1 .dt-lb-groot { color: #FFD54A; font-size: clamp(34px, 4.6vw, 86px); }
       .dt-lb-stijger { font-size: clamp(13px, 1.2vw, 22px); font-weight: 700; color: #30D158; background: rgba(48,209,88,.16); padding: .25em .8em; border-radius: 999px; }
@@ -562,7 +641,8 @@ DT.register({
       @keyframes dt-lb-val { from { transform: translate(0, 0) rotate(0); opacity: 1; } 85% { opacity: 1; } to { transform: translate(var(--dx), 105vh) rotate(var(--r)); opacity: 0; } }
       @keyframes dt-lb-draai { to { transform: rotate(360deg); } }
       @keyframes dt-lb-vervaag { from { opacity: .5; } 40% { opacity: .9; } to { opacity: .55; } }
-      @keyframes dt-lb-kroonbord { from { opacity: 0; transform: translate(-50%, -8vh) rotate(-25deg) scale(.5); } to { opacity: 1; transform: translateX(-50%); } }
+      @keyframes dt-lb-kroonbord { from { opacity: 0; transform: translateY(-10vh) rotate(-22deg) scale(.5); } to { opacity: 1; transform: none; } }
+      @keyframes dt-lb-pop { from { opacity: 0; transform: translateY(3vh) scale(.6); } to { opacity: 1; transform: none; } }
       @media (prefers-reduced-motion: reduce) { .dt-lb-bord *, .dt-lb-bord *::after { animation: none !important; } }
       @media (max-width: 900px) {
         .dt-lb-rij { grid-template-columns: 28px 52px 32px minmax(0, 1fr) 110px; }

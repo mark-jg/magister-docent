@@ -94,15 +94,16 @@
     },
 
     /* Vraagt de pagina om een Magister-API-call te doen met haar eigen headers.
-     * Geeft { status, shape, json? } terug. json alleen met full=true. */
+     * Geeft { status, shape, json? } terug. json alleen met full=true; met blob=true { status, data }
+     * met een afbeelding als data-URL. */
     /* Met win een ander frame op hetzelfde domein (bijvoorbeeld window.parent): dat frame
      * doet dan de call met zíjn headers en antwoordt aan ons. */
-    api(url, { full = false, timeout = 15000, win = window } = {}) {
+    api(url, { full = false, blob = false, timeout = 15000, win = window } = {}) {
       return new Promise((resolve) => {
         const id = Math.random().toString(36).slice(2);
         const h = (e) => { if (DT.sameOrigin(e.source) && e.data?.type === "dt:api:result" && e.data.id === id) { window.removeEventListener("message", h); resolve(e.data); } };
         window.addEventListener("message", h);
-        try { win.postMessage({ type: "dt:api:get", id, url, full }, "*"); } catch { resolve({ status: 0, error: "frame onbereikbaar" }); }
+        try { win.postMessage({ type: "dt:api:get", id, url, full, blob }, "*"); } catch { resolve({ status: 0, error: "frame onbereikbaar" }); }
         setTimeout(() => { window.removeEventListener("message", h); resolve({ status: 0, error: "time-out" }); }, timeout);
       });
     },
