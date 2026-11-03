@@ -530,12 +530,31 @@ function agendaToolbarPass(root) {
 /* Lesdashboard: titelbalk, tabbladen en werkbalk op één kaart. De kaart is een los vlak achter die
  * drie (ze staan in Magister op verschillende plekken in de pagina). Breedte en hoogte volgen de
  * inhoudskolom: die verandert als het zijpaneel in- of uitklapt, daarom een ResizeObserver. */
-let ldKopRO = null, ldKopMain = null;
+let ldKopRO = null, ldKopMain = null, ldKopMO = null;
+const ldPadCache = new Map();
+/* Rechtermarge van de inhoud in de EINDtoestand. Magister laat die marge in 0,2s meeschuiven met het
+ * zijpaneel; tijdens die overgang geeft getComputedStyle een tussenwaarde. Een onzichtbare kopie met
+ * dezelfde klassen geeft direct de eindwaarde, zodat de kaart in dezelfde 0,2s meeschuift. */
+function ldEindPadding(main) {
+  const key = `${main.className}|${window.innerWidth}`;
+  if (ldPadCache.has(key)) return ldPadCache.get(key);
+  const probe = document.createElement("section");
+  probe.className = main.className;
+  probe.setAttribute("aria-hidden", "true");
+  probe.style.cssText = "display:none !important";
+  main.after(probe);
+  const ps = getComputedStyle(probe);
+  const v = { l: parseFloat(ps.paddingLeft) || 0, r: parseFloat(ps.paddingRight) || 0 };
+  probe.remove();
+  ldPadCache.set(key, v);
+  return v;
+}
 function lesdashKopPass(root, on) {
   const uiv = root.querySelector('ui-view[name="main"]');
   const main = on && uiv ? uiv.querySelector(":scope > section.ld-section") : null;
   const hb = main ? uiv.querySelector(":scope > .head-bar") : null;
   if (!main || !hb) {
+    ldKopMO?.disconnect(); ldKopMO = null;
     root.querySelectorAll(".dt-ld-kop").forEach((k) => k.remove());
     root.querySelectorAll(".dt-ld-on").forEach((u) => { u.classList.remove("dt-ld-on"); u.style.removeProperty("--dt-kop-l"); u.style.removeProperty("--dt-kop-r"); });
     if (ldKopRO) { ldKopRO.disconnect(); ldKopRO = null; ldKopMain = null; }
@@ -546,10 +565,10 @@ function lesdashKopPass(root, on) {
   uiv.classList.add("dt-ld-on");
   const meet = () => {
     if (!kop.isConnected) return;
-    const ur = uiv.getBoundingClientRect(), mr = main.getBoundingClientRect(), ms = getComputedStyle(main);
+    const ur = uiv.getBoundingClientRect(), mr = main.getBoundingClientRect(), pad = ldEindPadding(main);
     const binnenL = ur.left + uiv.clientLeft, binnenR = binnenL + uiv.clientWidth;
-    const l = Math.round(mr.left + parseFloat(ms.paddingLeft) - binnenL);
-    const r = Math.round(binnenR - (mr.right - parseFloat(ms.paddingRight)));
+    const l = Math.round(mr.left + pad.l - binnenL);
+    const r = Math.round(binnenR - (mr.right - pad.r));
     const top = parseFloat(getComputedStyle(kop).top) || 28;
     let onder = 0;
     for (const el of main.querySelectorAll(":scope > ld-menu .page-nav > ul.tabs, :scope > .verantwoord-container, #leerlinglijst > .dt-att-bar")) {
@@ -559,13 +578,17 @@ function lesdashKopPass(root, on) {
     const h = onder ? Math.round(onder - ur.top - uiv.clientTop + uiv.scrollTop + 16 - top) : 0;
     const zet = (k, v) => { if (uiv.style.getPropertyValue(k) !== v) uiv.style.setProperty(k, v); };
     zet("--dt-kop-l", `${l}px`); zet("--dt-kop-r", `${r}px`);
-    const css = `left:${l}px;right:${r}px;height:${Math.max(h, 52)}px`;
-    if (kop.style.cssText !== css) kop.style.cssText = css;
+    /* Per eigenschap en alleen bij verschil: opnieuw zetten zou de CSS-overgang telkens herstarten */
+    for (const [k, v] of [["left", `${l}px`], ["right", `${r}px`], ["height", `${Math.max(h, 52)}px`]]) if (kop.style[k] !== v) kop.style[k] = v;
   };
   if (ldKopMain !== main) {
     ldKopRO?.disconnect();
     ldKopRO = new ResizeObserver(() => requestAnimationFrame(meet));
     ldKopRO.observe(main); ldKopRO.observe(uiv);
+    /* Klasse van de inhoud wisselt bij in-/uitklappen: meteen de eindmaat zetten (CSS schuift mee in 0,2s). */
+    ldKopMO?.disconnect();
+    ldKopMO = new MutationObserver(() => meet());
+    ldKopMO.observe(main, { attributes: true, attributeFilter: ["class"] });
     const menu = main.querySelector(":scope > ld-menu"); if (menu) ldKopRO.observe(menu);
     ldKopMain = main;
   }
@@ -1165,7 +1188,7 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     .collapse-sidebar aside { overflow: visible !important; }
     ui-view.dt-ld-on > .aside-toggle-slide { display: none !important; }
     /* Lesdashboard: titel, tabbladen en werkbalk als één kaart (vlak .dt-ld-kop, maat via lesdashKopPass) */
-    ui-view.dt-ld-on > .dt-ld-kop { position: absolute; top: 28px; box-sizing: border-box; pointer-events: none; border-radius: ${t.glass ? "22px" : "16px"}; background: ${ldCard}; box-shadow: ${ldShadow}; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} transition: right .2s linear, height .15s ease; }
+    ui-view.dt-ld-on > .dt-ld-kop { position: absolute; top: 28px; box-sizing: border-box; pointer-events: none; border-radius: ${t.glass ? "22px" : "16px"}; background: ${ldCard}; box-shadow: ${ldShadow}; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} transition: left .2s linear, right .2s linear; }
     ui-view.dt-ld-on > .head-bar { top: 46px !important; height: 40px !important; line-height: 40px !important; left: calc(var(--dt-kop-l, 330px) + 18px) !important; right: calc(var(--dt-kop-r, 24px) + 16px) !important; margin: 0 !important; background: transparent !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; border-radius: 0 !important; transition: right .2s linear; }
     ui-view.dt-ld-on > .head-bar h1, ui-view.dt-ld-on > .head-bar h1 a { margin-left: 0 !important; padding-left: 0 !important; }
     ui-view.dt-ld-on > .head-bar h1 { height: 40px !important; line-height: 40px !important; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -1205,6 +1228,10 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     ui-view.dt-ld-on > .sidecolumn aside .head-bar .tabs li { height: 26px !important; }
     ui-view.dt-ld-on > .sidecolumn aside .head-bar .tabs li a { height: 26px !important; line-height: 26px !important; font-size: .8125rem !important; }
     ui-view.dt-ld-on > .sidecolumn:not(.collapse-sidebar) aside .head-bar .toggle-button { width: 30px !important; height: 30px !important; }
+    ui-view.dt-ld-on > .sidecolumn aside .head-bar .toggle-button { position: static !important; inset: auto !important; margin: 0 !important; flex: none; }
+    ui-view.dt-ld-on > .sidecolumn aside .head-bar mg-aside-toggle:empty { display: none !important; }
+    aside .head-bar .toggle-button:focus { outline: 0 !important; }
+    aside .head-bar .toggle-button:focus-visible { outline: 2px solid ${t.accent} !important; outline-offset: 2px; }
     ui-view.dt-ld-on > .sidecolumn:not(.collapse-sidebar) aside { overflow: visible !important; }
     ui-view.dt-ld-on > .sidecolumn:not(.collapse-sidebar) aside .content-container { margin: 58px -16px 0 !important; padding: 0 16px 24px !important; width: calc(100% + 32px) !important; height: calc(100% - 58px) !important; box-sizing: border-box; scrollbar-width: none; }
     ui-view.dt-ld-on > .sidecolumn:not(.collapse-sidebar) aside .content-container::-webkit-scrollbar { display: none; }
