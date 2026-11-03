@@ -930,12 +930,13 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     #leerlinglijst .ui-grid-header-cell .ui-grid-column-menu-button { display: none !important; }
     #leerlinglijst .ui-grid-header { border-bottom: 1px solid ${t.sepSoft} !important; box-shadow: none !important; }
     #leerlinglijst .ui-grid-header-cell .ui-grid-cell-contents { min-width: 0 !important; }
-    /* Rijen: geen eigen randen of schaduwen van Magister, één dunne scheidingslijn per rij */
+    /* Rijen: geen eigen randen of schaduwen van Magister, één dunne scheidingslijn per rij.
+     * Cellen houden minstens 30px hoogte: een lege zwevende cel (de !-kolom) van 0px laat de volgende kolom eroverheen schuiven. */
     #leerlinglijst .ui-grid-row { position: relative; overflow: hidden; border: 0 !important; box-shadow: none !important; background: transparent !important; }
     #leerlinglijst .ui-grid-row::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: 0; height: 1px; background: ${t.sepSoft}; pointer-events: none; z-index: 1; }
     #leerlinglijst .ui-grid-row:last-child::after { display: none; }
     #leerlinglijst .ui-grid-row > div, #leerlinglijst .ui-grid-row td { background: transparent !important; box-shadow: none !important; }
-    #leerlinglijst .ui-grid-row .ui-grid-cell { height: 100% !important; background: transparent !important; border: 0 !important; box-shadow: none !important; color: ${t.fg} !important; transition: background .12s !important; }
+    #leerlinglijst .ui-grid-row .ui-grid-cell { height: 100% !important; min-height: 30px !important; background: transparent !important; border: 0 !important; box-shadow: none !important; color: ${t.fg} !important; transition: background .12s !important; }
     #leerlinglijst .ui-grid-row .ui-grid-cell-contents, #leerlinglijst .ui-grid-row .mg-checkbox-cell, #leerlinglijst .leerlinglijst-presentie-cell, #leerlinglijst .leerlinglijst-presentie-cell > .mg-checkbox-cell { background: transparent !important; box-shadow: none !important; }
     #leerlinglijst .ui-grid-row:hover .ui-grid-cell { background: ${t.glass ? (t.dark ? "rgba(255,255,255,.06)" : "rgba(255,255,255,.45)") : t.hover} !important; }
     #leerlinglijst .ui-grid-row.ui-grid-row-selected > [ui-grid-row] > .ui-grid-cell { background: ${t.tint} !important; }
