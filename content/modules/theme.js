@@ -755,6 +755,9 @@ function withPrivateTwins(css) {
 
 function appleCss(p, dark, accent, top = (typeof window === "undefined" || window === window.top)) {
   const t = applePalette(p, dark, accent);
+  /* Kaartstijl van het lesdashboard (kopkaart, lijst en zijpaneel) */
+  const ldCard = t.glass ? `linear-gradient(180deg, ${t.dark ? "rgba(255,255,255,.07)" : "rgba(255,255,255,.55)"}, transparent 60%), ${t.glassBg}` : t.surface;
+  const ldShadow = t.glass ? `${t.glassEdge}, ${t.dark ? "0 8px 28px rgba(0,0,0,.4), 0 1px 3px rgba(0,0,0,.25)" : "0 8px 28px rgba(31,41,61,.10), 0 1px 3px rgba(31,41,61,.05)"}` : t.card;
   return appleTokens(t) + `
     /* ---- Basis ---- */
     html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
@@ -971,7 +974,7 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     #leerlinglijst .acl-collapse-caption { font-weight: 600 !important; color: ${t.muted} !important; }
     #leerlinglijst .verantwoording-absent-container .acl-collapse-caption { color: ${t.red} !important; }
     #leerlinglijst .verantwoording-grid-container { height: calc(100% - 36px) !important; }
-    #leerlinglijst .ui-grid { background: ${t.glass ? t.glassBg : t.surface} !important; border: 0 !important; border-radius: ${t.glass ? "22px" : "16px"} !important; box-shadow: ${t.glass ? `${t.glassEdge}, ${t.glassShadow}` : t.card} !important; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} overflow: hidden; }
+    #leerlinglijst .ui-grid { background: ${t.glass ? t.glassBg : t.surface} !important; border: 0 !important; border-radius: ${t.glass ? "22px" : "16px"} !important; box-shadow: ${ldShadow} !important; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} overflow: hidden; }
     #leerlinglijst .ui-grid-top-panel::before, #leerlinglijst .ui-grid-top-panel::after, #leerlinglijst .ui-grid-vertical-bar, #leerlinglijst .ui-grid-pinned-container > .ui-grid-render-container::after, #leerlinglijst .ui-grid-resize-overlay { display: none !important; }
     #leerlinglijst .ui-grid-header-cell, #leerlinglijst .ui-grid-pinned-container .ui-grid-cell, #leerlinglijst .ui-grid-row .highlight { border: 0 !important; }
     #leerlinglijst .ui-grid-cell-focus { box-shadow: none !important; outline: 0 !important; }
@@ -1162,7 +1165,7 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     .collapse-sidebar aside { overflow: visible !important; }
     ui-view.dt-ld-on > .aside-toggle-slide { display: none !important; }
     /* Lesdashboard: titel, tabbladen en werkbalk als één kaart (vlak .dt-ld-kop, maat via lesdashKopPass) */
-    ui-view.dt-ld-on > .dt-ld-kop { position: absolute; top: 28px; box-sizing: border-box; pointer-events: none; border-radius: ${t.glass ? "22px" : "16px"}; background: ${t.glass ? `linear-gradient(180deg, ${t.dark ? "rgba(255,255,255,.07)" : "rgba(255,255,255,.55)"}, transparent 60%), ${t.glassBg}` : t.surface}; box-shadow: ${t.glass ? `${t.glassEdge}, ${t.glassShadow}` : t.card}; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} transition: right .2s linear, height .15s ease; }
+    ui-view.dt-ld-on > .dt-ld-kop { position: absolute; top: 28px; box-sizing: border-box; pointer-events: none; border-radius: ${t.glass ? "22px" : "16px"}; background: ${ldCard}; box-shadow: ${ldShadow}; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} transition: right .2s linear, height .15s ease; }
     ui-view.dt-ld-on > .head-bar { top: 46px !important; height: 40px !important; line-height: 40px !important; left: calc(var(--dt-kop-l, 330px) + 18px) !important; right: calc(var(--dt-kop-r, 24px) + 16px) !important; margin: 0 !important; background: transparent !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; border-radius: 0 !important; transition: right .2s linear; }
     ui-view.dt-ld-on > .head-bar h1, ui-view.dt-ld-on > .head-bar h1 a { margin-left: 0 !important; padding-left: 0 !important; }
     ui-view.dt-ld-on > .head-bar h1 { height: 40px !important; line-height: 40px !important; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -1196,6 +1199,25 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-btn:not(.dt-btn-primary):hover { background: ${t.dark ? "rgba(118,118,128,.34)" : "rgba(118,118,128,.2)"} !important; }
     ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-att-input { background: ${t.dark ? "rgba(118,118,128,.24)" : "rgba(118,118,128,.12)"} !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
     ui-view.dt-ld-on > .sidecolumn aside { top: 28px !important; }
+    /* Zijpaneel naast de kaart: zelfde kaartstijl, 16px binnenmarge, 12px tussen kaarten, knoppen van 30px */
+    ui-view.dt-ld-on > .sidecolumn:not(.collapse-sidebar) aside .head-bar { height: 46px !important; line-height: normal !important; padding: 0 8px !important; margin: 0 !important; gap: 8px !important; box-sizing: border-box; border-radius: ${t.glass ? "22px" : "16px"} !important; background: ${ldCard} !important; box-shadow: ${ldShadow} !important; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} }
+    ui-view.dt-ld-on > .sidecolumn:not(.collapse-sidebar) aside .head-bar .tabs { flex: 1; width: auto !important; min-width: 0; height: 30px !important; padding: 2px !important; background: ${t.dark ? "rgba(118,118,128,.24)" : "rgba(118,118,128,.12)"} !important; }
+    ui-view.dt-ld-on > .sidecolumn aside .head-bar .tabs li { height: 26px !important; }
+    ui-view.dt-ld-on > .sidecolumn aside .head-bar .tabs li a { height: 26px !important; line-height: 26px !important; font-size: .8125rem !important; }
+    ui-view.dt-ld-on > .sidecolumn:not(.collapse-sidebar) aside .head-bar .toggle-button { width: 30px !important; height: 30px !important; }
+    ui-view.dt-ld-on > .sidecolumn:not(.collapse-sidebar) aside { overflow: visible !important; }
+    ui-view.dt-ld-on > .sidecolumn:not(.collapse-sidebar) aside .content-container { margin: 58px -16px 0 !important; padding: 0 16px 24px !important; width: calc(100% + 32px) !important; height: calc(100% - 58px) !important; box-sizing: border-box; scrollbar-width: none; }
+    ui-view.dt-ld-on > .sidecolumn:not(.collapse-sidebar) aside .content-container::-webkit-scrollbar { display: none; }
+    ui-view.dt-ld-on > .sidecolumn aside .widget { padding: 0 0 12px !important; margin: 0 !important; }
+    ui-view.dt-ld-on > .sidecolumn aside .widget > .content-pane { border-radius: ${t.glass ? "22px" : "16px"} !important; background: ${ldCard} !important; box-shadow: ${ldShadow} !important; overflow: hidden; }
+    ui-view.dt-ld-on > .sidecolumn aside .widget > .content-pane > h3, ui-view.dt-ld-on > .sidecolumn aside .widget h3 { height: 44px !important; line-height: 44px !important; padding: 0 44px 0 16px !important; margin: 0 !important; font: 600 .9375rem/44px ${t.font} !important; color: ${t.fg} !important; letter-spacing: -.01em; }
+    ui-view.dt-ld-on > .sidecolumn aside .widget h3 b, ui-view.dt-ld-on > .sidecolumn aside .widget h3 span { font: inherit !important; line-height: inherit !important; }
+    ui-view.dt-ld-on > .sidecolumn aside .widget h3 .fold-toggle, ui-view.dt-ld-on > .sidecolumn aside .widget .fold-toggle { top: 0 !important; right: 4px !important; width: 40px !important; height: 44px !important; line-height: 44px !important; display: grid !important; place-items: center; }
+    ui-view.dt-ld-on > .sidecolumn aside .widget .fold-toggle i { font-size: 12px !important; line-height: 1 !important; width: auto !important; height: auto !important; color: ${t.muted} !important; }
+    ui-view.dt-ld-on > .sidecolumn aside .widget .content { padding: 0 16px 16px !important; }
+    ui-view.dt-ld-on > .sidecolumn aside .widget footer.endlink { padding: 0 16px 16px !important; }
+    ui-view.dt-ld-on > .sidecolumn aside .widget .list li > a > span.value, ui-view.dt-ld-on > .sidecolumn aside .widget .list li .single-line > span.value:first-child { padding-left: 0 !important; }
+    ui-view.dt-ld-on > .sidecolumn aside .widget .list li.no-data { padding-left: 8px !important; padding-right: 8px !important; }
     aside .widget > .content-pane { border-radius: 20px !important; box-shadow: ${t.card} !important; }
     aside .widget > .content-pane h3 { height: 48px !important; line-height: 48px !important; padding-left: 20px !important; font-size: 1.0625rem !important; border-bottom: 0 !important; }
     aside .widget > .content-pane > .content { padding: 0 20px 16px !important; }
