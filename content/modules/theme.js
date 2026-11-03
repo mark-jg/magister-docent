@@ -626,8 +626,9 @@ function leerlingenKopPass(root, on) {
     zet("--dt-ll-rm", `${rm}px`); zet("--dt-ll-up", `${up}px`);
     /* Magister zet het filterpaneel met position: fixed en rekent zelf de plek uit; wij leggen het naast
      * de kaart: zelfde bovenkant, 16px tussenruimte, onderkant gelijk met de tabel. */
-    /* Hoogte: de kaart duwt de tabel omlaag; de pagina blijft binnen het venster met 16px ruimte onderaan */
-    zet("--dt-ll-ph", `${Math.max(300, Math.round(win.innerHeight - pr.top - 16))}px`);
+    /* Hoogte: de kaart duwt de tabel omlaag; de pagina blijft binnen het venster met 24px ruimte onderaan
+     * (het frame loopt door tot de onderrand, zie de regel voor #guest-app-frame) */
+    zet("--dt-ll-ph", `${Math.max(300, Math.round(win.innerHeight - pr.top - 24))}px`);
     const tabel = links.querySelector(".table-container") || links;
     const onder = tabel.getBoundingClientRect().bottom;
     zet("--dt-ll-ft", `${kopTop - sy}px`);
@@ -1294,6 +1295,10 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     ui-view.dt-ld-on > .sidecolumn aside .widget footer.endlink { padding: 0 16px 16px !important; }
     ui-view.dt-ld-on > .sidecolumn aside .widget .list li > a > span.value, ui-view.dt-ld-on > .sidecolumn aside .widget .list li .single-line > span.value:first-child { padding-left: 0 !important; }
     ui-view.dt-ld-on > .sidecolumn aside .widget .list li.no-data { padding-left: 8px !important; padding-right: 8px !important; }
+    /* Frame van het leerlingenoverzicht tot de onderrand van het venster (Magister laat 24px marge plus 9px
+     * onder het inline-frame vrij); de marge van 24px zit daarna binnen het frame, zodat schaduwen zichtbaar blijven */
+    ui-view[name="main"]:has(#guest-app-frame[src*="/op-leerlingen/"]) { padding-bottom: 0 !important; }
+    mg-guest-app .fill-viewport > #guest-app-frame[src*="/op-leerlingen/"] { display: block !important; height: 100% !important; }
     /* ---- Leerlingenoverzicht: zelfde kaartopbouw als het lesdashboard (vlak .dt-ll-kop, maat via leerlingenKopPass) ---- */
     html.dt-ll-on body > .dt-ll-kop { position: absolute; top: 8px; z-index: 0; box-sizing: border-box; pointer-events: none; border-radius: ${t.glass ? "22px" : "16px"}; background: ${ldCard}; box-shadow: ${ldShadow}; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} }
     html.dt-ll-on app-root > dna-breadcrumbs, html.dt-ll-on app-root > dna-page-header, html.dt-ll-on app-leerlingen-root > dna-tabs { position: relative !important; z-index: 1; margin-right: calc(var(--dt-ll-rm, 296px) + 16px) !important; }
