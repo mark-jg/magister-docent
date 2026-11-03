@@ -9,6 +9,8 @@
  * afwezig = absent, ziek of uitgestuurd; te laat telt als aanwezig; vrijgestelde lessen tellen niet mee.
  * Volgorde: aanwezig %, dan minder vaak te laat, dan meer lessen aanwezig. Gelijke cijfers delen een
  * plaats en de plaatsen lopen door zonder gaten (1, 1, 2), zodat er altijd een 1, 2 en 3 op het podium staan.
+ * Per leerling wordt ook de week ervoor opgehaald (in dezelfde aanvragen), voor de pijl omhoog/omlaag/gelijk
+ * ten opzichte van de plaats van vorige week.
  * Alles via je eigen Magister-sessie; er gaat niets naar buiten. */
 DT.register({
   id: "leaderboard",
@@ -85,7 +87,7 @@ DT.register({
     this._volgende.addEventListener("click", () => this.kies(DT, { week: this.plus(this._ma, 7) }));
     this._nu.addEventListener("click", () => this.kies(DT, { week: this.maandag(new Date()) }));
     this._status = DT.el("div", { class: "dt-lb-status", "aria-live": "polite" });
-    this._podium = DT.el("div", { class: "dt-lb-podium" });
+    this._podium = DT.el("div", { class: "dt-lb-podium dt-lb-card" });
     this._lijst = DT.el("ol", { class: "dt-lb-lijst" });
     v.append(
       DT.el("div", { class: "dt-lb-kop dt-lb-card" }, [
@@ -95,7 +97,7 @@ DT.register({
       ]),
       this._status, this._podium,
       DT.el("div", { class: "dt-lb-card dt-lb-tabel" }, [
-        DT.el("div", { class: "dt-lb-rij dt-lb-th", "aria-hidden": "true" }, ["#", "", "Leerling", "Aanwezig", "Lessen", "Te laat"].map((t) => DT.el("span", { text: t }))),
+        DT.el("div", { class: "dt-lb-rij dt-lb-th", "aria-hidden": "true" }, ["#", "Trend", "", "Leerling", "Aanwezig", "Lessen", "Te laat"].map((t) => DT.el("span", { text: t }))),
         this._lijst,
       ]),
     );
@@ -120,7 +122,7 @@ DT.register({
     if (!kl.length) return this.status(r.status === 200 ? "Er zijn geen klassen aan je gekoppeld." : `Klassen ophalen lukte niet (Magister antwoordde ${r.status}).`, true);
     let bewaard = null; try { bewaard = localStorage.getItem("dt-lb-klas"); } catch {}
     this._klassen.replaceChildren(...kl.map((k) => {
-      const b = DT.el("button", { type: "button", role: "tab", class: "dt-lb-klas", "data-klas": k.naam, title: `${k.aantal} leerlingen`, text: k.naam });
+      const b = DT.el("button", { type: "button", role: "tab", class: "dt-lb-klas", "data-klas": k.naam, text: k.naam });
       b.addEventListener("click", () => this.kies(DT, { klas: k.naam }));
       return b;
     }));
@@ -178,23 +180,25 @@ DT.register({
     const items = lijst(r);
     if (!items) { c.fout = `Leerlingen van ${klas} ophalen lukte niet (Magister antwoordde ${r.status}).`; return; }
     c.lln = items.map((x) => ({ id: x.id, naam: [x.roepnaam, x.tussenvoegsel, x.achternaam].filter(Boolean).join(" "), init: ((x.roepnaam || "")[0] || "") + ((x.achternaam || "")[0] || "") })).filter((x) => x.id != null);
-    const van = ma, zo = this.plus(ma, 6), now = new Date();
-    const tot = new Date(Math.min(+new Date(zo.getFullYear(), zo.getMonth(), zo.getDate(), 23, 59, 59), +now));
+    const zo = this.plus(ma, 6), now = new Date(), eind = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
+    const tot = new Date(Math.min(+eind(zo), +now));
+    const vorigVan = this.plus(ma, -7), vorigTot = eind(this.plus(ma, -1));
     const werk = c.lln.slice();
     const doe = async () => {
       while (werk.length) {
         const l = werk.shift();
-        const v = await api(`/api/m6/leerlingen/${l.id}/verantwoordingen?begin=${this.ymd(van)}&einde=${this.ymd(zo)}`);
+        const v = await api(`/api/m6/leerlingen/${l.id}/verantwoordingen?begin=${this.ymd(vorigVan)}&einde=${this.ymd(zo)}`);
         await wacht(120);
-        const a = await api(`/api/leerlingen/${l.id}/afspraken?status=actief&begin=${this.ymd(van)}&einde=${this.ymd(zo)}`);
+        const a = await api(`/api/leerlingen/${l.id}/afspraken?status=actief&begin=${this.ymd(vorigVan)}&einde=${this.ymd(zo)}`);
         await wacht(120);
         const regs = lijst(v), rooster = lijst(a);
-        let T = null;
+        let T = null, Tv = null;
         if (regs && rooster) {
-          rooster.push(...await vzLosseLessen(l.id, regs, rooster, api, 20));
-          T = vzStats(regs, rooster, van, tot).totaal;
+          rooster.push(...await vzLosseLessen(l.id, regs, rooster, api, 30));
+          T = vzStats(regs, rooster, ma, tot).totaal;
+          Tv = vzStats(regs, rooster, vorigVan, vorigTot).totaal;
         }
-        c.rijen.push({ l, T, fout: !T });
+        c.rijen.push({ l, T, Tv, fout: !T });
       }
     };
     await Promise.all([doe(), doe()]);
@@ -202,11 +206,12 @@ DT.register({
   },
 
   /* Volgorde en plaatsen; gelijke cijfers delen een plaats (1, 1, 2). */
-  rangschik(rijen) {
+  rangschik(rijen, veld = "T") {
     const met = [], zonder = [];
-    for (const r of rijen) {
-      if (r.T && r.T.telt > 0) met.push({ ...r, aanw: r.T.telt - r.T.afwezig, pct: (r.T.telt - r.T.afwezig) / r.T.telt });
-      else zonder.push(r);
+    for (const x of rijen) {
+      const T = x[veld];
+      if (T && T.telt > 0) met.push({ ...x, T, aanw: T.telt - T.afwezig, pct: (T.telt - T.afwezig) / T.telt });
+      else zonder.push(x);
     }
     met.sort((a, b) => b.pct - a.pct || a.T.teLaat - b.T.teLaat || b.aanw - a.aanw || a.l.naam.localeCompare(b.l.naam, "nl"));
     met.forEach((r, i) => {
@@ -229,29 +234,30 @@ DT.register({
     const lessen = (r) => `${r.aanw} van ${r.T.telt}`;
     const open = (r) => () => typeof openLeerling === "function" && openLeerling(r.l.id);
 
+    /* Vergeleken met vorige week (alleen als alles binnen is). */
+    const vorig = c.klaar ? new Map(this.rangschik(c.rijen, "Tv").met.map((r) => [r.l.id, r.plek])) : null;
+    const trend = (r) => {
+      if (!vorig) return DT.el("span", { class: "dt-lb-trend" });
+      const v = vorig.get(r.l.id);
+      if (v == null) return DT.el("span", { class: "dt-lb-trend is-nieuw", title: "Vorige week geen lessen", text: "nieuw" });
+      const d = v - r.plek, pijl = (up) => `<svg viewBox="0 0 10 10" width="8" height="8" aria-hidden="true"><path d="${up ? "M5 1.5 9 8H1z" : "M5 8.5 1 2h8z"}" fill="currentColor"/></svg>`;
+      const t = `Vorige week ${v}e plaats`;
+      if (d > 0) return DT.el("span", { class: "dt-lb-trend is-op", title: `${t}: ${d} omhoog`, "aria-label": `${d} plaats${d > 1 ? "en" : ""} gestegen`, html: `${pijl(true)}${d}` });
+      if (d < 0) return DT.el("span", { class: "dt-lb-trend is-af", title: `${t}: ${-d} omlaag`, "aria-label": `${-d} plaats${d < -1 ? "en" : ""} gedaald`, html: `${pijl(false)}${-d}` });
+      return DT.el("span", { class: "dt-lb-trend is-gelijk", title: `${t}: gelijk`, "aria-label": "gelijk gebleven", html: `<svg viewBox="0 0 10 10" width="8" height="8" aria-hidden="true"><path d="M1.5 3.5h7M1.5 6.5h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>` });
+    };
+
     /* Podium: 2 – 1 – 3, pas als alles binnen is (anders verspringt het). Een gedeelde plaats toont
-     * iedereen die er staat. */
+     * iedereen die er staat. Opbouw: blokken groeien op (3, 2, 1), dan komen de leerlingen erop, het
+     * percentage telt op en bij de winnaar(s) valt de kroon en wat confetti. Eén keer per klas en week. */
     if (c.klaar && met.length) {
-      const groep = (n) => met.filter((r) => r.plek === n);
-      const volgorde = [groep(2), groep(1), groep(3)].filter((g) => g.length);
-      const namen = (g) => g.length <= 3 ? g.map((r) => r.l.naam.split(" ")[0]).join(", ").replace(/, ([^,]*)$/, " en $1") : `${g.slice(0, 2).map((r) => r.l.naam.split(" ")[0]).join(", ")} en ${g.length - 2} anderen`;
-      this._podium.replaceChildren(...volgorde.map((g) => {
-        const r = g[0], een = g.length === 1;
-        const kaart = DT.el(een ? "button" : "div", { class: `dt-lb-card dt-lb-plaats dt-lb-p${r.plek}`, ...(een ? { type: "button", title: "Leerlingkaart openen" } : { title: g.map((x) => x.l.naam).join("\n") }) }, [
-          DT.el("span", { class: "dt-lb-medaille", text: String(r.plek) }),
-          DT.el("span", { class: "dt-lb-avatars" }, [...g.slice(0, 4).map((x) => DT.el("span", { class: "dt-lb-avatar", text: x.l.init })), ...(g.length > 4 ? [DT.el("span", { class: "dt-lb-avatar dt-lb-meer", text: `+${g.length - 4}` })] : [])]),
-          DT.el("span", { class: "dt-lb-naam", text: een ? r.l.naam : namen(g) }),
-          DT.el("span", { class: "dt-lb-groot", text: pct(r) }),
-          DT.el("span", { class: "dt-lb-sub", text: `${lessen(r)} lessen${r.T.teLaat ? ` · ${r.T.teLaat}× te laat` : ""}${een ? "" : ` · ${g.length} leerlingen`}` }),
-        ]);
-        if (een) kaart.addEventListener("click", open(r));
-        return kaart;
-      }));
-    } else this._podium.replaceChildren();
+      if (this._podiumVan !== c) this.podium(c, met, { pct, lessen, open, trend });
+    } else { this._podiumVan = null; this._podium.replaceChildren(); }
 
     const rij = (r, leeg) => {
       const li = DT.el("li", { class: `dt-lb-rij${leeg ? " is-leeg" : ""}${!leeg && r.plek <= 3 ? " is-top" : ""}`, tabindex: "0", title: "Leerlingkaart openen" }, [
         DT.el("span", { class: "dt-lb-plek", text: leeg ? "–" : String(r.plek) }),
+        leeg ? DT.el("span") : trend(r),
         DT.el("span", { class: "dt-lb-avatar", text: r.l.init }),
         DT.el("span", { class: "dt-lb-naam", text: r.l.naam }),
         leeg ? DT.el("span", { class: "dt-lb-geen", text: r.fout ? "niet op te halen" : "geen lessen" })
@@ -264,6 +270,61 @@ DT.register({
       return li;
     };
     this._lijst.replaceChildren(...met.map((r) => rij(r)), ...zonder.map((r) => rij(r, true)));
+  },
+
+  podium(c, met, { pct, lessen, open, trend }) {
+    this._podiumVan = c;
+    const rustig = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const groep = (n) => met.filter((r) => r.plek === n);
+    const volgorde = [groep(2), groep(1), groep(3)].filter((g) => g.length);
+    const voornamen = (g) => g.map((r) => r.l.naam.split(" ")[0]);
+    const namen = (g) => g.length <= 3 ? voornamen(g).join(", ").replace(/, ([^,]*)$/, " en $1") : `${voornamen(g).slice(0, 2).join(", ")} en ${g.length - 2} anderen`;
+    const START = { 3: 450, 2: 600, 1: 800 };   // ms: wanneer de leerlingen op hun blok verschijnen
+    const kolommen = volgorde.map((g) => {
+      const r = g[0], een = g.length === 1, n = r.plek;
+      const groot = DT.el("span", { class: "dt-lb-groot", text: rustig ? pct(r) : "0%" });
+      const top = DT.el(een ? "button" : "div", { class: "dt-lb-top", ...(een ? { type: "button", title: "Leerlingkaart openen" } : { title: g.map((x) => x.l.naam).join("\n") }) }, [
+        ...(n === 1 ? [DT.el("span", { class: "dt-lb-kroon", "aria-hidden": "true", html: `<svg viewBox="0 0 24 16" width="30" height="20"><path d="M2 14 1 3l6 5 5-7 5 7 6-5-1 11z" fill="#F7C948" stroke="#D99A00" stroke-width="1.2" stroke-linejoin="round"/><circle cx="12" cy="9.5" r="1.6" fill="#fff" opacity=".85"/></svg>` })] : []),
+        DT.el("span", { class: "dt-lb-avatars" }, [...g.slice(0, 4).map((x) => DT.el("span", { class: "dt-lb-avatar", text: x.l.init })), ...(g.length > 4 ? [DT.el("span", { class: "dt-lb-avatar dt-lb-meer", text: `+${g.length - 4}` })] : [])]),
+        DT.el("span", { class: "dt-lb-naam", text: een ? r.l.naam : namen(g) }),
+        groot,
+        DT.el("span", { class: "dt-lb-sub", text: `${lessen(r)} lessen${r.T.teLaat ? ` · ${r.T.teLaat}× te laat` : ""}${een ? "" : ` · ${g.length} leerlingen`}` }),
+        ...(een ? [trend(r)] : []),
+      ]);
+      if (een) top.addEventListener("click", open(r));
+      if (!rustig) this.telOp(groot, Math.floor(r.pct * 100), START[n]);
+      return DT.el("div", { class: `dt-lb-plaats dt-lb-p${n}` }, [top, DT.el("div", { class: "dt-lb-blok", "aria-hidden": "true" }, DT.el("span", { text: String(n) }))]);
+    });
+    this._podium.replaceChildren(...kolommen);
+    if (!rustig) setTimeout(() => this.confetti(), 1150);
+  },
+
+  telOp(el, doel, wacht) {
+    const duur = 700;
+    setTimeout(() => {
+      const t0 = performance.now();
+      const stap = (t) => {
+        const f = Math.min(1, (t - t0) / duur), e = 1 - (1 - f) ** 3;
+        el.textContent = `${Math.round(doel * e)}%`;
+        if (f < 1 && el.isConnected) requestAnimationFrame(stap);
+      };
+      requestAnimationFrame(stap);
+    }, wacht);
+  },
+
+  confetti() {
+    const p1 = this._podium?.querySelector(".dt-lb-p1");
+    if (!p1 || !p1.isConnected) return;
+    const laag = DT.el("div", { class: "dt-lb-confetti", "aria-hidden": "true" });
+    const kleur = ["#F7C948", "#34C759", "#007AFF", "#FF2D55", "#AF52DE", "#FF9500"];
+    for (let i = 0; i < 36; i++) {
+      const hoek = (Math.PI * (0.15 + 0.7 * Math.random())), kracht = 90 + Math.random() * 130;
+      const s = DT.el("i");
+      s.style.cssText = `--x:${Math.round(Math.cos(hoek) * kracht * (Math.random() < .5 ? -1 : 1))}px;--y:${Math.round(-Math.sin(hoek) * kracht)}px;--r:${Math.round(Math.random() * 720 - 360)}deg;background:${kleur[i % kleur.length]};animation-delay:${Math.round(Math.random() * 120)}ms;${i % 3 ? "" : "border-radius:50%;"}`;
+      laag.append(s);
+    }
+    p1.append(laag);
+    setTimeout(() => laag.remove(), 1900);
   },
 
   status(tekst, fout = false, deel = null) {
@@ -307,27 +368,49 @@ DT.register({
       .dt-lb-status.is-fout { color: #FF3B30; }
       .dt-lb-voortgang { flex: 0 0 160px; height: 4px; border-radius: 2px; background: rgba(120,120,128,.18); overflow: hidden; }
       .dt-lb-voortgang i { display: block; height: 100%; background: var(--dt-accent); transition: width .3s; }
-      .dt-lb-podium { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: end; }
+      .dt-lb-podium { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: end; padding: 28px 28px 0; overflow: hidden; }
       .dt-lb-podium:empty { display: none; }
-      .dt-lb-plaats { appearance: none; font: inherit; color: inherit; cursor: pointer; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 20px 16px 18px; position: relative; }
-      .dt-lb-plaats.dt-lb-p1 { padding-top: 32px; padding-bottom: 26px; }
-      div.dt-lb-plaats { cursor: default; }
+      .dt-lb-plaats { display: flex; flex-direction: column; align-items: center; gap: 12px; position: relative; min-width: 0; }
+      .dt-lb-top { appearance: none; border: 0; background: none; padding: 0; font: inherit; color: inherit; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; max-width: 100%; position: relative;
+        animation: dt-lb-in .55s cubic-bezier(.2,.9,.3,1.25) both; }
+      button.dt-lb-top { cursor: pointer; border-radius: 16px; }
+      .dt-lb-p3 .dt-lb-top { animation-delay: .45s; } .dt-lb-p2 .dt-lb-top { animation-delay: .6s; } .dt-lb-p1 .dt-lb-top { animation-delay: .8s; }
+      .dt-lb-blok { width: 100%; border-radius: 16px 16px 0 0; display: flex; justify-content: center; padding-top: 10px; box-sizing: border-box; color: #fff; font-size: 34px; font-weight: 800; letter-spacing: -.02em;
+        text-shadow: 0 1px 2px rgba(0,0,0,.18); transform-origin: bottom; position: relative; overflow: hidden; animation: dt-lb-groei .65s cubic-bezier(.2,.9,.3,1.12) both; }
+      .dt-lb-p1 .dt-lb-blok { height: 132px; background: linear-gradient(180deg, #F7C948, #E0A800); animation-delay: .3s; }
+      .dt-lb-p2 .dt-lb-blok { height: 96px; background: linear-gradient(180deg, #C9CED6, #9AA1AB); animation-delay: .15s; }
+      .dt-lb-p3 .dt-lb-blok { height: 68px; background: linear-gradient(180deg, #DDA46C, #B87333); }
+      .dt-lb-p1 .dt-lb-blok::after { content: ""; position: absolute; inset: 0 auto 0 0; width: 40%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent); transform: translateX(-120%) skewX(-20deg); animation: dt-lb-glans 1.1s ease-in-out 1.3s both; }
+      .dt-lb-kroon { position: absolute; top: -22px; left: 50%; margin-left: -15px; z-index: 2; animation: dt-lb-kroon .6s cubic-bezier(.3,1.6,.5,1) 1.1s both; }
+      .dt-lb-p1 .dt-lb-top { padding-top: 14px; }
       .dt-lb-avatars { display: flex; justify-content: center; }
       .dt-lb-avatars .dt-lb-avatar + .dt-lb-avatar { margin-left: -12px; }
       .dt-lb-plaats .dt-lb-avatar { width: 52px; height: 52px; font-size: 18px; box-shadow: 0 0 0 3px var(--dt-bg); background: color-mix(in srgb, var(--dt-accent) 14%, var(--dt-bg)); }
-      .dt-lb-plaats.dt-lb-p1 .dt-lb-avatar { width: 64px; height: 64px; font-size: 22px; }
+      .dt-lb-p1 .dt-lb-avatar { width: 64px; height: 64px; font-size: 22px; }
       .dt-lb-avatar.dt-lb-meer { font-size: 15px !important; }
-      .dt-lb-medaille { position: absolute; top: 12px; left: 12px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #fff; background: #A2845E; }
-      .dt-lb-p1 .dt-lb-medaille { background: linear-gradient(180deg, #F7C948, #E0A800); }
-      .dt-lb-p2 .dt-lb-medaille { background: linear-gradient(180deg, #C7CCD3, #9AA1AB); }
-      .dt-lb-p3 .dt-lb-medaille { background: linear-gradient(180deg, #D9A066, #B87333); }
       .dt-lb-plaats .dt-lb-naam { font-size: 15px; font-weight: 600; max-width: 100%; white-space: normal; }
       .dt-lb-groot { font-size: 30px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
       .dt-lb-p1 .dt-lb-groot { font-size: 36px; color: var(--dt-accent); }
       .dt-lb-sub { font-size: 12px; color: var(--dt-muted); }
+      .dt-lb-confetti { position: absolute; left: 50%; bottom: 124px; width: 0; height: 0; pointer-events: none; z-index: 3; }
+      .dt-lb-confetti i { position: absolute; width: 7px; height: 11px; border-radius: 2px; opacity: 0; animation: dt-lb-confetti 1.5s cubic-bezier(.15,.7,.4,1) both; }
+      @keyframes dt-lb-groei { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+      @keyframes dt-lb-in { from { opacity: 0; transform: translateY(24px) scale(.85); } to { opacity: 1; transform: none; } }
+      @keyframes dt-lb-glans { from { transform: translateX(-120%) skewX(-20deg); } to { transform: translateX(300%) skewX(-20deg); } }
+      @keyframes dt-lb-kroon { from { opacity: 0; transform: translateY(-26px) rotate(-25deg) scale(.6); } to { opacity: 1; transform: none; } }
+      @keyframes dt-lb-confetti { 0% { opacity: 1; transform: translate(0, 0) rotate(0); } 70% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--x), calc(var(--y) + 140px)) rotate(var(--r)); } }
+      @media (prefers-reduced-motion: reduce) { .dt-lb-podium *, .dt-lb-podium *::after { animation: none !important; } }
+      .dt-lb-trend { display: inline-flex; align-items: center; justify-content: center; gap: 3px; min-width: 34px; height: 20px; padding: 0 6px; box-sizing: border-box; border-radius: 999px; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; justify-self: start; }
+      .dt-lb-trend:empty { background: none; }
+      .dt-lb-trend.is-op { background: rgba(52,199,89,.16); color: #248A3D; }
+      .dt-lb-trend.is-af { background: rgba(255,59,48,.14); color: #D70015; }
+      .dt-lb-trend.is-gelijk { background: rgba(120,120,128,.14); color: var(--dt-muted); }
+      .dt-lb-trend.is-nieuw { background: color-mix(in srgb, var(--dt-accent) 12%, transparent); color: var(--dt-accent); font-weight: 600; }
+      html.dt-dark .dt-lb-trend.is-op { color: #30D158; } html.dt-dark .dt-lb-trend.is-af { color: #FF6961; }
+      .dt-lb-top .dt-lb-trend { margin-top: 2px; }
       .dt-lb-tabel { padding: 6px 0 8px; overflow: hidden; }
       .dt-lb-lijst { list-style: none; margin: 0; padding: 0; }
-      .dt-lb-rij { display: grid; grid-template-columns: 44px 36px minmax(0, 1fr) minmax(140px, 260px) 90px 70px; align-items: center; gap: 12px; padding: 0 18px; min-height: 44px; font-size: 14px; }
+      .dt-lb-rij { display: grid; grid-template-columns: 36px 64px 36px minmax(0, 1fr) minmax(140px, 260px) 90px 70px; align-items: center; gap: 12px; padding: 0 18px; min-height: 44px; font-size: 14px; }
       .dt-lb-lijst .dt-lb-rij { cursor: pointer; border-top: 1px solid color-mix(in srgb, var(--dt-fg) 7%, transparent); }
       .dt-lb-lijst .dt-lb-rij:hover { background: color-mix(in srgb, var(--dt-accent) 5%, transparent); }
       .dt-lb-th { min-height: 34px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--dt-muted); }
@@ -343,8 +426,8 @@ DT.register({
       .dt-lb-geen { color: var(--dt-muted); font-style: italic; }
       .dt-lb-rij.is-leeg .dt-lb-naam { color: var(--dt-muted); }
       @media (max-width: 900px) {
-        .dt-lb-rij { grid-template-columns: 32px 32px minmax(0, 1fr) 120px; }
-        .dt-lb-rij > :nth-child(n+5) { display: none; }
+        .dt-lb-rij { grid-template-columns: 28px 52px 32px minmax(0, 1fr) 110px; }
+        .dt-lb-rij > :nth-child(n+6) { display: none; }
         .dt-lb-podium { gap: 8px; }
       }
     `;
