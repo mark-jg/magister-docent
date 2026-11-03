@@ -18,6 +18,7 @@ globalThis.DT_DEFAULTS = {
   /* Eigen periodes (bijv. onderwijsperiodes): { id, naam, begin: "JJJJ-MM-DD", einde: "JJJJ-MM-DD" } */
   periodes: { enabled: true, lijst: [] },
   aanwezigexport: { enabled: true },
+  leaderboard: { enabled: true },
   melding: { enabled: true, coaches: [], to: "", cc: "", name: "", extra: true, afzender: "" },
   links: [
     { label: "Magister Web", url: "https://accounts.magister.net" },

@@ -1299,6 +1299,9 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
      * onder het inline-frame vrij); de marge van 24px zit daarna binnen het frame, zodat schaduwen zichtbaar blijven */
     ui-view[name="main"]:has(#guest-app-frame[src*="/op-leerlingen/"]) { padding-top: 16px !important; padding-bottom: 0 !important; }
     mg-guest-app .fill-viewport > #guest-app-frame[src*="/op-leerlingen/"] { display: block !important; height: 100% !important; }
+    /* ---- Leaderboard (aanwezigheid): kaarten zoals het lesdashboard ---- */
+    .dt-lb { --lb-card: ${ldCard}; --lb-shadow: ${ldShadow}; --lb-tint: ${t.tint}; }
+    ${t.glass ? `.dt-lb .dt-lb-card { -webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur}; }` : ""}
     /* ---- Leerlingenoverzicht: zelfde kaartopbouw als het lesdashboard (vlak .dt-ll-kop, maat via leerlingenKopPass) ---- */
     html.dt-ll-on body > .dt-ll-kop { position: absolute; top: 8px; z-index: 0; box-sizing: border-box; pointer-events: none; border-radius: ${t.glass ? "22px" : "16px"}; background: ${ldCard}; box-shadow: ${ldShadow}; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} }
     html.dt-ll-on app-root > dna-breadcrumbs, html.dt-ll-on app-root > dna-page-header, html.dt-ll-on app-leerlingen-root > dna-tabs { position: relative !important; z-index: 1; margin-right: calc(var(--dt-ll-rm, 296px) + 16px) !important; }
