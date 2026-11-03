@@ -39,6 +39,8 @@ DT.register({
 
   init(DT) {
     this._stopObs = DT.observe(() => { this.applyExtraInline(DT); this.injectShadow(DT, this._vars); this.recolor(DT); this.agendaPass(DT); }, { debounce: 600, poll: 2500 });
+    /* Lesdashboardkaart los en snel, anders verspringt de kop pas seconden na het laden */
+    this._stopKop = DT.observe(() => lesdashKopPass(document, !!this.preset(DT).look), { debounce: 60, poll: 1000 });
     this._style = DT.el("style", { id: "dt-theme-style" });
     document.head.append(this._style);
     this._mq = window.matchMedia("(prefers-color-scheme: dark)");
@@ -49,6 +51,7 @@ DT.register({
 
   destroy(DT) {
     this._stopObs && this._stopObs();
+    this._stopKop && this._stopKop();
     this._style?.remove();
     lesdashKopPass(document, false);
     document.documentElement.classList.remove("dt-dark");
@@ -553,7 +556,7 @@ function lesdashKopPass(root, on) {
       if (!el.offsetParent) continue;
       onder = Math.max(onder, el.getBoundingClientRect().bottom);
     }
-    const h = onder ? Math.round(onder - ur.top - uiv.clientTop + uiv.scrollTop + 10 - top) : 0;
+    const h = onder ? Math.round(onder - ur.top - uiv.clientTop + uiv.scrollTop + 16 - top) : 0;
     const zet = (k, v) => { if (uiv.style.getPropertyValue(k) !== v) uiv.style.setProperty(k, v); };
     zet("--dt-kop-l", `${l}px`); zet("--dt-kop-r", `${r}px`);
     const css = `left:${l}px;right:${r}px;height:${Math.max(h, 52)}px`;
@@ -1160,14 +1163,35 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     ui-view.dt-ld-on > .aside-toggle-slide { display: none !important; }
     /* Lesdashboard: titel, tabbladen en werkbalk als één kaart (vlak .dt-ld-kop, maat via lesdashKopPass) */
     ui-view.dt-ld-on > .dt-ld-kop { position: absolute; top: 28px; box-sizing: border-box; pointer-events: none; border-radius: ${t.glass ? "22px" : "16px"}; background: ${t.glass ? `linear-gradient(180deg, ${t.dark ? "rgba(255,255,255,.07)" : "rgba(255,255,255,.55)"}, transparent 60%), ${t.glassBg}` : t.surface}; box-shadow: ${t.glass ? `${t.glassEdge}, ${t.glassShadow}` : t.card}; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} transition: right .2s linear, height .15s ease; }
-    ui-view.dt-ld-on > .head-bar { top: 36px !important; left: calc(var(--dt-kop-l, 330px) + 14px) !important; right: calc(var(--dt-kop-r, 24px) + 10px) !important; margin: 0 !important; background: transparent !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; border-radius: 0 !important; transition: right .2s linear; }
+    ui-view.dt-ld-on > .head-bar { top: 46px !important; height: 40px !important; line-height: 40px !important; left: calc(var(--dt-kop-l, 330px) + 18px) !important; right: calc(var(--dt-kop-r, 24px) + 16px) !important; margin: 0 !important; background: transparent !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; border-radius: 0 !important; transition: right .2s linear; }
     ui-view.dt-ld-on > .head-bar h1, ui-view.dt-ld-on > .head-bar h1 a { margin-left: 0 !important; padding-left: 0 !important; }
-    ui-view.dt-ld-on > section.ld-section { padding-top: 48px !important; }
-    ui-view.dt-ld-on > section.ld-section > .verantwoord-container { margin-left: 14px !important; }
-    ui-view.dt-ld-on > section.ld-section > ld-menu .page-nav { margin: 6px 10px 22px !important; }
+    ui-view.dt-ld-on > .head-bar h1 { height: 40px !important; line-height: 40px !important; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    /* Eén knopmaat (30px) in de hele kaart: knoppen in de titelrij, tabbladen en werkbalk */
+    /* Knoppen rechts in de titelrij: één flexrij (Magister zet ze met float: right, vandaar row-reverse) */
+    ui-view.dt-ld-on > .head-bar .head-bar-links { float: right !important; margin: 0 0 0 16px !important; height: 40px; width: auto !important; display: flex !important; flex-direction: row-reverse; align-items: center; gap: 6px; }
+    ui-view.dt-ld-on > .head-bar .head-bar-links > :not(.ng-hide), ui-view.dt-ld-on > .head-bar .head-bar-links :not(ul, li, .ng-hide) > :is(div, mg-headbar-button):not(.ng-hide) { float: none !important; height: 40px !important; margin: 0 !important; padding: 0 !important; display: flex !important; flex-direction: row-reverse; align-items: center; gap: 6px; }
+    ui-view.dt-ld-on > .head-bar .head-bar-links a.text-menu, ui-view.dt-ld-on > .head-bar .head-bar-links div.sub > a { height: 30px !important; line-height: 30px !important; margin: 0 !important; padding: 0 !important; display: inline-flex !important; align-items: center; }
+    ui-view.dt-ld-on > .head-bar .head-bar-links div.sub > a { padding-right: 16px !important; }
+    ui-view.dt-ld-on > .head-bar .head-bar-links a.text-menu span, ui-view.dt-ld-on > .head-bar .head-bar-links div.sub > a span { line-height: 30px !important; padding: 0 14px !important; font: 500 .8125rem/30px ${t.font} !important; }
+    ui-view.dt-ld-on > .head-bar .head-bar-links a:has(> i.ico) { width: 30px !important; height: 30px !important; margin: 0 !important; padding: 0 !important; display: inline-grid !important; place-items: center; }
+    ui-view.dt-ld-on > .head-bar .head-bar-links a > i.ico { width: 30px !important; height: 30px !important; line-height: 30px !important; font-size: 13px !important; border-radius: 50% !important; padding: 0 !important; margin: 0 !important; text-align: center; }
+    ui-view.dt-ld-on > .head-bar .head-bar-links div.sub:after { line-height: 40px !important; }
+    ui-view.dt-ld-on > section.ld-section { padding-top: 66px !important; }
+    ui-view.dt-ld-on > section.ld-section > .verantwoord-container { margin-left: 16px !important; }
+    ui-view.dt-ld-on > section.ld-section > ld-menu .page-nav { margin: 0 16px 28px !important; }
     ui-view.dt-ld-on > section.ld-section:has(#leerlinglijst > .dt-att-bar) > ld-menu .page-nav { margin-bottom: 10px !important; }
+    ui-view.dt-ld-on > section.ld-section > ld-menu .page-nav > ul.tabs { height: 30px !important; padding: 2px !important; }
+    ui-view.dt-ld-on > section.ld-section > ld-menu .page-nav > ul.tabs > li > a { height: 26px !important; line-height: 26px !important; padding: 0 14px !important; font-size: .8125rem !important; }
     ui-view.dt-ld-on > section.ld-section > ld-menu .page-nav > ul.tabs { width: fit-content !important; background: ${t.dark ? "rgba(118,118,128,.24)" : "rgba(118,118,128,.12)"} !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
-    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar { padding: 0 10px !important; margin: 0 0 22px !important; }
+    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar { padding: 0 16px !important; margin: 0 0 28px !important; gap: 6px !important; min-height: 30px; align-items: center; }
+    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-btn { height: 30px !important; padding: 0 12px !important; gap: 5px !important; font: 500 .8125rem/1 ${t.font} !important; }
+    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-btn svg { width: 12px; height: 12px; }
+    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-att-shortcut { display: none !important; }
+    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-att-search { height: 30px; align-items: center; }
+    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-att-search .dt-att-input { margin: 0 !important; }
+    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-att-input { width: 180px !important; height: 30px !important; font-size: .8125rem !important; line-height: 30px !important; }
+    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-att-legend { gap: 2px 10px !important; font-size: .6875rem !important; }
+    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-att-legend kbd { min-width: 15px !important; height: 15px !important; line-height: 15px !important; padding: 0 4px !important; font-size: .625rem !important; border-radius: 4px !important; }
     ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-btn:not(.dt-btn-primary) { background: ${t.dark ? "rgba(118,118,128,.24)" : "rgba(118,118,128,.12)"} !important; box-shadow: none !important; }
     ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-btn:not(.dt-btn-primary):hover { background: ${t.dark ? "rgba(118,118,128,.34)" : "rgba(118,118,128,.2)"} !important; }
     ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-att-input { background: ${t.dark ? "rgba(118,118,128,.24)" : "rgba(118,118,128,.12)"} !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
