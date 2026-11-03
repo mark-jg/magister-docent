@@ -11,6 +11,9 @@
  * plaats en de plaatsen lopen door zonder gaten (1, 1, 2), zodat er altijd een 1, 2 en 3 op het podium staan.
  * Per leerling wordt ook de week ervoor opgehaald (in dezelfde aanvragen), voor de pijl omhoog/omlaag/gelijk
  * ten opzichte van de plaats van vorige week.
+ *
+ * Digibord: knop die alleen de top 3 schermvullend toont, met een langzamere onthulling (3, 2, 1) voor
+ * de klas. Bewust geen hele klas en geen dalers: alleen voornamen, aanwezigheid en wie gestegen is.
  * Alles via je eigen Magister-sessie; er gaat niets naar buiten. */
 DT.register({
   id: "leaderboard",
@@ -81,6 +84,9 @@ DT.register({
     this._klassen = DT.el("div", { class: "dt-lb-seg", role: "tablist", "aria-label": "Klas" });
     this._week = DT.el("span", { class: "dt-lb-week" });
     this._nu = DT.el("button", { class: "dt-lb-nu", type: "button", text: "Deze week" });
+    this._bordKnop = DT.el("button", { class: "dt-lb-nu dt-lb-bordknop", type: "button", disabled: "", title: "Top 3 schermvullend tonen, bijvoorbeeld op het digibord",
+      html: `<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="8.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 11v2.5M5 13.5h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>Digibord</span>` });
+    this._bordKnop.addEventListener("click", () => this.bord(DT));
     this._vorige = DT.el("button", { class: "dt-lb-pijl", type: "button", "aria-label": "Vorige week", html: `<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>` });
     this._volgende = DT.el("button", { class: "dt-lb-pijl", type: "button", "aria-label": "Volgende week", html: `<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>` });
     this._vorige.addEventListener("click", () => this.kies(DT, { week: this.plus(this._ma, -7) }));
@@ -93,7 +99,7 @@ DT.register({
       DT.el("div", { class: "dt-lb-kop dt-lb-card" }, [
         DT.el("nav", { class: "dt-lb-crumbs", "aria-label": "Kruimelpad" }, [terug, DT.el("span", { "aria-hidden": "true", text: "›" }), DT.el("span", { text: "Leaderboard" })]),
         DT.el("h1", { html: `Leaderboard<span class="dt-lb-punt">.</span>` }),
-        DT.el("div", { class: "dt-lb-bediening" }, [this._klassen, DT.el("div", { class: "dt-lb-weeknav" }, [this._nu, this._vorige, this._week, this._volgende])]),
+        DT.el("div", { class: "dt-lb-bediening" }, [this._klassen, DT.el("div", { class: "dt-lb-weeknav" }, [this._nu, this._vorige, this._week, this._volgende, this._bordKnop])]),
       ]),
       this._status, this._podium,
       DT.el("div", { class: "dt-lb-card dt-lb-tabel" }, [
@@ -110,6 +116,7 @@ DT.register({
 
   sluit() {
     this._gen++;
+    this._bord?.sluit();
     this._view?.remove(); this._view = null;
     document.querySelectorAll(".dt-lb-open").forEach((el) => el.classList.remove("dt-lb-open"));
   },
@@ -252,7 +259,9 @@ DT.register({
      * percentage telt op en bij de winnaar(s) valt de kroon en wat confetti. Eén keer per klas en week. */
     if (c.klaar && met.length) {
       if (this._podiumVan !== c) this.podium(c, met, { pct, lessen, open, trend });
-    } else { this._podiumVan = null; this._podium.replaceChildren(); }
+      this._bordData = { met, vorig, klas: this._klas, week: this._week.textContent };
+    } else { this._podiumVan = null; this._podium.replaceChildren(); this._bordData = null; }
+    this._bordKnop.disabled = !this._bordData;
 
     const rij = (r, leeg) => {
       const li = DT.el("li", { class: `dt-lb-rij${leeg ? " is-leeg" : ""}${!leeg && r.plek <= 3 ? " is-top" : ""}`, tabindex: "0", title: "Leerlingkaart openen" }, [
@@ -297,6 +306,91 @@ DT.register({
     });
     this._podium.replaceChildren(...kolommen);
     if (!rustig) setTimeout(() => this.confetti(), 1150);
+  },
+
+  /* ---------- digibord: alleen de top 3, schermvullend ---------- */
+  bord(DT) {
+    const d = this._bordData;
+    if (!d || this._bord) return;
+    this.css();
+    const laag = DT.el("div", { class: "dt-lb-bord", role: "dialog", "aria-modal": "true", "aria-label": `Meest aanwezig ${d.klas}` });
+    const inhoud = DT.el("div", { class: "dt-lb-bord-inhoud" });
+    const opnieuw = DT.el("button", { type: "button", text: "Opnieuw afspelen" });
+    const dicht = DT.el("button", { type: "button", text: "Sluiten (Esc)" });
+    laag.append(DT.el("div", { class: "dt-lb-bord-gloed", "aria-hidden": "true" }), inhoud, DT.el("div", { class: "dt-lb-bord-knoppen" }, [opnieuw, dicht]));
+    let timers = [], muis = 0;
+    const wis = () => { timers.forEach(clearTimeout); timers = []; };
+    const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+    const speel = () => { wis(); inhoud.replaceChildren(...this.bordInhoud(DT, d, later)); };
+    const beweeg = () => { laag.classList.add("is-actief"); clearTimeout(muis); muis = setTimeout(() => laag.classList.remove("is-actief"), 2500); };
+    const toets = (e) => { if (e.key === "Escape") { e.preventDefault(); this._bord?.sluit(); } };
+    const fs = () => { if (!document.fullscreenElement && this._bord) this._bord.sluit(); };
+    this._bord = {
+      sluit: () => {
+        wis(); clearTimeout(muis);
+        document.removeEventListener("keydown", toets, true); document.removeEventListener("fullscreenchange", fs);
+        if (document.fullscreenElement === laag) document.exitFullscreen().catch(() => {});
+        laag.remove(); this._bord = null;
+      },
+    };
+    opnieuw.addEventListener("click", speel);
+    dicht.addEventListener("click", () => this._bord?.sluit());
+    laag.addEventListener("mousemove", beweeg);
+    document.addEventListener("keydown", toets, true);
+    document.body.append(laag);
+    laag.requestFullscreen?.().then(() => document.addEventListener("fullscreenchange", fs)).catch(() => {});
+    speel(); beweeg();
+  },
+
+  bordInhoud(DT, { met, vorig, klas, week }, later) {
+    const rustig = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const groep = (n) => met.filter((r) => r.plek === n);
+    /* Alleen voornamen; bij dubbele voornamen op het podium de eerste letter van de achternaam erbij. */
+    const top = [1, 2, 3].flatMap(groep), vn = (r) => r.l.naam.split(" ")[0];
+    const dubbel = new Set(top.map(vn).filter((v, i, a) => a.indexOf(v) !== i));
+    const roep = (r) => dubbel.has(vn(r)) ? `${vn(r)} ${r.l.naam.split(" ").slice(-1)[0][0]}.` : vn(r);
+    const START = { 3: 1400, 2: 2600, 1: 4000 };   // ms: wanneer de leerlingen van die plaats verschijnen
+    const kolom = (g) => {
+      const r = g[0], n = r.plek, max = n === 1 ? 8 : 5;
+      const namen = g.length <= max ? g.map(roep) : [...g.slice(0, max - 1).map(roep), `en ${g.length - max + 1} anderen`];
+      const groot = DT.el("span", { class: "dt-lb-groot", text: rustig ? `${Math.floor(r.pct * 100)}%` : "0%" });
+      const stijgers = g.filter((x) => vorig?.has(x.l.id) && vorig.get(x.l.id) > x.plek);
+      if (!rustig) this.telOp(groot, Math.floor(r.pct * 100), START[n]);
+      return DT.el("div", { class: `dt-lb-plaats dt-lb-p${n}` }, [
+        DT.el("div", { class: "dt-lb-top" }, [
+          ...(n === 1 ? [DT.el("span", { class: "dt-lb-kroon", "aria-hidden": "true", html: `<svg viewBox="0 0 24 16"><path d="M2 14 1 3l6 5 5-7 5 7 6-5-1 11z" fill="#F7C948" stroke="#D99A00" stroke-width="1" stroke-linejoin="round"/><circle cx="12" cy="9.5" r="1.6" fill="#fff" opacity=".85"/></svg>` })] : []),
+          DT.el("span", { class: "dt-lb-avatars" }, [...g.slice(0, 5).map((x) => DT.el("span", { class: "dt-lb-avatar", text: x.l.init })), ...(g.length > 5 ? [DT.el("span", { class: "dt-lb-avatar", text: `+${g.length - 5}` })] : [])]),
+          DT.el("span", { class: "dt-lb-namen" }, namen.map((t) => DT.el("span", { text: t }))),
+          groot,
+          ...(stijgers.length === 1 && g.length === 1 ? [DT.el("span", { class: "dt-lb-stijger", text: `▲ ${vorig.get(r.l.id) - r.plek} ${vorig.get(r.l.id) - r.plek === 1 ? "plaats" : "plaatsen"} gestegen` })] : []),
+        ]),
+        DT.el("div", { class: "dt-lb-blok" }, DT.el("span", { text: String(n) })),
+      ]);
+    };
+    if (!rustig) { later(() => this.regen(DT, 140), START[1] + 300); later(() => this.regen(DT, 60), START[1] + 2600); }
+    return [
+      DT.el("header", { class: "dt-lb-bord-kop" }, [
+        DT.el("span", { class: "dt-lb-bord-label", text: `${klas} · ${week}` }),
+        DT.el("h1", { text: "Meest aanwezig" }),
+      ]),
+      DT.el("div", { class: "dt-lb-bord-podium" }, [groep(2), groep(1), groep(3)].filter((g) => g.length).map(kolom)),
+    ];
+  },
+
+  /* Confetti die over het hele scherm naar beneden dwarrelt. */
+  regen(DT, aantal) {
+    const laag = document.querySelector(".dt-lb-bord");
+    if (!laag) return;
+    const kleur = ["#F7C948", "#34C759", "#0A84FF", "#FF2D55", "#BF5AF2", "#FF9F0A", "#64D2FF"];
+    const bak = DT.el("div", { class: "dt-lb-regen", "aria-hidden": "true" });
+    for (let i = 0; i < aantal; i++) {
+      const s = DT.el("i");
+      const duur = 2600 + Math.random() * 2200;
+      s.style.cssText = `left:${(Math.random() * 100).toFixed(1)}%;--dx:${Math.round(Math.random() * 160 - 80)}px;--r:${Math.round(Math.random() * 1080 - 540)}deg;background:${kleur[i % kleur.length]};animation-duration:${Math.round(duur)}ms;animation-delay:${Math.round(Math.random() * 900)}ms;${i % 3 ? "" : "border-radius:50%;width:10px;height:10px;"}`;
+      bak.append(s);
+    }
+    laag.append(bak);
+    setTimeout(() => bak.remove(), 6200);
   },
 
   telOp(el, doel, wacht) {
@@ -425,6 +519,51 @@ DT.register({
       .dt-lb-num { color: var(--dt-muted); font-variant-numeric: tabular-nums; }
       .dt-lb-geen { color: var(--dt-muted); font-style: italic; }
       .dt-lb-rij.is-leeg .dt-lb-naam { color: var(--dt-muted); }
+      .dt-lb-bordknop { display: inline-flex; gap: 6px; margin-left: 6px; }
+      .dt-lb-bordknop:disabled { opacity: .4; cursor: default; }
+      .dt-lb-bord { position: fixed; inset: 0; z-index: 2147482000; overflow: hidden; color: #fff; font-family: var(--dt-font); cursor: none;
+        background: radial-gradient(120% 90% at 50% 0%, #2A3F8F 0%, #141B3D 55%, #0A0E22 100%); }
+      .dt-lb-bord.is-actief { cursor: default; }
+      .dt-lb-bord-gloed { position: absolute; left: 50%; top: 58%; width: 140vmax; height: 140vmax; margin: -70vmax 0 0 -70vmax; pointer-events: none; opacity: .5;
+        background: repeating-conic-gradient(from 0deg, rgba(255,255,255,.07) 0deg 8deg, transparent 8deg 24deg); animation: dt-lb-draai 60s linear infinite, dt-lb-vervaag 2s ease 3.6s both;
+        -webkit-mask: radial-gradient(closest-side, #000 20%, transparent 75%); mask: radial-gradient(closest-side, #000 20%, transparent 75%); }
+      .dt-lb-bord-inhoud { position: relative; height: 100%; display: flex; flex-direction: column; align-items: center; padding: 5vh 4vw 0; box-sizing: border-box; }
+      .dt-lb-bord-kop { text-align: center; animation: dt-lb-in .8s cubic-bezier(.2,.9,.3,1.2) .1s both; }
+      .dt-lb-bord-label { display: inline-block; padding: .35em 1em; border-radius: 999px; background: rgba(255,255,255,.12); font-size: clamp(14px, 1.5vw, 24px); font-weight: 600; letter-spacing: .02em; }
+      .dt-lb-bord h1 { margin: .25em 0 0; font-size: clamp(40px, 6.5vw, 110px); line-height: 1; font-weight: 800; letter-spacing: -.03em;
+        background: linear-gradient(180deg, #fff 30%, #FFE08A); -webkit-background-clip: text; background-clip: text; color: transparent; }
+      .dt-lb-bord-podium { flex: 1; width: min(1400px, 92vw); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2.5vw; align-items: end; }
+      .dt-lb-bord .dt-lb-plaats { display: flex; flex-direction: column; align-items: center; gap: 2vh; min-width: 0; }
+      .dt-lb-bord .dt-lb-top { display: flex; flex-direction: column; align-items: center; gap: .8vh; text-align: center; position: relative; max-width: 100%; animation: dt-lb-in .8s cubic-bezier(.2,.9,.3,1.3) both; }
+      .dt-lb-bord .dt-lb-p3 .dt-lb-top { animation-delay: 1.4s; } .dt-lb-bord .dt-lb-p2 .dt-lb-top { animation-delay: 2.6s; } .dt-lb-bord .dt-lb-p1 .dt-lb-top { animation-delay: 4s; }
+      .dt-lb-bord .dt-lb-blok { width: 100%; border-radius: 2vw 2vw 0 0; display: flex; justify-content: center; padding-top: 2vh; box-sizing: border-box; font-size: clamp(48px, 7vw, 130px); font-weight: 800; color: #fff;
+        text-shadow: 0 2px 6px rgba(0,0,0,.25); transform-origin: bottom; position: relative; overflow: hidden; animation: dt-lb-groei 1s cubic-bezier(.2,.9,.3,1.1) both; box-shadow: inset 0 2px 0 rgba(255,255,255,.35); }
+      .dt-lb-bord .dt-lb-p1 .dt-lb-blok { height: 34vh; background: linear-gradient(180deg, #FFD54A, #E0A800); animation-delay: 3.2s; }
+      .dt-lb-bord .dt-lb-p2 .dt-lb-blok { height: 25vh; background: linear-gradient(180deg, #D5DAE1, #9AA1AB); animation-delay: 1.8s; }
+      .dt-lb-bord .dt-lb-p3 .dt-lb-blok { height: 18vh; background: linear-gradient(180deg, #E3A872, #B87333); animation-delay: .6s; }
+      .dt-lb-bord .dt-lb-p1 .dt-lb-blok::after { content: ""; position: absolute; inset: 0 auto 0 0; width: 35%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent); transform: translateX(-120%) skewX(-20deg); animation: dt-lb-glans 1.4s ease-in-out 4.6s both; }
+      .dt-lb-bord .dt-lb-kroon { position: absolute; top: -6.5vh; left: 50%; margin-left: 0; width: 6vw; min-width: 56px; transform: translateX(-50%); animation: dt-lb-kroonbord .8s cubic-bezier(.3,1.6,.5,1) 4.7s both; }
+      .dt-lb-bord .dt-lb-kroon svg { width: 100%; height: auto; display: block; filter: drop-shadow(0 4px 10px rgba(247,201,72,.5)); }
+      .dt-lb-bord .dt-lb-avatars { display: flex; justify-content: center; }
+      .dt-lb-bord .dt-lb-avatar { width: 6vw; height: 6vw; min-width: 56px; min-height: 56px; border-radius: 50%; display: grid; place-items: center; font-size: clamp(18px, 2vw, 38px); font-weight: 700;
+        background: rgba(255,255,255,.16); color: #fff; box-shadow: 0 0 0 4px #141B3D; text-transform: uppercase; }
+      .dt-lb-bord .dt-lb-avatar + .dt-lb-avatar { margin-left: -1.4vw; }
+      .dt-lb-bord .dt-lb-p1 .dt-lb-avatar { width: 7.5vw; height: 7.5vw; background: rgba(255,213,74,.25); }
+      .dt-lb-namen { display: flex; flex-wrap: wrap; justify-content: center; gap: .1em .6em; font-size: clamp(18px, 2.2vw, 42px); font-weight: 700; letter-spacing: -.01em; line-height: 1.15; }
+      .dt-lb-bord .dt-lb-groot { font-size: clamp(28px, 3.6vw, 68px); font-weight: 800; color: rgba(255,255,255,.92); font-variant-numeric: tabular-nums; }
+      .dt-lb-bord .dt-lb-p1 .dt-lb-groot { color: #FFD54A; font-size: clamp(34px, 4.6vw, 86px); }
+      .dt-lb-stijger { font-size: clamp(13px, 1.2vw, 22px); font-weight: 700; color: #30D158; background: rgba(48,209,88,.16); padding: .25em .8em; border-radius: 999px; }
+      .dt-lb-bord-knoppen { position: absolute; right: 2vw; top: 2vh; display: flex; gap: 8px; opacity: 0; transition: opacity .3s; }
+      .dt-lb-bord.is-actief .dt-lb-bord-knoppen, .dt-lb-bord-knoppen:focus-within { opacity: 1; }
+      .dt-lb-bord-knoppen button { appearance: none; border: 0; border-radius: 999px; padding: 10px 18px; font: 600 14px/1 var(--dt-font); color: #fff; background: rgba(255,255,255,.16); cursor: pointer; }
+      .dt-lb-bord-knoppen button:hover { background: rgba(255,255,255,.26); }
+      .dt-lb-regen { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+      .dt-lb-regen i { position: absolute; top: -20px; width: 9px; height: 16px; border-radius: 2px; animation-name: dt-lb-val; animation-timing-function: cubic-bezier(.3,.2,.6,1); animation-fill-mode: both; }
+      @keyframes dt-lb-val { from { transform: translate(0, 0) rotate(0); opacity: 1; } 85% { opacity: 1; } to { transform: translate(var(--dx), 105vh) rotate(var(--r)); opacity: 0; } }
+      @keyframes dt-lb-draai { to { transform: rotate(360deg); } }
+      @keyframes dt-lb-vervaag { from { opacity: .5; } 40% { opacity: .9; } to { opacity: .55; } }
+      @keyframes dt-lb-kroonbord { from { opacity: 0; transform: translate(-50%, -8vh) rotate(-25deg) scale(.5); } to { opacity: 1; transform: translateX(-50%); } }
+      @media (prefers-reduced-motion: reduce) { .dt-lb-bord *, .dt-lb-bord *::after { animation: none !important; } }
       @media (max-width: 900px) {
         .dt-lb-rij { grid-template-columns: 28px 52px 32px minmax(0, 1fr) 110px; }
         .dt-lb-rij > :nth-child(n+6) { display: none; }
