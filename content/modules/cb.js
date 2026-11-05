@@ -719,6 +719,7 @@ DT.register({
   /* ===================================================================================== */
   afspraken(DT) {
     const K = TardyKern, h = this._scherm.hoofd, d = K.vandaag();
+    if (this._mafModus === "geschiedenis") return this.geschiedenis(DT);
     const lijst = K.meldLijst();
     this._kies = new Set([...(this._kies || [])].filter((id) => lijst.some((m) => m.id === id)));
     const datum = DT.el("input", { type: "date", value: K.volgendeSchooldag(d) }), tijd = DT.el("input", { type: "time", value: K.S.instellingen.meldTijd || "08:30" });
@@ -726,7 +727,7 @@ DT.register({
       DT.el("b", { text: `${this._kies.size} gekozen` }), DT.el("label", {}, ["Datum ", datum]), DT.el("label", {}, ["Tijd ", tijd]),
       this.knop(DT, "Verzetten", () => { this.gekozenAfspraken().forEach((m) => { m.datum = datum.value; m.tijd = tijd.value; }); this.bewaar(); this.teken(); }),
       this.knop(DT, "Mails aanmaken", () => this.mailsMeldafspraak(DT, datum.value, tijd.value), true),
-      this.knop(DT, "Verschenen", () => { this.gekozenAfspraken().forEach((m) => m.status = "verschenen"); this._kies.clear(); this.bewaar(); this.teken(); }),
+      this.knop(DT, "Verschenen", () => { this.gekozenAfspraken().forEach((m) => this.rondAf(m, "verschenen")); this._kies.clear(); this.bewaar(); this.teken(); }),
       this.knop(DT, "Niet verschenen", () => { this.gekozenAfspraken().forEach((m) => this.nietVerschenen(m)); this._kies.clear(); this.bewaar(); this.teken(); }),
     ]);
     balk.hidden = !this._kies.size;
@@ -736,7 +737,8 @@ DT.register({
       vink.addEventListener("change", () => { vink.checked ? this._kies.add(m.id) : this._kies.delete(m.id); this.teken(); });
       const aantal = m.aanleiding === "ongeoorloofd" ? `${t.ongeoorloofd}× ongeoorloofd` : `${t.teLaat}× te laat`;
       return DT.el("tr", {}, [DT.el("td", {}, vink),
-        DT.el("td", {}, [DT.el("b", { text: K.naamVan(st) }), DT.el("small", { text: ` ${st.klas || ""}${K.minderjarig(st) === true ? " · 18−" : ""}` })]),
+        DT.el("td", {}, [this.naamKnop(DT, st), DT.el("small", { text: ` ${st.klas || ""}${K.minderjarig(st) === true ? " · 18−" : ""}` }),
+          m.vorigeId ? DT.el("small", { class: "dt-cb-vervolg", text: ` · ${this.vervolgTekst(m)}` }) : null].filter(Boolean)),
         DT.el("td", { text: K.AANLEIDING[m.aanleiding] || m.aanleiding }),
         DT.el("td", {}, [DT.el("span", { class: `dt-cb-niveau n${n}`, text: n ? `trede ${n}` : "—" }), DT.el("small", { text: ` ${aantal}` })]),
         DT.el("td", { text: `${K.langDatum(m.datum)} ${m.tijd || ""}` }),
@@ -744,16 +746,16 @@ DT.register({
         DT.el("td", { class: "dt-cb-acties" }, [
           this.knop(DT, "In Magister", () => this.afspraakMaken(m.stamnr, { onderwerp: `Meldafspraak bij de CB'er: ${K.naamVan(st)}`, datum: m.datum, tijd: m.tijd,
             tekst: `Meldafspraak (${(K.AANLEIDING[m.aanleiding] || m.aanleiding).toLowerCase()}): ${aantal}.${m.aanleidingTekst ? `\n${m.aanleidingTekst}` : ""}\n\nAangemaakt vanuit de Te laat-balie (Tardy).` }), false, "klein"),
-          this.knop(DT, "Verschenen", () => { m.status = "verschenen"; this.bewaar(); this.teken(); }, false, "klein"),
-          this.knop(DT, "Niet", () => { this.nietVerschenen(m); this.bewaar(); this.teken(); }, false, "klein"),
-          this.knop(DT, "Vervalt", () => { K.S.meldafspraken = K.S.meldafspraken.filter((x) => x.id !== m.id); this.bewaar(); this.teken(); }, false, "klein stil")]),
+          this.knop(DT, "Verschenen", () => { this.rondAf(m, "verschenen"); this.bewaar(); this.teken(); }, false, "klein"),
+          this.knop(DT, "Niet", () => this.nietModal(DT, m), false, "klein"),
+          this.knop(DT, "Vervalt", () => { this.rondAf(m, "vervallen"); this.bewaar(); this.teken(); }, false, "klein stil")]),
       ]);
     };
     const groepen = [["Verlopen", lijst.filter((m) => m.datum < d)], ["Vandaag", lijst.filter((m) => m.datum === d)], ["Komende dagen", lijst.filter((m) => m.datum > d)]].filter(([, r]) => r.length);
     const alles = DT.el("input", { type: "checkbox", "aria-label": "Alles kiezen" }); alles.checked = !!lijst.length && this._kies.size === lijst.length;
     alles.addEventListener("change", () => { this._kies = new Set(alles.checked ? lijst.map((m) => m.id) : []); this.teken(); });
     h.replaceChildren(
-      DT.el("div", { class: "dt-cb-rij" }, [DT.el("span", { class: "dt-cb-zacht", text: `${lijst.length} ${lijst.length === 1 ? "afspraak" : "afspraken"}` }), this.knop(DT, "Student toevoegen", () => this.handmatigeAfspraak(DT))]),
+      DT.el("div", { class: "dt-cb-rij" }, [this.mafSchakel(DT), DT.el("span", { class: "dt-cb-zacht", text: `${lijst.length} ${lijst.length === 1 ? "afspraak" : "afspraken"}` }), this.knop(DT, "Student toevoegen", () => this.handmatigeAfspraak(DT))]),
       balk,
       lijst.length ? DT.el("table", { class: "dt-cb-tabel" }, [
         DT.el("thead", {}, DT.el("tr", {}, [DT.el("th", {}, alles), ...["Student", "Aanleiding", "Ladder", "Wanneer", "Mail", ""].map((t) => DT.el("th", { text: t }))])),
@@ -762,13 +764,253 @@ DT.register({
     );
   },
   gekozenAfspraken() { return TardyKern.meldLijst().filter((m) => this._kies.has(m.id)); },
-  nietVerschenen(m) {
+  /* ---------- afronden en vervolg: alles blijft bewaard, zodat de geschiedenis compleet is ---------- */
+  /* Statussen: open, verschenen, niet-verschenen (telt mee in de ladder "Niet verschenen"), verzet (kon niet,
+   * buiten de student om; telt niet mee) en vervallen. vorigeId/vervolgId koppelen een afspraak aan de
+   * afspraak die erop volgt. Tardy kijkt alleen naar open en niet-verschenen, dus dit werkt daar ook. */
+  rondAf(m, status, extra = {}) {
     const K = TardyKern;
-    m.status = "niet-verschenen";
-    const d = K.volgendeSchooldag(m.datum);
-    if (!K.S.meldafspraken.some((x) => x.stamnr === m.stamnr && x.datum === d && x.status === "open"))
-      K.S.meldafspraken.push({ id: K.uid(), stamnr: m.stamnr, datum: d, tijd: K.S.instellingen.meldTijd, aanleiding: "nietgemeld", status: "open", gemaaktOp: K.vandaag(), gemaild: false });
+    Object.assign(m, { status, afgerondOp: new Date().toISOString(), afgerondDoor: K.S.instellingen.cbNaam || "" }, extra);
   },
+  vervolg(m, { datum, tijd, aanleiding, tekst }) {
+    const K = TardyKern;
+    let n = K.S.meldafspraken.find((x) => x.stamnr === m.stamnr && x.datum === datum && x.status === "open" && x.id !== m.id);
+    if (!n) {
+      n = { id: K.uid(), stamnr: m.stamnr, datum, tijd: tijd || K.S.instellingen.meldTijd, aanleiding, status: "open", gemaaktOp: K.vandaag(), gemaild: false };
+      if (tekst) n.aanleidingTekst = tekst;
+      K.S.meldafspraken.push(n);
+    }
+    n.vorigeId = m.id; m.vervolgId = n.id;
+    return n;
+  },
+  eersteDag(m) { const K = TardyKern; return K.volgendeSchooldag(K.vandaag() > m.datum ? K.vandaag() : m.datum); },
+  /* Weggebleven: telt mee in het protocol, en direct een nieuwe meldafspraak. */
+  nietVerschenen(m, datum = null, tijd = null, notitie = "") {
+    this.rondAf(m, "niet-verschenen", notitie ? { notitie } : {});
+    return this.vervolg(m, { datum: datum || this.eersteDag(m), tijd, aanleiding: "nietgemeld" });
+  },
+
+  nietModal(DT, m) {
+    const K = TardyKern, st = K.S.studenten[m.stamnr] || {};
+    const datum = DT.el("input", { type: "date", class: "dt-cb-veld klein", value: this.eersteDag(m) });
+    const tijd = DT.el("input", { type: "time", class: "dt-cb-veld klein", value: m.tijd || K.S.instellingen.meldTijd || "08:30" });
+    const reden = DT.el("input", { type: "text", class: "dt-cb-veld", placeholder: "Wat was er? bijv. toets liep uit, door docent vastgehouden, CB'er afwezig" });
+    const keuze = (titel, tekst) => DT.el("div", { class: "dt-cb-keuze" }, [DT.el("b", { text: titel }), DT.el("small", { text: tekst })]);
+    this.modal(`${K.naamVan(st)} is niet verschenen`, [
+      DT.el("p", { class: "dt-cb-zacht", text: `Meldafspraak van ${K.langDatum(m.datum)} ${m.tijd || ""} (${(K.AANLEIDING[m.aanleiding] || m.aanleiding).toLowerCase()}).` }),
+      keuze("Weggebleven", "Telt mee in de ladder “Niet verschenen bij de meldafspraak”. Er komt meteen een nieuwe meldafspraak en je ziet welke stap het protocol nu vraagt."),
+      keuze("Buiten de student om", "Telt niet mee. Er komt een nieuwe afspraak; de reden blijft in de geschiedenis staan."),
+      DT.el("div", { class: "dt-cb-rij" }, [DT.el("label", {}, ["Nieuwe afspraak ", datum]), DT.el("label", {}, ["om ", tijd])]),
+      DT.el("label", { class: "dt-cb-protveld" }, [DT.el("span", { text: "Reden of notitie" }), reden]),
+    ], [
+      ["Annuleren", () => this.sluitModal()],
+      ["Buiten de student om", () => {
+        if (!reden.value.trim()) { reden.focus(); return this.melding("Vul kort in wat er was; dat blijft in de geschiedenis staan.", "err"); }
+        this.rondAf(m, "verzet", { reden: reden.value.trim() });
+        const n = this.vervolg(m, { datum: datum.value, tijd: tijd.value, aanleiding: m.aanleiding, tekst: m.aanleidingTekst });
+        this.bewaar(); this.teken(); this.sluitModal();
+        this.melding(`Nieuwe afspraak op ${K.langDatum(n.datum)} om ${n.tijd}. Telt niet mee in het protocol.`);
+      }],
+      ["Weggebleven", () => {
+        const n = this.nietVerschenen(m, datum.value, tijd.value, reden.value.trim());
+        this.bewaar(); this.teken(); this.stapModal(DT, m, n);
+      }, true],
+    ]);
+  },
+
+  /* Na wegblijven: wat het protocol nu vraagt, met de drie actieknoppen en de nieuwe afspraak. */
+  stapModal(DT, m, n = null) {
+    const K = TardyKern, st = K.S.studenten[m.stamnr] || {}, pid = K.periodeVanDatum(m.datum)?.id || K.UI.periodeId;
+    n ||= K.S.meldafspraken.find((x) => x.id === m.vervolgId) || null;
+    const sigs = K.hoogsteTreden(K.signalenVoor(m.stamnr, pid));
+    const s = sigs.find((x) => x.soort === "nietgemeld"), hoogst = this.perStudent(sigs.filter((x) => !x.afgehandeld))[0];
+    const opnieuw = () => { this.teken(); this.stapModal(DT, m, n); };
+    const inhoud = [
+      DT.el("p", { text: `Vastgelegd: niet verschenen op ${K.langDatum(m.datum)}.${n ? ` Nieuwe meldafspraak op ${K.langDatum(n.datum)} om ${n.tijd}.` : ""}` }),
+      s ? DT.el("div", { class: `dt-cb-stapblok n${s.niveau}` }, [
+        DT.el("div", { class: "dt-cb-kaartkop" }, [DT.el("b", { text: s.titel }), DT.el("span", { class: `dt-cb-niveau n${s.niveau}`, text: s.consequentie })]),
+        DT.el("p", { text: s.maatregel }),
+        this.actieKnoppen(DT, s, st, pid, opnieuw),
+      ]) : DT.el("p", { class: "dt-cb-zacht", text: "Het protocol vraagt bij deze telling nog geen extra stap." }),
+      hoogst && s && hoogst.key !== s.key && hoogst.niveau > s.niveau
+        ? DT.el("p", { class: "dt-cb-waarschuw", text: `Let op: op een andere ladder staat ${K.naamVan(st)} al op ${hoogst.consequentie} (${hoogst.titel}). Die zwaardere stap gaat voor; zie Signalen.` }) : null,
+    ].filter(Boolean);
+    const knoppen = [["Sluiten", () => this.sluitModal()]];
+    if (n) {
+      knoppen.unshift(["Afspraak in Magister", () => this.afspraakMaken(m.stamnr, { onderwerp: `Meldafspraak bij de CB'er: ${K.naamVan(st)}`, datum: n.datum, tijd: n.tijd,
+        tekst: `Nieuwe meldafspraak: niet verschenen op ${K.langDatum(m.datum)}.\n\nAangemaakt vanuit de Te laat-balie (Tardy).` })]);
+      knoppen.unshift([n.gemaild ? "✓ Student gemaild" : "Mail student over nieuwe afspraak", () => {
+        const t = K.mailTekst("student-meldafspraak", m.stamnr, pid, { datum: n.datum, tijd: n.tijd, melding: n });
+        const a = document.createElement("a");
+        a.href = `mailto:${encodeURIComponent(t.aan || "")}?subject=${encodeURIComponent(t.onderwerp)}&body=${encodeURIComponent(t.body)}`; a.click();
+        n.gemaild = true; K.S.mails.push({ id: K.uid(), stamnr: m.stamnr, type: t.type, aan: t.aan, onderwerp: t.onderwerp, op: K.vandaag() });
+        this.bewaar(); opnieuw();
+      }]);
+    }
+    this.modal(`Volgende stap voor ${K.naamVan(st)}`, inhoud, knoppen);
+  },
+
+  nieuweAfspraakModal(DT, m) {
+    const K = TardyKern, st = K.S.studenten[m.stamnr] || {};
+    const datum = DT.el("input", { type: "date", class: "dt-cb-veld klein", value: K.volgendeSchooldag(K.vandaag()) });
+    const tijd = DT.el("input", { type: "time", class: "dt-cb-veld klein", value: K.S.instellingen.meldTijd || "08:30" });
+    this.modal(`Nieuwe meldafspraak voor ${K.naamVan(st)}`, [
+      DT.el("p", { class: "dt-cb-zacht", text: `Volgt op de afspraak van ${K.langDatum(m.datum)} (${this.uitkomst(m).tekst.toLowerCase()}).` }),
+      DT.el("div", { class: "dt-cb-rij" }, [DT.el("label", {}, ["Datum ", datum]), DT.el("label", {}, ["om ", tijd])]),
+    ], [["Annuleren", () => this.sluitModal()], ["Afspraak maken", () => {
+      const n = this.vervolg(m, { datum: datum.value, tijd: tijd.value, aanleiding: m.status === "niet-verschenen" ? "nietgemeld" : m.aanleiding, tekst: m.aanleidingTekst });
+      this.bewaar(); this.sluitModal(); this.teken(); this.melding(`Meldafspraak op ${K.langDatum(n.datum)} om ${n.tijd}.`);
+    }, true]]);
+  },
+
+  /* ---------- geschiedenis: per schooljaar en periode ---------- */
+  schooljaarVan(d) { const y = +d.slice(0, 4), mnd = +d.slice(5, 7); return mnd >= 8 ? `${y}-${y + 1}` : `${y - 1}-${y}`; },
+  /* De periodes in de gedeelde gegevens gelden voor één schooljaar. Die bewaren we per schooljaar, zodat oudere
+   * afspraken later nog in hun eigen periode staan als Tardy al op het nieuwe schooljaar is gezet. */
+  periodesVan(sj) {
+    const K = TardyKern, nu = K.periodes();
+    if (nu.length && this.schooljaarVan(nu[0].start) === sj) return nu;
+    return (K.S.cbPeriodes || {})[sj] || [];
+  },
+  bewaarPeriodes() {
+    const K = TardyKern, nu = K.periodes(); if (!nu.length || this._kijkt) return;
+    const sj = this.schooljaarVan(nu[0].start), arch = (K.S.cbPeriodes ||= {});
+    if (JSON.stringify(arch[sj]) !== JSON.stringify(nu)) { arch[sj] = JSON.parse(JSON.stringify(nu)); this.bewaar(); }
+  },
+  periodeVan(d) { return this.periodesVan(this.schooljaarVan(d)).find((p) => d >= p.start && d <= p.eind) || null; },
+  uitkomst(m) {
+    const d = TardyKern.vandaag();
+    return ({ verschenen: { k: "ok", tekst: "Verschenen" }, "niet-verschenen": { k: "nok", tekst: "Niet verschenen" }, verzet: { k: "verzet", tekst: "Verzet, buiten de student om" },
+      vervallen: { k: "weg", tekst: "Vervallen" } })[m.status] || (m.datum < d ? { k: "open", tekst: "Nog niet afgerond" } : { k: "gepland", tekst: m.datum === d ? "Vandaag" : "Gepland" });
+  },
+  vervolgTekst(m) {
+    const K = TardyKern, byId = (id) => K.S.meldafspraken.find((x) => x.id === id);
+    const v = m.vervolgId && byId(m.vervolgId), w = m.vorigeId && byId(m.vorigeId);
+    return [w ? `volgt op ${K.kortDatum(w.datum)} (${this.uitkomst(w).tekst.toLowerCase()})` : "", v ? `→ nieuwe afspraak ${K.kortDatum(v.datum)} (${this.uitkomst(v).tekst.toLowerCase()})` : ""].filter(Boolean).join(" · ");
+  },
+  naamKnop(DT, st) {
+    const b = DT.el("button", { type: "button", class: "dt-cb-naamknop", text: TardyKern.naamVan(st), title: "Meldafspraken van deze student" });
+    b.addEventListener("click", () => this.studentHistorie(DT, st.stamnr)); return b;
+  },
+  mafSchakel(DT) {
+    const groep = DT.el("div", { class: "dt-cb-chips", role: "group", "aria-label": "Weergave" });
+    for (const [id, t] of [["open", "Openstaand"], ["geschiedenis", "Geschiedenis"]]) {
+      const b = DT.el("button", { type: "button", class: "dt-cb-chip", "aria-pressed": String((this._mafModus || "open") === id), text: t });
+      b.addEventListener("click", () => { this._mafModus = id; this.teken(); }); groep.append(b);
+    }
+    return groep;
+  },
+  telling(lijst) {
+    const n = (st) => lijst.filter((m) => m.status === st).length, ok = n("verschenen"), nok = n("niet-verschenen");
+    return { totaal: lijst.length, ok, nok, verzet: n("verzet"), weg: n("vervallen"), open: lijst.filter((m) => m.status === "open").length, pct: ok + nok ? Math.round((100 * ok) / (ok + nok)) : null };
+  },
+  tellingRegel(DT, t) {
+    return DT.el("div", { class: "dt-cb-telregel" }, [
+      DT.el("span", { text: `${t.totaal} ${t.totaal === 1 ? "afspraak" : "afspraken"}` }),
+      DT.el("span", { class: "ok", text: `${t.ok} verschenen` }), DT.el("span", { class: "nok", text: `${t.nok} niet verschenen` }),
+      t.verzet ? DT.el("span", { text: `${t.verzet} verzet` }) : null, t.weg ? DT.el("span", { text: `${t.weg} vervallen` }) : null,
+      t.open ? DT.el("span", { text: `${t.open} open` }) : null,
+      t.pct != null ? DT.el("b", { text: `${t.pct}% nagekomen` }) : null,
+    ].filter(Boolean));
+  },
+  histRij(DT, m, metStudent = true) {
+    const K = TardyKern, st = K.S.studenten[m.stamnr] || { stamnr: m.stamnr, roepnaam: m.stamnr }, u = this.uitkomst(m);
+    const open = m.vervolgId && K.S.meldafspraken.some((x) => x.id === m.vervolgId && x.status === "open");
+    const acties = [];
+    if (m.status === "open") {
+      acties.push(this.knop(DT, "Verschenen", () => { this.rondAf(m, "verschenen"); this.bewaar(); this.teken(); this.vernieuwModal(DT); }, false, "klein"),
+        this.knop(DT, "Niet", () => this.nietModal(DT, m), false, "klein"));
+    } else {
+      if (m.status === "niet-verschenen") acties.push(this.knop(DT, "Volgende stap", () => this.stapModal(DT, m), false, "klein"));
+      if (!open && m.status !== "verschenen") acties.push(this.knop(DT, "Nieuwe afspraak", () => this.nieuweAfspraakModal(DT, m), false, "klein"));
+      if (!m.vervolgId) acties.push(this.knop(DT, "Terugzetten", () => {
+        if (!confirm("Deze afspraak weer op open zetten? De uitkomst vervalt.")) return;
+        m.status = "open"; delete m.afgerondOp; delete m.afgerondDoor; delete m.reden; this.bewaar(); this.teken(); this.vernieuwModal(DT);
+      }, false, "klein stil"));
+    }
+    const wie = m.afgerondOp ? `${m.afgerondDoor ? `${m.afgerondDoor}, ` : ""}${new Date(m.afgerondOp).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}` : "";
+    return DT.el("tr", { "data-zoek": `${K.naamVan(st)} ${st.klas || ""} ${m.stamnr}`.toLowerCase() }, [
+      DT.el("td", {}, [DT.el("b", { text: K.kortDatum(m.datum) }), DT.el("small", { text: ` ${m.tijd || ""}` })]),
+      metStudent ? DT.el("td", {}, [this.naamKnop(DT, st), DT.el("small", { text: ` ${st.klas || ""}` })]) : null,
+      DT.el("td", {}, [DT.el("span", { text: K.AANLEIDING[m.aanleiding] || m.aanleiding }), m.aanleidingTekst ? DT.el("small", { class: "dt-cb-blok", text: m.aanleidingTekst }) : null].filter(Boolean)),
+      DT.el("td", {}, [DT.el("span", { class: `dt-cb-uitkomst ${u.k}`, text: u.tekst }), m.reden || m.notitie ? DT.el("small", { class: "dt-cb-blok", text: m.reden || m.notitie }) : null,
+        wie ? DT.el("small", { class: "dt-cb-blok dt-cb-zacht", text: wie }) : null].filter(Boolean)),
+      DT.el("td", {}, DT.el("small", { text: this.vervolgTekst(m) || "—" })),
+      DT.el("td", { class: "dt-cb-acties" }, acties),
+    ].filter(Boolean));
+  },
+  histTabel(DT, lijst, perPeriode, metStudent = true) {
+    const kop = ["Datum", ...(metStudent ? ["Student"] : []), "Aanleiding", "Uitkomst", "Vervolg", ""];
+    const groepen = [];
+    if (perPeriode) {
+      for (const m of lijst) {
+        const sj = this.schooljaarVan(m.datum), p = this.periodeVan(m.datum), k = `${sj} · ${p ? p.naam : "buiten de periodes"}`;
+        let g = groepen.find((x) => x[0] === k); if (!g) groepen.push(g = [k, []]); g[1].push(m);
+      }
+    } else groepen.push([null, lijst]);
+    return DT.el("table", { class: "dt-cb-tabel dt-cb-hist" }, [
+      DT.el("thead", {}, DT.el("tr", {}, kop.map((t) => DT.el("th", { text: t })))),
+      ...groepen.map(([titel, r]) => DT.el("tbody", {}, [
+        titel ? DT.el("tr", { class: "dt-cb-groepkop" }, DT.el("td", { colspan: String(kop.length) }, [DT.el("span", { text: titel }), this.tellingRegel(DT, this.telling(r))])) : null,
+        ...r.map((m) => this.histRij(DT, m, metStudent))].filter(Boolean))),
+    ]);
+  },
+
+  geschiedenis(DT) {
+    const K = TardyKern, h = this._scherm.hoofd;
+    this.bewaarPeriodes();
+    const alle = K.S.meldafspraken.filter((m) => m.datum).slice().sort((a, b) => (b.datum + (b.tijd || "")).localeCompare(a.datum + (a.tijd || "")));
+    const jaren = [...new Set([this.schooljaarVan(K.vandaag()), ...alle.map((m) => this.schooljaarVan(m.datum))])].sort().reverse();
+    if (!jaren.includes(this._hJaar)) this._hJaar = jaren[0];
+    const pers = this.periodesVan(this._hJaar);
+    if (this._hPer && !pers.some((p) => p.id === this._hPer)) this._hPer = "";
+    const kies = (opties, waarde, zet, label) => {
+      const sel = DT.el("select", { class: "dt-cb-veld klein", "aria-label": label }, opties.map(([v, t]) => DT.el("option", { value: v, text: t })));
+      sel.value = waarde; sel.addEventListener("change", () => { zet(sel.value); this.teken(); }); return sel;
+    };
+    const p = pers.find((x) => x.id === this._hPer);
+    let lijst = alle.filter((m) => this.schooljaarVan(m.datum) === this._hJaar && (!p || (m.datum >= p.start && m.datum <= p.eind)));
+    const uit = this._hUit || "";
+    if (uit) lijst = lijst.filter((m) => uit === "open" ? m.status === "open" : m.status === uit);
+    const zoek = DT.el("input", { type: "search", class: "dt-cb-veld klein", placeholder: "Zoek student of klas", value: this._hZoek || "" });
+    const tabel = lijst.length ? this.histTabel(DT, lijst, true) : DT.el("div", { class: "dt-cb-leeg" }, DT.el("p", { text: "Geen meldafspraken in deze selectie." }));
+    const filter = () => {
+      const q = (this._hZoek = zoek.value.trim().toLowerCase());
+      tabel.querySelectorAll?.("tbody tr[data-zoek]").forEach((tr) => { tr.hidden = !!q && !tr.dataset.zoek.includes(q); });
+    };
+    zoek.addEventListener("input", filter);
+    h.replaceChildren(
+      DT.el("div", { class: "dt-cb-rij" }, [this.mafSchakel(DT),
+        kies(jaren.map((j) => [j, `Schooljaar ${j}`]), this._hJaar, (v) => { this._hJaar = v; this._hPer = ""; }, "Schooljaar"),
+        kies([["", "Alle periodes"], ...pers.map((x) => [x.id, `${x.naam} · ${K.kortDatum(x.start)} – ${K.kortDatum(x.eind)}`])], this._hPer || "", (v) => { this._hPer = v; }, "Periode"),
+        kies([["", "Alle uitkomsten"], ["verschenen", "Verschenen"], ["niet-verschenen", "Niet verschenen"], ["verzet", "Verzet"], ["vervallen", "Vervallen"], ["open", "Open"]], uit, (v) => { this._hUit = v; }, "Uitkomst"),
+        zoek]),
+      DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("h2", { text: `${p ? p.naam : "Schooljaar"} ${this._hJaar}` }), this.tellingRegel(DT, this.telling(lijst)),
+        pers.length ? null : DT.el("p", { class: "dt-cb-zacht", text: "Van dit schooljaar zijn de periodes niet bewaard; de afspraken staan per schooljaar." })].filter(Boolean)),
+      tabel,
+    );
+    filter();
+  },
+
+  /* Alles van één student: per schooljaar en periode, met de stand van te laat en niet verschenen. */
+  studentHistorie(DT, sn) {
+    const K = TardyKern, st = K.S.studenten[sn] || { stamnr: sn, roepnaam: sn };
+    this._histStudent = sn;
+    const lijst = K.S.meldafspraken.filter((m) => m.stamnr === sn && m.datum).sort((a, b) => (b.datum + (b.tijd || "")).localeCompare(a.datum + (a.tijd || "")));
+    const reg = K.S.registraties.filter((r) => r.stamnr === sn);
+    const t = this.telling(lijst);
+    const m = this.modal(`Meldafspraken van ${K.naamVan(st)}`, [
+      DT.el("p", { class: "dt-cb-zacht", text: `${st.klas || ""} · ${sn} · ${reg.length} registraties in de balie` }),
+      this.tellingRegel(DT, t),
+      lijst.length ? this.histTabel(DT, lijst, true, false) : DT.el("p", { text: "Nog geen meldafspraken." }),
+    ], [["Nieuwe meldafspraak", () => {
+      if (K.S.meldafspraken.some((x) => x.stamnr === sn && x.status === "open")) return this.melding("Er staat al een open meldafspraak.");
+      K.S.meldafspraken.push({ id: K.uid(), stamnr: sn, datum: K.volgendeSchooldag(K.vandaag()), tijd: K.S.instellingen.meldTijd, aanleiding: "handmatig", status: "open", gemaaktOp: K.vandaag(), gemaild: false });
+      this.bewaar(); this.teken(); this.studentHistorie(DT, sn);
+    }], ["Sluiten", () => { this._histStudent = null; this.sluitModal(); }, true]]);
+    m.classList.add("breed");
+  },
+  vernieuwModal(DT) { if (this._histStudent && this._modal?.classList.contains("breed")) this.studentHistorie(DT, this._histStudent); },
   handmatigeAfspraak(DT) {
     const K = TardyKern;
     const reden = DT.el("input", { type: "text", class: "dt-cb-veld", placeholder: "Reden (komt in de mail), bijv. je hebt je afspraak met de mentor gemist" });
@@ -870,7 +1112,8 @@ DT.register({
         DT.el("div", { class: "dt-cb-rij" }, [
           s.afgehandeld ? this.knop(DT, "Heropen", () => { K.zetAfh(s.key, null); this.teken(); }, false, "klein stil")
             : this.knop(DT, "Afgehandeld", afhandelen, true, "klein"),
-          this.knop(DT, "Verzuim in Magister", () => this.openInMagister(st), false, "klein stil"), bekijk].filter(Boolean)),
+          this.knop(DT, "Verzuim in Magister", () => this.openInMagister(st), false, "klein stil"), bekijk,
+          K.S.meldafspraken.some((m) => m.stamnr === s.stamnr) ? this.knop(DT, "Meldafspraken", () => this.studentHistorie(DT, s.stamnr), false, "klein stil") : null].filter(Boolean)),
       ].filter(Boolean));
     };
     const perNiveau = [4, 3, 2, 1].map((n) => [n, zicht.filter((s) => s.niveau === n)]).filter(([, l]) => l.length);
@@ -1120,14 +1363,14 @@ DT.register({
     this.bewaar();
   },
 
-  actieKnoppen(DT, s, st, pid) {
+  actieKnoppen(DT, s, st, pid, naKlik = () => this.teken()) {
     const K = TardyKern, gedaan = (K.S.cbActies || {})[s.key] || {};
     const per = (K.periodeById(pid) || {}).naam || "deze periode";
     const stand = this.statsRegel(DT, s.stamnr)?.textContent || "";
     const ontvangers = [...new Set(s.mails.map((t) => ({ student: "student", ouders: "ouders", mentor: "mentor", bureau: "verzuimbureau" })[(K.MAILSOORT[t] || {}).aan] || "mentor"))];
     const knop = (soort, label, klaarLabel, fn, uit = false) => {
       const wanneer = gedaan[soort] ? new Date(gedaan[soort]) : null;
-      const b = this.knop(DT, wanneer ? `✓ ${klaarLabel}` : label, () => { fn(); this.actieGedaan(s.key, soort); this.teken(); }, false, `klein${wanneer ? " stil" : ""}`);
+      const b = this.knop(DT, wanneer ? `✓ ${klaarLabel}` : label, () => { fn(); this.actieGedaan(s.key, soort); naKlik(); }, false, `klein${wanneer ? " stil" : ""}`);
       b.classList.add("dt-cb-actie"); if (wanneer) b.classList.add("is-gedaan");
       b.title = wanneer ? `${klaarLabel} op ${wanneer.toLocaleDateString("nl-NL", { day: "numeric", month: "long" })} om ${wanneer.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}. Klik om het opnieuw te doen.` : "";
       if (uit) b.setAttribute("disabled", "");
@@ -1580,6 +1823,20 @@ DT.register({
       .dt-cb-protrij { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0 12px; }
       .dt-cb-protsub { margin: 4px 0 8px; font-size: 13px; font-weight: 700; }
       .dt-cb-protvinkjes { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 12px; }
+      .dt-cb-naamknop { appearance: none; border: 0; padding: 0; background: none; font: inherit; font-weight: 700; color: var(--cb-acc); cursor: pointer; text-align: left; }
+      .dt-cb-naamknop:hover { text-decoration: underline; }
+      .dt-cb-vervolg { color: var(--cb-zacht); } .dt-cb-blok { display: block; }
+      .dt-cb-uitkomst { display: inline-flex; padding: 0 8px; border-radius: var(--cb-r); font-size: 12px; line-height: 20px; font-weight: 700; white-space: nowrap; background: var(--cb-vlak); }
+      .dt-cb-uitkomst.ok { background: #d9f2e3; color: #145c33; } .dt-cb-uitkomst.nok { background: #fdd8dc; color: #9b1424; }
+      .dt-cb-uitkomst.verzet { background: #ddeffe; color: #0b4f8a; } .dt-cb-uitkomst.open { background: #ffe3c2; color: #7a4100; } .dt-cb-uitkomst.weg { color: var(--cb-zacht); }
+      .dt-cb-telregel { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--cb-zacht); margin: 4px 0 0; }
+      .dt-cb-telregel .ok { color: var(--cb-groen); } .dt-cb-telregel .nok { color: var(--cb-rood); } .dt-cb-telregel b { color: var(--cb-fg); }
+      .dt-cb-groepkop td .dt-cb-telregel { font-weight: 400; }
+      .dt-cb-hist td { vertical-align: top; }
+      .dt-cb-keuze { padding: 8px 12px; margin: 0 0 8px; border-radius: var(--cb-r); background: var(--cb-vlak); } .dt-cb-keuze b, .dt-cb-keuze small { display: block; font-size: 14px; line-height: 20px; } .dt-cb-keuze small { font-size: 13px; color: var(--cb-zacht); }
+      .dt-cb-stapblok { margin: 8px 0; padding: 12px; border-radius: var(--cb-r); border: 1px solid var(--cb-lijnzacht); border-left: 4px solid var(--cb-lijn); }
+      .dt-cb-stapblok.n1 { border-left-color: #f2c400; } .dt-cb-stapblok.n2 { border-left-color: #f08a00; } .dt-cb-stapblok.n3 { border-left-color: #d7263d; } .dt-cb-stapblok.n4 { border-left-color: #8e44ad; }
+      .dt-cb-modal.breed .dt-cb-modalin { width: min(1000px, calc(100vw - 48px)); max-height: calc(100vh - 64px); overflow: auto; }
       .dt-cb-acties3 { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; padding: 8px; border-radius: var(--cb-r); border: 1px dashed var(--cb-lijnzacht); }
       .dt-cb-actie.is-gedaan { color: var(--cb-groen); }
       .dt-cb-gevolg { display: flex; gap: 8px; align-items: baseline; margin: 0 0 8px; }
