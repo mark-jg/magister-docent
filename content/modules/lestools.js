@@ -43,6 +43,12 @@ DT.register({
   mount(DT) {
     const grid = document.querySelector("ld-hulpmiddelen .hulpmiddelen-grid");
     if (!grid) { if (this._scherm && !/\/hulpmiddelen/.test(location.hash)) this._scherm.sluit(); return; }
+    /* De kaarten worden in de extensie gemaakt, vaak voordat Magisters dna-link-card klaar is; dan negeert
+     * de kaart het heading-attribuut en toont "Heading". Opnieuw zetten laat de kaart het alsnog oppakken. */
+    for (const c of grid.querySelectorAll(".dt-lt-tegel")) {
+      const h = c.getAttribute("heading"), h1 = c.shadowRoot?.querySelector("h1");
+      if (h1 && h1.textContent.trim() !== h) { c.removeAttribute("heading"); c.setAttribute("heading", h); }
+    }
     if (grid.querySelector(".dt-lt-tegel")) return;
     this.css();
     for (const t of this.TOOLS) {
