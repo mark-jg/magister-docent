@@ -567,7 +567,7 @@ DT.register({
     S.registraties.push(reg);
     const pid = (K.periodeVanDatum(d) || K.huidigePeriode()).id, t = K.tellingen(stamnr, pid);
     const aantal = groep === "telaat" ? t.teLaat : groep === "ongeoorloofd" ? t.ongeoorloofd : groep === "calamiteit" ? t.calamiteit : 0;
-    const g = K.gevolgVan(groep, aantal, t.achttienMin);
+    const g = K.gevolgVan(groep, aantal, this.oudersMet18(S.studenten[stamnr]) ? true : t.achttienMin);   // 18+ met toestemming: de tekst met ouders
     let meldDatum = null;
     if (g.meld && !S.meldafspraken.some((m) => m.stamnr === stamnr && m.status === "open")) {
       meldDatum = K.volgendeSchooldag(d);
@@ -822,7 +822,7 @@ DT.register({
   stapModal(DT, m, n = null) {
     const K = TardyKern, st = K.S.studenten[m.stamnr] || {}, pid = K.periodeVanDatum(m.datum)?.id || K.UI.periodeId;
     n ||= K.S.meldafspraken.find((x) => x.id === m.vervolgId) || null;
-    const sigs = K.hoogsteTreden(K.signalenVoor(m.stamnr, pid));
+    const sigs = this.met18(K.hoogsteTreden(K.signalenVoor(m.stamnr, pid)));
     const s = sigs.find((x) => x.soort === "nietgemeld"), hoogst = this.perStudent(sigs.filter((x) => !x.afgehandeld))[0];
     const opnieuw = () => { this.teken(); this.stapModal(DT, m, n); };
     const inhoud = [
@@ -1075,7 +1075,7 @@ DT.register({
 
   signalen(DT) {
     const K = TardyKern, h = this._scherm.hoofd, pid = K.UI.periodeId;
-    const alle = K.hoogsteTreden(K.alleSignalen(pid));
+    const alle = this.met18(K.hoogsteTreden(K.alleSignalen(pid)));
     const zicht = this.perStudent(alle.filter((s) => this._metAfgehandeld || !s.afgehandeld));
     const open = this.perStudent(alle.filter((s) => !s.afgehandeld));
     this._sigOpen ||= new Set();
@@ -1428,12 +1428,25 @@ DT.register({
 
   /* 18+ met toestemming voor contact met ouders (uit Magister). */
   oudersMet18(st) { return !!st && st.ouderToestemming === true && TardyKern.minderjarig(st) === false; },
+  /* Signalen van 18+-studenten met toestemming voor contact met ouders: de maatregel zoals voor minderjarigen
+   * (met ouders informeren) in plaats van de 18+-tekst, en de mails van de trede volledig. */
+  met18(lijst) {
+    const K = TardyKern;
+    return lijst.map((s) => {
+      if (!this.oudersMet18(K.S.studenten[s.stamnr])) return s;
+      const tr = this.tredeVan(s);
+      if (!tr) return s;
+      const maatregel = K.vulIn(tr.maatregel) + (tr.bijMeer && s.telling > tr.vanaf ? K.vulIn(tr.bijMeer) : "");
+      return Object.assign({}, s, { maatregel, mails: this.sigMails(s) });
+    });
+  },
+  tredeVan(s) { return (TardyKern.protocolLadder(s.soort)?.treden || []).find((x) => x.vanaf === s.drempel && x.niveau === s.niveau && x.label === s.consequentie) || null; },
   /* De mails van een signaal. De kern laat mails aan ouders weg bij 18+; heeft de student in Magister
    * toestemming gegeven voor contact met ouders, dan nemen we de mails van de trede weer volledig mee. */
   sigMails(s) {
     const K = TardyKern, st = K.S.studenten[s.stamnr];
     if (!this.oudersMet18(st)) return s.mails;
-    const tr = (K.protocolLadder(s.soort)?.treden || []).find((x) => x.vanaf === s.drempel && x.niveau === s.niveau && x.label === s.consequentie);
+    const tr = this.tredeVan(s);
     return tr ? [...new Set([...(tr.mails || []), ...s.mails])] : s.mails;
   },
   /* Meerdere adressen (ouders) in één mailto: elk adres apart gecodeerd, gescheiden door komma's. */
@@ -1564,7 +1577,7 @@ DT.register({
   mentorOverzicht(DT) {
     const K = TardyKern, pid = K.UI.periodeId, p = K.periodeById(pid), groepen = {};
     Object.values(K.S.studenten).filter((st) => !st.archief).forEach((st) => {
-      const t = K.tellingen(st.stamnr, pid), alle = K.signalenVoor(st.stamnr, pid), sig = alle.filter((x) => !x.afgehandeld);
+      const t = K.tellingen(st.stamnr, pid), alle = this.met18(K.signalenVoor(st.stamnr, pid)), sig = alle.filter((x) => !x.afgehandeld);
       if (!alle.length) return;
       const m = K.mentorVan(st), k = K.mentorSleutel(st) || "zonder-mentor";
       (groepen[k] ||= { mentor: m, regels: [] }).regels.push({ st, t, sig, reeks: K.langsteReeks(t.ziekDatums).lengte });
@@ -1856,7 +1869,7 @@ DT.register({
     const status = DT.el("span", { class: `dt-cb-uitkomst ${aangepast ? "verzet" : "weg"}`, text: aangepast ? "Aangepast" : "Standaardtekst" });
     const voorbeeld = DT.el("pre", { class: "dt-cb-voorbeeld" });
     const toonVoorbeeld = () => {
-      const sig = K.hoogsteTreden(K.alleSignalen(K.UI.periodeId))[0], sn = sig?.stamnr || Object.keys(K.S.studenten)[0];
+      const sig = this.met18(K.hoogsteTreden(K.alleSignalen(K.UI.periodeId)))[0], sn = sig?.stamnr || Object.keys(K.S.studenten)[0];
       if (!sn) { voorbeeld.textContent = "Nog geen studenten voor een voorbeeld."; return; }
       let t;
       if (isEigen) t = sig ? this.eigenTekst(keuze, this.signaalVars(DT, sig, K.S.studenten[sig.stamnr], K.UI.periodeId)) : { onderwerp: "", body: "Nog geen signaal voor een voorbeeld." };
