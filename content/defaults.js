@@ -20,6 +20,8 @@ globalThis.DT_DEFAULTS = {
   aanwezigexport: { enabled: true },
   leaderboard: { enabled: true },
   lestools: { enabled: true },
+  /* Community builder: Te laat-balie (Tardy in Magister). Persoonlijke gegevens blijven in de extensie. */
+  cb: { enabled: false, naam: "", paraaf: "", email: "", lokaal: "", zwarting: 3, autoPrint: false, printer: null },
   melding: { enabled: true, coaches: [], to: "", cc: "", name: "", extra: true, afzender: "" },
   links: [
     { label: "Magister Web", url: "https://accounts.magister.net" },

@@ -147,6 +147,7 @@ DT.register({
           ["export", "Excel", "Alt+E", () => DT.module("tables")?.exportAll(DT)],
           ["mail", "Mail coach", "Alt+M", () => DT.module("melding")?.trigger(DT)],
           ...(DT.settings.aanwezigexport?.enabled !== false ? [["aanwezigexport", "Klas → Excel", "", () => { this.toggle(false); DT.module("aanwezigexport")?.klas(DT); }]] : []),
+          ...(DT.settings.cb?.enabled ? [["cb", "Te laat-balie", "", () => { this.toggle(false); DT.module("cb")?.open(DT); }]] : []),
           DT.settings.developer?.enabled ? ["inspector", "Inspector", "Alt+I", () => { this.toggle(false); DT.module("inspector")?.start(DT); }] : ["options", "Instellingen", "", () => chrome.runtime.sendMessage({ type: "openOptions" })]
         ];
         return widget("Acties", DT.el("div", { class: "dt-actions" }, acts.map(([icon, label, kbd, go]) => {
@@ -197,6 +198,7 @@ const DT_ICONS = Object.fromEntries(Object.entries({
   aanwezigexport: `<rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 8l4 5M12 8l-4 5M14 9h3M14 13h3M8 17h9"/>`,
   periodes: `<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4M7 15h4M13 15h4"/>`,
   melding: `<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 8l9 6 9-6"/>`,
+  cb: `<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6M12 2v3"/>`,
   ai: `<path d="M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4z"/><path d="M18 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/>`,
   theme: `<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>`,
   export: `<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>`,

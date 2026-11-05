@@ -56,6 +56,8 @@
         "content/modules/aanwezigexport.js",
         "content/modules/leaderboard.js",
         "content/modules/lestools.js",
+        "content/modules/cb-kern.js",
+        "content/modules/cb.js",
         "content/boot.js"
       ],
       "css": [
