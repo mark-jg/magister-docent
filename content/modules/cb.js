@@ -842,7 +842,7 @@ DT.register({
       knoppen.unshift([n.gemaild ? "✓ Student gemaild" : "Mail student over nieuwe afspraak", () => {
         const t = this.mailVan("student-meldafspraak", m.stamnr, pid, { datum: n.datum, tijd: n.tijd, melding: n });
         const a = document.createElement("a");
-        a.href = `mailto:${encodeURIComponent(t.aan || "")}?subject=${encodeURIComponent(t.onderwerp)}&body=${encodeURIComponent(t.body)}`; a.click();
+        a.href = `mailto:${this.adressen(t.aan)}?subject=${encodeURIComponent(t.onderwerp)}&body=${encodeURIComponent(t.body)}`; a.click();
         n.gemaild = true; K.S.mails.push({ id: K.uid(), stamnr: m.stamnr, type: t.type, aan: t.aan, onderwerp: t.onderwerp, op: K.vandaag() });
         this.bewaar(); opnieuw();
       }]);
@@ -1045,7 +1045,7 @@ DT.register({
       });
       this.bewaar(); this.sluitModal(); this.teken(); this.melding(`${mails.length} ${mails.length === 1 ? "mail" : "mails"} vastgelegd in de dossiers.`);
     };
-    const open = (m) => { const a = document.createElement("a"); a.href = `mailto:${encodeURIComponent(m.aan || "")}?subject=${encodeURIComponent(m.onderwerp)}&body=${encodeURIComponent(m.body)}`; a.click(); };
+    const open = (m) => { const a = document.createElement("a"); a.href = `mailto:${this.adressen(m.aan)}?subject=${encodeURIComponent(m.onderwerp)}&body=${encodeURIComponent(m.body)}`; a.click(); };
     const kaarten = mails.map((m) => DT.el("div", { class: "dt-cb-mail" }, [
       DT.el("div", { class: "dt-cb-rij" }, [DT.el("b", { text: `${m.naam || ""} → ${m.aan || "geen e-mailadres"}` }),
         this.knop(DT, "Open", () => open(m), false, "klein"), this.knop(DT, "Kopieer", () => navigator.clipboard.writeText(`${m.onderwerp}\n\n${m.body}`).then(() => this.melding("Gekopieerd.")), false, "klein")]),
@@ -1130,8 +1130,8 @@ DT.register({
         this.statsRegel(DT, s.stamnr),
         DT.el("div", { class: "dt-cb-rij" }, [
           this.knop(DT, "Verzuim in Magister", () => this.openInMagister(st), false, "klein stil"),
-          s.mails.length ? this.knop(DT, "Mailteksten bekijken", () => this.mailLijst(DT, "Mails bij deze stap", `${K.naamVan(st)} · ${s.titel}`,
-            s.mails.map((type) => Object.assign(this.mailVan(type, s.stamnr, pid), { naam: `${K.naamVan(st)} · ${(K.MAILSOORT[type] || { label: type }).label}` }))), false, "klein stil") : null,
+          s.mails.length ? this.knop(DT, "Mailteksten bekijken", async () => (s.mails.some((t) => (K.MAILSOORT[t] || {}).aan === "ouders") && await this.zorgOuders(st), this.mailLijst(DT, "Mails bij deze stap", `${K.naamVan(st)} · ${s.titel}`,
+            s.mails.map((type) => Object.assign(this.mailVan(type, s.stamnr, pid), { naam: `${K.naamVan(st)} · ${(K.MAILSOORT[type] || { label: type }).label}` })))), false, "klein stil") : null,
           K.S.meldafspraken.some((m) => m.stamnr === s.stamnr) ? this.knop(DT, "Meldafspraken", () => this.studentHistorie(DT, s.stamnr), false, "klein stil") : null,
         ].filter(Boolean)),
       ].filter(Boolean)) : null;
@@ -1220,6 +1220,7 @@ DT.register({
             (rijen[p.id] ||= {})[sn] = { TL: c.TL || 0, ON: (c.AB_NO || 0) + (c.TL || 0), GE: c.AB_OK || 0, ZK: c.ZK || 0, AB: (c.AB_OK || 0) + (c.AB_NO || 0), UI: c.UI || 0, VR: c.VR || 0 };
           }
           K.S.lesreg[sn] = { op: vandaag, bron: "magister", ziekDatums: [...ziek].sort(), medischDatums: [...med].sort(), onUren, perioden };
+          if (K.minderjarig(st) !== false) await this.ouderMails(st, id).catch(() => {});
         } catch { H.fout++; }
         H.klaar++;
         if (this._view === "signalen" && this._scherm) this.tekenHaal();
@@ -1423,13 +1424,55 @@ DT.register({
     ]);
   },
 
+  /* Meerdere adressen (ouders) in één mailto: elk adres apart gecodeerd, gescheiden door komma's. */
+  adressen(aan) { return String(aan || "").split(/[,;]\s*/).map((x) => x.trim()).filter(Boolean).map(encodeURIComponent).join(","); },
+
+  /* E-mailadressen van ouders/verzorgers uit Magister (Basisgegevens › Ouders/verzorgers): de ouders van de
+   * leerling en per ouder de contactgegevens van het type "emailadres". Bewaard als st.ouderEmail, het veld
+   * dat Tardy ook gebruikt voor mails aan ouders. Alleen voor minderjarigen of als de student nog geen
+   * leeftijd heeft; bij 18+ vallen de mails aan ouders volgens het protocol weg. */
+  async ouderMails(st, id = null) {
+    const K = TardyKern;
+    id ||= st.magisterId;
+    if (!id) { const hit = (await this.zoekMagister(st.stamnr)).find((x) => x.stamnr === String(st.stamnr)); id = hit?.magisterId; if (id) st.magisterId = id; }
+    if (!id) return null;
+    const lijst = (r) => (r && r.status === 200 && r.json) ? (Array.isArray(r.json) ? r.json : r.json.items || []) : null;
+    const ouders = lijst(await this.apiOpnieuw(`/api/leerlingen/${encodeURIComponent(id)}/ouders`));
+    if (!ouders) return null;
+    const adressen = [];
+    for (const o of ouders.slice().sort((a, b) => (a.volgnummer || 9) - (b.volgnummer || 9))) {
+      const c = lijst(await this.apiOpnieuw(`/api/ouders/${encodeURIComponent(o.id)}/contactgegevens`)) || [];
+      for (const x of c) {
+        const mail = String(x.emailadres || "").trim();
+        if (x.type === "emailadres" && /@/.test(mail) && !adressen.some((a) => a.toLowerCase() === mail.toLowerCase())) adressen.push(mail);
+      }
+    }
+    st.ouderEmailOp = K.vandaag();
+    if (adressen.length) { st.ouderEmail = adressen.join(", "); st.ouderEmailBron = "magister"; }
+    this.bewaar();
+    return adressen;
+  },
+  /* Vlak voor een mail aan ouders: adres ophalen als het er nog niet is (of ouder is dan een week). */
+  async zorgOuders(st) {
+    const K = TardyKern;
+    if (!st || (st.ouderEmail && st.ouderEmailOp && st.ouderEmailOp >= K.plusDagen(K.vandaag(), -7))) return;
+    if (st.ouderEmail && !st.ouderEmailOp) return;   // met de hand of uit een Tardy-import: laten staan
+    if (!st.ouderEmail && st.ouderEmailOp === K.vandaag()) return;   // vandaag al gezocht, niets gevonden
+    this.melding("E-mailadres van ouders/verzorgers ophalen uit Magister…");
+    try {
+      const r = await this.ouderMails(st);
+      if (r && !r.length) this.melding("In Magister staat geen e-mailadres van ouders/verzorgers.", "err");
+    } catch { this.melding("Ophalen van het adres van ouders/verzorgers lukte niet.", "err"); }
+  },
+
   /* Alle mails van deze trede als concept in het eigen mailprogramma (Outlook), en vastleggen in het dossier. */
-  mailsDirect(s, pid) {
+  async mailsDirect(s, pid) {
     const K = TardyKern, st = K.S.studenten[s.stamnr];
+    if (s.mails.some((t) => (K.MAILSOORT[t] || {}).aan === "ouders")) await this.zorgOuders(st);
     const mails = s.mails.map((type) => this.mailVan(type, s.stamnr, pid));
     mails.forEach((m, i) => setTimeout(() => {
       const a = document.createElement("a");
-      a.href = `mailto:${encodeURIComponent(m.aan || "")}?subject=${encodeURIComponent(m.onderwerp)}&body=${encodeURIComponent(m.body)}`;
+      a.href = `mailto:${this.adressen(m.aan)}?subject=${encodeURIComponent(m.onderwerp)}&body=${encodeURIComponent(m.body)}`;
       a.click();
     }, i * 900));
     mails.forEach((m) => K.S.mails.push({ id: K.uid(), stamnr: s.stamnr, type: m.type, aan: m.aan, onderwerp: m.onderwerp, op: K.vandaag() }));
