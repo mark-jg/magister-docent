@@ -113,6 +113,7 @@ var PvaDocx = (() => {
       const r4 = rijMet(rijen, "4."); if (r4) {
         r4[1] = zetTekst(r4[1], ll[4]?.stand);
         let c = r4[2];
+        if (ll[4]?.tekst) c = zetTekst(c, ll[4].tekst);   // vrije tekst uit het profiel (vervangt de hele cel)
         if (ll[4]?.iwVoldaan !== "" && ll[4]?.iwVoldaan != null) c = c.replace(/…( van 9)/, `${esc(ll[4].iwVoldaan)}$1`);
         if (d.pct != null) c = c.replace(/…%/, `${esc(d.pct)}%`);
         r4[2] = c;
@@ -181,6 +182,152 @@ var PvaDocx = (() => {
     return new Uint8Array(CFB.write(cfb, { fileType: "zip", type: "array", compression: true }));
   }
 
-  return { vul, vulDocument, tekstVan };
+  /* ================= Eigen sjabloon met plaatshouders ================= */
+  /* {veld}            tekst, bijvoorbeeld {naam}, {klas}, {toelichting}, {woorden.waardoor}
+   * {x:sleutel}       vakje: ☒ als aangevinkt, anders ☐ ({x:ouders}, {x:reden.verzuim}, {x:stap.brief1})
+   * {doel.doel} …     in een tabelrij: die rij herhaalt voor elk doel; zo ook actie., vak., basis., evaluatie.
+   * ctx = { velden: {sleutel: tekst}, vinkjes: {sleutel: true}, rijen: {doel: [{…, x: {…}}], …} } */
+  const PH = /\{(x:)?([\p{L}0-9_.-]+)\}/gu;
+  function samenvoegen(xml) {   // Word knipt {naam} soms over meerdere runs: dan de alinea tot één run maken
+    return xml.replace(/<w:p[ >][\s\S]*?<\/w:p>/g, (p) => {
+      if (!p.includes("{")) return p;
+      const runs = delen(p, R), totaal = tekstVan(p);
+      const heel = (totaal.match(PH) || []).length; if (!heel) return p;
+      const los = runs.reduce((n, r) => n + (tekstVan(r.xml).match(PH) || []).length, 0);
+      if (los === heel) return p;
+      const pPr = (p.match(/<w:pPr>[\s\S]*?<\/w:pPr>/) || [""])[0];
+      const eerste = runs.find((r) => /<w:t[ >]/.test(r.xml)) || runs[0];
+      const rPr = ((eerste && eerste.xml.match(/<w:rPr>[\s\S]*?<\/w:rPr>/)) || [""])[0];
+      const open = p.match(/^<w:p[^>]*>/)[0];
+      return `${open}${pPr}<w:r>${rPr}<w:t xml:space="preserve">${esc(totaal)}</w:t></w:r></w:p>`;
+    });
+  }
+  function invullen(xml, velden, vinkjes) {
+    return xml.replace(/(<w:t(?: [^>]*)?>)([^<]*)(<\/w:t>)/g, (m, a, t, b) => {
+      if (!t.includes("{")) return m;
+      const nieuw = t.replace(PH, (ph, x, k) => {
+        if (x) return vinkjes[k] ? "☒" : "☐";
+        if (!(k in velden)) return ph;
+        return esc(velden[k] ?? "").split("\n").join(`${b}<w:br/>${a.replace(/<w:t(?: [^>]*)?>/, '<w:t xml:space="preserve">')}`);
+      });
+      return `${a.replace(/<w:t(?: [^>]*)?>/, '<w:t xml:space="preserve">')}${nieuw}${b}`;
+    });
+  }
+  function vulSjabloonXml(xml, ctx) {
+    xml = samenvoegen(xml);
+    const prefixen = Object.keys(ctx.rijen || {});
+    xml = xml.replace(/<w:tr[ >][\s\S]*?<\/w:tr>/g, (tr) => {
+      const pre = prefixen.find((p) => tr.includes(`{${p}.`) || tr.includes(`{x:${p}.`));
+      if (!pre) return tr;
+      const items = ctx.rijen[pre] || [];
+      if (!items.length) return invullen(tr, new Proxy({}, { has: (_, k) => k.startsWith(`${pre}.`), get: () => "" }), {});
+      return items.map((it) => {
+        const v = Object.fromEntries(Object.entries(it).filter(([k]) => k !== "x").map(([k, w]) => [`${pre}.${k}`, w]));
+        const x = Object.fromEntries(Object.entries(it.x || {}).map(([k, w]) => [k, w]));
+        const alle = Object.assign({}, ctx.velden, v);   // ontbrekende velden van deze rij worden leeg
+        return invullen(tr, new Proxy(alle, { has: (o, k) => k in o || k.startsWith(`${pre}.`), get: (o, k) => o[k] ?? "" }), Object.assign({}, ctx.vinkjes, x));
+      }).join("");
+    });
+    return invullen(xml, ctx.velden || {}, ctx.vinkjes || {});
+  }
+  function sjabloon(bytes, ctx, CFB = (typeof XLSX !== "undefined" ? XLSX.CFB : null)) {
+    const cfb = CFB.read(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes), { type: "array" });
+    for (const pad of cfb.FullPaths) {
+      if (!/\/word\/(document|header\d*|footer\d*)\.xml$/.test(pad)) continue;
+      const e = CFB.find(cfb, pad.replace(/^Root Entry/, ""));
+      if (!e || !e.content) continue;
+      e.content = new TextEncoder().encode(vulSjabloonXml(new TextDecoder("utf-8").decode(e.content), ctx));
+    }
+    return schoon(cfb, CFB);
+  }
+  function schoon(cfb, CFB) {
+    const merk = cfb.FullPaths.findIndex((p) => /Sh33tJ5$/.test(p));
+    if (merk >= 0) CFB.utils.cfb_del(cfb, cfb.FullPaths[merk]);
+    return new Uint8Array(CFB.write(cfb, { fileType: "zip", type: "array", compression: true }));
+  }
+
+  /* ================= Standaard-Word (zonder eigen sjabloon) ================= */
+  /* Bouwt een net Word-document met plaatshouders op basis van het profiel; vullen gaat daarna met sjabloon().
+   * Hetzelfde document is het voorbeeldsjabloon dat een school in de eigen huisstijl kan opmaken. */
+  function standaardSjabloon(profiel, soortId, CFB = (typeof XLSX !== "undefined" ? XLSX.CFB : null)) {
+    const soort = (profiel.soorten || {})[soortId] || { naam: "Plan van aanpak" }, traject = soortId !== "algemeen";
+    const W = 9638;
+    const run = (t, o = {}) => `<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>${o.b ? "<w:b/>" : ""}${o.i ? "<w:i/>" : ""}<w:color w:val="${o.kleur || "222222"}"/><w:sz w:val="${o.sz || 19}"/></w:rPr><w:t xml:space="preserve">${esc(t)}</w:t></w:r>`;
+    const p = (t, o = {}) => `<w:p><w:pPr><w:spacing w:before="${o.voor || 0}" w:after="${o.na ?? 40}"/></w:pPr>${[].concat(t).map((x) => (typeof x === "string" ? run(x, o) : run(x.t, Object.assign({}, o, x)))).join("")}</w:p>`;
+    const kop = (nr, t) => p([{ t: ` ${nr} ` , b: true, kleur: "FFFFFF" }, { t: `  ${t}`, b: true }], { sz: 24, voor: 240, na: 80 }).replace("<w:r><w:rPr>", '<w:r><w:rPr><w:shd w:val="clear" w:color="auto" w:fill="222222"/>');
+    const rand = '<w:tcBorders><w:top w:val="single" w:sz="4" w:color="C8C8C8"/><w:bottom w:val="single" w:sz="4" w:color="C8C8C8"/><w:left w:val="nil"/><w:right w:val="nil"/></w:tcBorders>';
+    const cel = (inhoud, w, o = {}) => `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${o.span ? `<w:gridSpan w:val="${o.span}"/>` : ""}${rand}${o.grijs ? '<w:shd w:val="clear" w:color="auto" w:fill="F2F2F2"/>' : ""}<w:tcMar><w:top w:w="50" w:type="dxa"/><w:bottom w:w="50" w:type="dxa"/></w:tcMar></w:tcPr>${[].concat(inhoud).map((x) => (x.startsWith("<w:p") ? x : p(x, o))).join("")}</w:tc>`;
+    const tabel = (breedtes, rijen) => `<w:tbl><w:tblPr><w:tblW w:w="${W}" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid>${breedtes.map((b) => `<w:gridCol w:w="${b}"/>`).join("")}</w:tblGrid>${rijen.map((r) => `<w:tr><w:trPr><w:cantSplit/></w:trPr>${r}</w:tr>`).join("")}</w:tbl>`;
+    const label = (t, w) => cel(t, w, { kleur: "555555", sz: 18 });
+    const vinkLijst = (lijst) => lijst.map(([k, t]) => `{x:${k}} ${t}`).join("     ");
+    const kolommen = profiel.kolommen || [];
+    const delen = [];
+    delen.push(p(soort.naam || "Plan van aanpak", { b: true, sz: 40, na: 0 }), p("{naam}", { sz: 30, kleur: "6B6B6B", voor: 40, na: 20 }),
+      p([profiel.school, profiel.naam].filter(Boolean).join(" · "), { sz: 18, kleur: "6B6B6B", na: 120 }));
+    // 1 Gegevens
+    const g = [[["Naam", "{naam}"], ["Studentnummer", "{studentnummer}"]], [["Klas", "{klas}"], ["Geboortedatum", "{geboortedatum}"]], [["SLB", "{slb}"], ["Datum gesprek", "{datum}"]]];
+    if (traject) g.push([["Opleidingsmanager", "{opleidingsmanager}"], ["Begeleidingscoach", "{begeleidingscoach}"]]);
+    delen.push(kop(1, "Gegevens"), tabel([1800, 3019, 1800, 3019], [
+      ...g.map(([[a, b], [c, d]]) => label(a, 1800) + cel(b, 3019) + label(c, 1800) + cel(d, 3019)),
+      label("Aanwezig", 1800) + cel("{x:student} student     {x:ouders} ouder(s)/verzorger(s)     {x:collega} collega: {collega}", 7838, { span: 3 }),
+    ]));
+    // 2 Aanleiding
+    const aanleiding = [];
+    if (traject && (soort.stappen || []).length) aanleiding.push(label("Stap", 1800) + cel(vinkLijst(soort.stappen.map(([k, t]) => [`stap.${k}`, t])), 7838));
+    aanleiding.push(label("Reden", 1800) + cel(`${vinkLijst((profiel.redenen || []).map(([k, t]) => [`reden.${k}`, t]))}${(profiel.redenen || []).some(([k]) => k === "anders") ? ": {anders}" : ""}`, 7838));
+    aanleiding.push(label("Toelichting", 1800) + cel("{toelichting}", 7838));
+    delen.push(kop(2, "Aanleiding"), tabel([1800, 7838], aanleiding));
+    // 3 Waar sta je nu
+    delen.push(kop(3, "Waar sta je nu"));
+    if ((profiel.leerlijnen || []).length) {
+      const rest = W - 2600 - 1300, kb = kolommen.length ? Math.floor((rest - 2200) / kolommen.length) : 0, vb = rest - kb * kolommen.length;
+      const br = [2600, 1300, vb, ...kolommen.map(() => kb)];
+      delen.push(p(profiel.leerlijnenTitel || "Leerlijnen en vakken", { b: true, voor: 60 }), tabel(br, [
+        ["Leerlijn", "Stand", "Vak", ...kolommen].map((t, i) => cel(t, br[i], { b: true, sz: 17, grijs: true })).join(""),
+        cel("{vak.leerlijn}", br[0]) + cel("{vak.stand}", br[1]) + cel("{vak.naam}", br[2]) + kolommen.map((_, i) => cel(`{vak.k${i + 1}}`, kb)).join(""),
+      ]));
+    }
+    if ((profiel.basis || []).length) {
+      delen.push(p(profiel.basisTitel || "Basisvaardigheden", { b: true, voor: 120 }), tabel([2400, 2600, 2300, 2338], [
+        ["Vak", "Getoetst tot nu toe", "Behaald", "Stand"].map((t, i) => cel(t, [2400, 2600, 2300, 2338][i], { b: true, sz: 17, grijs: true })).join(""),
+        cel("{basis.naam}", 2400) + cel("{basis.getoetst}", 2600) + cel("{basis.behaald}", 2300) + cel("{basis.stand}", 2338),
+      ]));
+    }
+    delen.push(tabel([1800, 7838], [label("Aanwezigheid", 1800) + cel("{aanwezigheid}", 7838)]));
+    // 4 Doelen, 5 Acties
+    delen.push(kop(4, "Wat ga je behalen"), tabel([4400, 3400, 1838], [
+      ["Doel", "Waaraan zie je het", "Uiterlijk"].map((t, i) => cel(t, [4400, 3400, 1838][i], { b: true, sz: 17, grijs: true })).join(""),
+      cel("{doel.doel}", 4400) + cel("{doel.bewijs}", 3400) + cel("{doel.uiterlijk}", 1838)]));
+    delen.push(kop(5, "Acties en afspraken"), tabel([1800, 5838, 2000], [
+      ["Wie", "Doet wat", "Wanneer"].map((t, i) => cel(t, [1800, 5838, 2000][i], { b: true, sz: 17, grijs: true })).join(""),
+      cel("{actie.wie}", 1800) + cel("{actie.wat}", 5838) + cel("{actie.wanneer}", 2000)]));
+    // 6 In jouw woorden
+    delen.push(kop(6, "In jouw woorden"), tabel([W], [
+      ["Waardoor loopt het nu niet zoals je wilt?", "waardoor"], ["Wat ga jij vanaf nu anders doen?", "anders"], ["Wat heb je nodig van school of van thuis?", "nodig"],
+    ].map(([v, k]) => cel([p(v, { b: true, sz: 18 }), p(`{woorden.${k}}`)], W))));
+    // 7 Evaluatie
+    const vervolg = traject && soort.vervolg ? "{x:vervolg.afsluiten} afsluiten     {x:vervolg.nieuw} nieuw plan     {x:vervolg.volgende} volgende stap" : "{evaluatie.afspraak}";
+    delen.push(kop(7, "Evaluatie"), tabel([1800, 3600, 4238], [
+      ["Datum", "Doelen", traject && soort.vervolg ? "Vervolg" : "Afspraak en vervolg"].map((t, i) => cel(t, [1800, 3600, 4238][i], { b: true, sz: 17, grijs: true })).join(""),
+      cel("{evaluatie.datum}", 1800) + cel("{x:evaluatie.behaald} behaald     {x:evaluatie.deels} deels     {x:evaluatie.niet} niet", 3600) + cel(vervolg.replace(/\{x:vervolg\./g, "{x:evaluatie.vervolg."), 4238)]));
+    // 8 Akkoord
+    const teken = (wie, naam) => cel([p(wie, { b: true, sz: 18 }), p(`Naam: ${naam}`, { sz: 17, kleur: "555555" }), p("Datum en handtekening", { sz: 17, kleur: "555555", na: 400 })], 4819);
+    delen.push(kop(8, "Akkoord"), tabel([4819, 4819], [teken("Student", "{naam}") + teken("Ouder/verzorger (bij minderjarige)", "{ouder}"),
+      teken("Studieloopbaanbegeleider", "{slb}") + (traject ? teken("Opleidingsmanager", "{opleidingsmanager}") : cel("", 4819))]));
+    const doc = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>${delen.join("")}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="567" w:footer="567" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+    const bestanden = {
+      "/[Content_Types].xml": '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>',
+      "/_rels/.rels": '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>',
+      "/word/_rels/document.xml.rels": '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
+      "/word/styles.xml": '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial" w:eastAsia="Arial"/><w:sz w:val="19"/><w:lang w:val="nl-NL"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="40" w:line="264" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>',
+      "/docProps/core.xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>${esc(soort.naam || "Plan van aanpak")}</dc:title></cp:coreProperties>`,
+      "/word/document.xml": doc,
+    };
+    const cfb = CFB.utils.cfb_new();
+    for (const [pad, tekst] of Object.entries(bestanden)) CFB.utils.cfb_add(cfb, pad, new TextEncoder().encode(tekst));
+    return schoon(cfb, CFB);
+  }
+
+  return { vul, vulDocument, tekstVan, sjabloon, standaardSjabloon, vulSjabloonXml };
 })();
 if (typeof module !== "undefined") module.exports = PvaDocx;
