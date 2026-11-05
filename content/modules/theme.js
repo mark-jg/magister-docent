@@ -1725,6 +1725,8 @@ function appleShellCss(p, dark, accent) {
     .container > .appbar-host { position: relative !important; z-index: 1210 !important; }
     .container > .menu-host { position: relative !important; z-index: 1200 !important; }
     .container > ui-view[name="main"] { position: relative; z-index: 1; }
+    /* Magisters schermvullende vensters (Groepjes, Timer, Wie heeft de beurt?, menu's) boven de zijbalk. */
+    dna-overlay-container { z-index: 1300 !important; }
     .collapsed-menu .popup-menu, .collapsed-menu li:hover span, .collapsed-menu .main-menu > li.active > ul, .collapsed-menu #faux-label { z-index: 1205 !important; }    html body .container > .appbar-host, html body .container > .menu-host { background: ${bg} !important; background-color: ${bg} !important; background-image: none !important; ${blur} }
     html body .appbar-host mg-appbar, html body .appbar-host .appbar, html body .menu-host nav.menu, html body .menu-host .menu-container, html body .menu-host .menu-footer, html body .menu-host .menu-footer a { background: transparent !important; background-color: transparent !important; background-image: none !important; }
     html body .appbar > div > a, html body .appbar .menu-button button, html body a.appbar-button { background: transparent !important; background-color: transparent !important; color: ${t.muted} !important; }
