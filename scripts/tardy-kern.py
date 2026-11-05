@@ -44,7 +44,8 @@ const kern = {{ H, UI, leegeState, normaliseer, SOORTEN, SOORT, soortNaam, REDEN
   periodes, periodeById, huidigePeriode, periodeVanDatum, inPeriode, tellingen, signalenVoor, alleSignalen, hoogsteTreden,
   handelAf, zetAfh, afh, hoogsteNiveau, protocol, protocolLadder, gevolgVan, mailTekst, MAILSOORT, mentorVan, mentorSleutel,
   naamVan, minderjarig, volgendeSchooldag, langDatum, kortDatum, dmy, plusDagen, vandaag, nuTijd, uid, esc, meldLijst,
-  AANLEIDING, NIVEAUNAAM, briefjesHtml, bonBeeld, bonOpdracht, bonOntwerp, bonInfo, BON, langsteReeks, ondertekening, TELLERS }};
+  AANLEIDING, NIVEAUNAAM, briefjesHtml, bonBeeld, bonOpdracht, bonOntwerp, bonInfo, BON, langsteReeks, ondertekening, TELLERS,
+  PROTOCOL_STANDAARD, NIVEAU_STANDAARD, tredeTeller, vulIn }};
 Object.defineProperty(kern, "S", {{ get: () => S, set: (v) => {{ S = v; }} }});
 return kern;
 }})();

@@ -207,7 +207,7 @@ DT.register({
   /* Paginakop (dna-page-header) met kruimelpad, tabbladen (dna-tabs), kaarten (dna-card) en knoppen
    * (dna-button), net als Meldingen of Registraties. Magisters onderdelen negeren attributen die de extensie
    * zet; componenten() laat het netwerk-script in de pagina ze opnieuw zetten. */
-  VIEWS: [["melden", "Melden"], ["meldafspraken", "Meldafspraken"], ["signalen", "Signalen"], ["instellingen", "Instellingen"]],
+  VIEWS: [["melden", "Melden"], ["meldafspraken", "Meldafspraken"], ["signalen", "Signalen"], ["protocol", "Protocol"], ["instellingen", "Instellingen"]],
 
   componenten() {
     window.postMessage({ type: "dt:attr:opnieuw", diep: false, selector: ":is(#dt-cbp, .dt-cb-modal) :is(dna-page-header, dna-tabs, dna-tab-bar, dna-button, dna-card)",
@@ -365,7 +365,7 @@ DT.register({
     if (K.S && this._scherm) {
       const zet = (v, n) => { const i = this._scherm.bar.querySelector(`[data-view="${v}"] .dt-cb-tel`); if (i) i.textContent = n ? String(n) : ""; };
       zet("meldafspraken", K.meldLijst().filter((m) => m.datum <= K.vandaag()).length);
-      zet("signalen", K.hoogsteTreden(K.alleSignalen(K.UI.periodeId)).filter((s) => !s.afgehandeld).length);
+      zet("signalen", this.perStudent(K.hoogsteTreden(K.alleSignalen(K.UI.periodeId)).filter((s) => !s.afgehandeld)).length);
     }
   },
 
@@ -378,7 +378,7 @@ DT.register({
     this._periode.replaceChildren(...K.periodes().map((p) => DT.el("option", { value: p.id, text: `${p.naam} · ${K.kortDatum(p.start)} – ${K.kortDatum(p.eind)}` })));
     this._periode.value = K.UI.periodeId;
     this._scherm.laag.classList.toggle("is-kijk", !!this._kijkt);
-    ({ melden: () => this.melden(DT), meldafspraken: () => this.afspraken(DT), signalen: () => this.signalen(DT), instellingen: () => this.instellingen(DT) })[this._view]();
+    ({ melden: () => this.melden(DT), meldafspraken: () => this.afspraken(DT), signalen: () => this.signalen(DT), protocol: () => this.protocol(DT), instellingen: () => this.instellingen(DT) })[this._view]();
     this.tekenStand();
     this.componenten();
   },
@@ -818,35 +818,66 @@ DT.register({
   /* ===================================================================================== */
   /* Signalen                                                                               */
   /* ===================================================================================== */
+  /* Eén kaart per student, op de hoogste stap waar die nu staat. De zwaardere maatregel omvat de lichtere: wie
+   * bij stap 4 (verzuimbureau/BBM) staat, hoort niet ook nog in stap 1 of 2. Binnen een ladder doet de kern dat
+   * al (hoogsteTreden); hier gaat het ook over ladders heen. Wat er op andere ladders openstaat, staat klein
+   * op dezelfde kaart en wordt met "Afgehandeld" meegenomen. */
+  perStudent(lijst) {
+    const per = new Map();
+    for (const s of lijst) { if (!per.has(s.stamnr)) per.set(s.stamnr, []); per.get(s.stamnr).push(s); }
+    return [...per.values()].map((l) => {
+      l.sort((a, b) => (a.afgehandeld ? 1 : 0) - (b.afgehandeld ? 1 : 0) || b.niveau - a.niveau || b.telling - a.telling);
+      return Object.assign({}, l[0], { ook: l.slice(1) });
+    });
+  },
+
   signalen(DT) {
     const K = TardyKern, h = this._scherm.hoofd, pid = K.UI.periodeId;
     const alle = K.hoogsteTreden(K.alleSignalen(pid));
-    const zicht = alle.filter((s) => this._metAfgehandeld || !s.afgehandeld);
+    const zicht = this.perStudent(alle.filter((s) => this._metAfgehandeld || !s.afgehandeld));
+    const open = this.perStudent(alle.filter((s) => !s.afgehandeld));
     const toggle = DT.el("label", { class: "dt-cb-schakel" }, [DT.el("input", { type: "checkbox" }), DT.el("span", { text: "Ook afgehandeld" })]);
     toggle.firstChild.checked = !!this._metAfgehandeld;
     toggle.firstChild.addEventListener("change", (e) => { this._metAfgehandeld = e.target.checked; this.teken(); });
+    const ladderNaam = (id) => (K.protocolLadder(id)?.titel || id).replace(/\s+[—-]\s+per periode$/i, "");
     const kaart = (s) => {
       const st = K.S.studenten[s.stamnr] || {};
-      const bekijk = s.mails.length ? this.knop(DT, "Mailteksten bekijken", () => this.mailLijst(DT, "Mails bij deze trede", `${K.naamVan(st)} · ${s.titel}`,
+      const ookOpen = s.ook.filter((x) => !x.afgehandeld);
+      const omvat = s.onderliggend + s.ook.reduce((n, x) => n + 1 + (x.onderliggend || 0), 0);
+      const bekijk = s.mails.length ? this.knop(DT, "Mailteksten bekijken", () => this.mailLijst(DT, "Mails bij deze stap", `${K.naamVan(st)} · ${s.titel}`,
         s.mails.map((type) => Object.assign(K.mailTekst(type, s.stamnr, pid), { naam: `${K.naamVan(st)} · ${(K.MAILSOORT[type] || { label: type }).label}` }))), false, "klein stil") : null;
+      const afhandelen = () => {
+        let mee = K.handelAf(s.key);
+        for (const x of ookOpen) mee += 1 + K.handelAf(x.key);
+        this.teken();
+        this.melding(mee ? `Afgehandeld, met ${mee} lichtere ${mee === 1 ? "stap" : "stappen"} die hierin ${mee === 1 ? "opgaat" : "opgaan"}.` : "Afgehandeld.");
+      };
       return DT.el("dna-card", { class: `dt-cb-kaart dt-cb-signaal n${s.niveau}${s.afgehandeld ? " is-af" : ""}` }, [
         DT.el("div", { class: "dt-cb-kaartkop" }, [
-          DT.el("div", { class: "dt-cb-wie" }, [DT.el("h3", { text: K.naamVan(st) }), DT.el("small", { text: `${st.klas || ""} · ${s.titel}${s.onderliggend ? ` · omvat ${s.onderliggend} lichtere ${s.onderliggend === 1 ? "trede" : "treden"}` : ""}` })]),
+          DT.el("div", { class: "dt-cb-wie" }, [DT.el("h3", { text: K.naamVan(st) }), DT.el("small", { text: `${st.klas || ""} · ${s.titel}${omvat ? ` · omvat ${omvat} lichtere ${omvat === 1 ? "stap" : "stappen"}` : ""}` })]),
           DT.el("span", { class: `dt-cb-niveau n${s.niveau}`, text: s.consequentie }),
         ]),
         DT.el("p", { text: s.maatregel }),
+        s.ook.length ? DT.el("details", { class: "dt-cb-ook" }, [
+          DT.el("summary", { text: `Ook ${ookOpen.length ? "open" : "geregistreerd"} op ${s.ook.length === 1 ? "een andere ladder" : `${s.ook.length} andere ladders`}: ${s.ook.map((x) => `${ladderNaam(x.soort)} (stap ${x.niveau})`).join(", ")}` }),
+          ...s.ook.map((x) => DT.el("div", { class: `dt-cb-ookregel${x.afgehandeld ? " is-af" : ""}` }, [
+            DT.el("span", { class: `dt-cb-niveau n${x.niveau}`, text: x.consequentie }),
+            DT.el("div", {}, [DT.el("b", { text: x.titel }), DT.el("small", { text: x.maatregel })]),
+          ])),
+        ]) : null,
         this.statsRegel(DT, s.stamnr),
         this.actieKnoppen(DT, s, st, pid),
         DT.el("div", { class: "dt-cb-rij" }, [
           s.afgehandeld ? this.knop(DT, "Heropen", () => { K.zetAfh(s.key, null); this.teken(); }, false, "klein stil")
-            : this.knop(DT, "Afgehandeld", () => { const mee = K.handelAf(s.key); this.teken(); this.melding(mee ? `Afgehandeld, met ${mee} lichtere trede${mee === 1 ? "" : "n"} die hierin opgaat.` : "Afgehandeld."); }, true, "klein"),
+            : this.knop(DT, "Afgehandeld", afhandelen, true, "klein"),
           this.knop(DT, "Verzuim in Magister", () => this.openInMagister(st), false, "klein stil"), bekijk].filter(Boolean)),
-      ]);
+      ].filter(Boolean));
     };
     const perNiveau = [4, 3, 2, 1].map((n) => [n, zicht.filter((s) => s.niveau === n)]).filter(([, l]) => l.length);
     h.replaceChildren(
       this.magisterKaart(DT),
-      DT.el("div", { class: "dt-cb-rij" }, [DT.el("span", { class: "dt-cb-zacht", text: `${alle.filter((s) => !s.afgehandeld).length} open in ${(K.periodeById(pid) || {}).naam || ""}` }), toggle, this.knop(DT, "Overzicht per mentor…", () => this.mentorOverzicht(DT))]),
+      DT.el("div", { class: "dt-cb-rij" }, [DT.el("span", { class: "dt-cb-zacht", text: `${open.length} ${open.length === 1 ? "student" : "studenten"} met een open stap in ${(K.periodeById(pid) || {}).naam || ""}` }), toggle,
+        this.knop(DT, "Overzicht per mentor…", () => this.mentorOverzicht(DT)), this.knop(DT, "Protocol bekijken", () => this._scherm.bar.querySelector('[data-view="protocol"]')?.click(), false, "stil")]),
       ...(perNiveau.length ? perNiveau.map(([n, l]) => DT.el("section", { class: "dt-cb-niveaugroep" }, [DT.el("h2", {}, [DT.el("span", { class: `dt-cb-niveau n${n}`, text: `${n}` }), DT.el("span", { text: ` ${K.NIVEAUNAAM[n]} (${l.length})` })]), ...l.map(kaart)]))
         : [DT.el("div", { class: "dt-cb-leeg" }, DT.el("p", { text: "Geen signalen in deze periode." }))]),
     );
@@ -1214,6 +1245,190 @@ DT.register({
   },
 
   /* ===================================================================================== */
+  /* Protocol: lezen en aanpassen (zelfde gegevens als de Protocolpagina in Tardy)           */
+  /* ===================================================================================== */
+  /* Het protocol staat in de gedeelde gegevens (S.instellingen.protocol); zonder eigen versie geldt de standaard
+   * uit Tardy. Wijzigingen gelden meteen voor de signalen, hier én in de Tardy-app. Alleen teksten en getallen:
+   * wat er geteld kan worden ligt vast in de kern (TELLERS). */
+  protBewerkbaar() {
+    const K = TardyKern, i = K.S.instellingen;
+    if (!i.protocol) i.protocol = JSON.parse(JSON.stringify(K.PROTOCOL_STANDAARD));
+    return i.protocol;
+  },
+  protIsStandaard() { const p = TardyKern.S.instellingen.protocol; return !p || JSON.stringify(p) === JSON.stringify(TardyKern.PROTOCOL_STANDAARD); },
+  protTekst(DT, t) {   // {meldtijd} invullen, **vet** als <b>, verder platte tekst
+    const delen = String(TardyKern.vulIn(t || "")).split(/\*\*(.+?)\*\*/g);
+    return delen.map((d, i) => (i % 2 ? DT.el("b", { text: d }) : document.createTextNode(d)));
+  },
+  protLabel(l, tr) { const K = TardyKern, tel = K.TELLERS[K.tredeTeller(l, tr)]; return tel ? tel.label(tr.vanaf, tr.vergelijking) : String(tr.vanaf); },
+  protMeter(DT, n) { return DT.el("span", { class: `dt-cb-meter m${n}` }, [1, 2, 3, 4].map(() => DT.el("i"))); },
+
+  protocol(DT) {
+    const K = TardyKern, h = this._scherm.hoofd, P = K.protocol(), bewerk = !!this._protBewerk, eigen = !this.protIsStandaard();
+    const balk = DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("div", { class: "dt-cb-rij" }, [
+      DT.el("div", { class: "dt-cb-wie" }, [DT.el("h2", { text: P.naam || "Verzuimprotocol" }),
+        DT.el("small", { text: bewerk ? "Aanpassen · elke wijziging wordt meteen bewaard in de gedeelde map en geldt ook in de Tardy-app" : eigen ? "Aangepast door de school" : "Standaardprotocol uit Tardy" })]),
+      DT.el("span", { style: "flex:1" }),
+      bewerk && eigen ? this.knop(DT, "Standaard terugzetten", () => {
+        if (!confirm(`Het protocol terugzetten naar de standaard (${K.PROTOCOL_STANDAARD.naam})? Jullie eigen aanpassingen verdwijnen.`)) return;
+        delete K.S.instellingen.protocol; this._protOpen = null; this.bewaar(); this.teken(); this.melding("Standaardprotocol teruggezet.");
+      }, false, "stil") : null,
+      bewerk ? this.knop(DT, "Klaar", () => { this._protBewerk = false; this._protOpen = null; this.teken(); this.melding("Protocol bewaard. Signalen volgen het nu."); }, true)
+        : this.knop(DT, "Aanpassen", () => {
+          if (this._kijkt) return this.melding("Een collega werkt nu in Tardy; aanpassen kan zodra die klaar is.", "err");
+          this._protBewerk = true; this._protOpen = null; this.teken();
+        }),
+    ].filter(Boolean))]);
+    h.replaceChildren(balk, ...(bewerk ? this.protEditor(DT) : this.protLezen(DT, P)));
+  },
+
+  protLezen(DT, P) {
+    const stap = (n, niv, kop, label, tekst, tekst18) => DT.el("div", { class: `dt-cb-stap s${niv}` }, [
+      DT.el("span", { class: `dt-cb-stapn${niv ? ` dt-cb-niveau n${niv}` : ""}`, text: n }),
+      DT.el("div", {}, [DT.el("b", {}, this.protTekst(DT, kop)),
+        DT.el("p", {}, [label ? DT.el("span", { class: "dt-cb-zacht", text: `${label}. ` }) : null, ...this.protTekst(DT, tekst)].filter(Boolean)),
+        tekst18 ? DT.el("p", { class: "dt-cb-zacht" }, [DT.el("b", { text: "18+: " }), ...this.protTekst(DT, tekst18)]) : null].filter(Boolean)),
+    ]);
+    const w = P.werkwijze || { regels: [] };
+    return [
+      (w.regels || []).length ? DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("h2", { text: w.titel || "Werkwijze" }),
+        DT.el("ol", { class: "dt-cb-proc" }, w.regels.map((r) => DT.el("li", {}, this.protTekst(DT, r))))]) : null,
+      ...P.ladders.map((l) => DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("h2", { text: l.titel }),
+        l.intro ? DT.el("p", { class: "dt-cb-zacht" }, this.protTekst(DT, l.intro)) : null,
+        DT.el("div", { class: "dt-cb-ladder" }, [
+          l.elkeKeer && l.elkeKeer.opPagina ? stap("Elke keer", 0, l.elkeKeer.kort || "", null, l.elkeKeer.maatregel, l.elkeKeer.maatregel18) : null,
+          ...(l.treden || []).map((tr) => stap(this.protLabel(l, tr), tr.niveau, tr.kort || tr.label, tr.label, tr.maatregel, tr.maatregel18)),
+        ].filter(Boolean))].filter(Boolean))),
+      ...(P.extra || []).map((x) => DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("h2", { text: x.titel }), DT.el("p", {}, this.protTekst(DT, x.tekst))])),
+    ].filter(Boolean);
+  },
+
+  protEditor(DT) {
+    const K = TardyKern, P = this.protBewerkbaar();
+    const bewaar = (opnieuw = false) => { this.bewaar(); if (opnieuw) this.teken(); };
+    const invoer = (label, waarde, zet, { hint = "", rijen = 0, ph = "", type = "text", opnieuw = false } = {}) => {
+      const inp = rijen ? DT.el("textarea", { class: "dt-cb-veld dt-cb-tekstvak", rows: String(rijen), placeholder: ph }) : DT.el("input", { type, class: "dt-cb-veld", placeholder: ph, ...(type === "number" ? { min: "1", step: "1" } : {}) });
+      inp.value = waarde ?? "";
+      inp.addEventListener(rijen || type === "text" ? "input" : "change", () => { zet(inp.value); bewaar(false); });
+      if (opnieuw) inp.addEventListener("change", () => this.teken());
+      return DT.el("label", { class: "dt-cb-protveld" }, [DT.el("span", {}, [label, hint ? DT.el("small", { class: "dt-cb-zacht", text: ` · ${hint}` }) : null].filter(Boolean)), inp]);
+    };
+    const keuze = (label, opties, waarde, zet) => {
+      const sel = DT.el("select", { class: "dt-cb-veld" }, opties.map(([v, t]) => DT.el("option", { value: String(v), text: t })));
+      sel.value = String(waarde); sel.addEventListener("change", () => { zet(sel.value); bewaar(true); });
+      return DT.el("label", { class: "dt-cb-protveld" }, [DT.el("span", { text: label }), sel]);
+    };
+    const vink = (label, aan, zet) => {
+      const c = DT.el("input", { type: "checkbox" }); c.checked = !!aan;
+      c.addEventListener("change", () => { zet(c.checked); bewaar(true); });
+      return DT.el("label", { class: "dt-cb-schakel" }, [c, DT.el("span", { text: label })]);
+    };
+    const vlag = (doel, veld) => (v) => { if (v) doel[veld] = true; else delete doel[veld]; };
+    const leegWeg = (doel, veld) => (v) => { if (String(v).trim()) doel[veld] = v; else delete doel[veld]; };
+    const niveauOpties = [1, 2, 3, 4].map((k) => [k, `${k} · ${K.NIVEAUNAAM[k]}`]);
+    const tellerOpties = Object.keys(K.TELLERS).map((k) => [k, K.TELLERS[k].naam]);
+    const mailNaam = (m) => {
+      const label = (K.MAILSOORT[m] || { label: m }).label;
+      if (Object.keys(K.MAILSOORT).filter((k) => K.MAILSOORT[k].label === label).length < 2) return label;
+      const deel = { telaat: "te laat", nietgemeld: "niet gemeld", ongeoorloofd: "ongeoorloofd", verbeterafspraken: "algemeen" }[m.split("-").slice(1).join("-")];
+      return label + (deel ? ` (${deel})` : "");
+    };
+    const sorteer = (l, tr, li) => {   // treden op volgorde: eerst de eigen telling van de ladder, dan per telling oplopend
+      const volgorde = []; l.treden.forEach((x) => { const k = K.tredeTeller(l, x); if (!volgorde.includes(k)) volgorde.push(k); });
+      l.treden.sort((a, b) => (volgorde.indexOf(K.tredeTeller(l, a)) - volgorde.indexOf(K.tredeTeller(l, b))) || a.vanaf - b.vanaf);
+      this._protOpen = `${li}:${l.treden.indexOf(tr)}`;
+    };
+    const tredeForm = (l, li, tr, ti) => {
+      const eigenTeller = K.tredeTeller(l, tr);
+      const dubbel = l.treden.some((x, xi) => xi !== ti && x.vanaf === tr.vanaf && K.tredeTeller(l, x) === eigenTeller);
+      const getal = invoer("Aantal", tr.vanaf, (v) => { tr.vanaf = Math.max(1, parseInt(v, 10) || 1); }, { type: "number" });
+      getal.querySelector("input").addEventListener("change", () => { sorteer(l, tr, li); bewaar(true); });
+      return DT.el("div", { class: "dt-cb-protform" }, [
+        dubbel ? DT.el("p", { class: "dt-cb-waarschuw", text: "Twee treden met dezelfde drempel en dezelfde telling. Kies een ander getal, anders lopen hun signalen door elkaar." }) : null,
+        DT.el("div", { class: "dt-cb-protrij" }, [
+          keuze("Telt", tellerOpties, eigenTeller, (v) => { if (v === l.teller) delete tr.teller; else tr.teller = v; sorteer(l, tr, li); }),
+          keuze("Wanneer", [[">=", "vanaf"], [">", "meer dan"]], tr.vergelijking || ">=", (v) => { if (v === ">") tr.vergelijking = ">"; else delete tr.vergelijking; }),
+          getal,
+          keuze("Niveau", niveauOpties, tr.niveau, (v) => { tr.niveau = Math.min(4, Math.max(1, parseInt(v, 10) || 1)); }),
+        ]),
+        invoer("Kop (op de protocolpagina)", tr.kort, (v) => { tr.kort = v; }, { ph: "bijv. Volgende schooldag {meldtijd} melden bij CB'er" }),
+        invoer("Naam van de maatregel", tr.label, (v) => { tr.label = v; }, { ph: "bijv. Registratie waarschuwing" }),
+        invoer("Wat er moet gebeuren", tr.maatregel, (v) => { tr.maatregel = v; }, { rijen: 3, hint: "zie je bij Signalen, in de notitie en na het melden" }),
+        invoer("Anders voor 18+", tr.maatregel18, leegWeg(tr, "maatregel18"), { rijen: 2, hint: "leeg laten als het hetzelfde is" }),
+        tr.doorlopend ? invoer("Extra zin vanaf de volgende keer", tr.bijMeer, leegWeg(tr, "bijMeer"), { ph: "bijv. Elke volgende keer vraagt opnieuw om een melding." }) : null,
+        DT.el("div", { class: "dt-cb-protsub", text: "Mails bij deze trede (mails aan ouders vervallen vanzelf bij 18+)" }),
+        DT.el("div", { class: "dt-cb-protvinkjes" }, Object.keys(K.MAILSOORT).filter((m) => m !== "mentor-overzicht").map((m) =>
+          vink(mailNaam(m), (tr.mails || []).includes(m), (aan) => { tr.mails = (tr.mails || []).filter((x) => x !== m); if (aan) tr.mails.push(m); }))),
+        DT.el("div", { class: "dt-cb-protsub", text: "Verder" }),
+        DT.el("div", { class: "dt-cb-protvinkjes" }, [
+          l.teller === eigenTeller && ["telaat", "ongeoorloofd", "calamiteit"].includes(l.teller) ? vink("Meldafspraak maken bij het melden", tr.meldafspraak, vlag(tr, "meldafspraak")) : null,
+          vink("Elke volgende keer een nieuw signaal", tr.doorlopend, vlag(tr, "doorlopend")),
+          vink("Alleen voor studenten jonger dan 18", tr.alleenMinderjarig, vlag(tr, "alleenMinderjarig")),
+        ].filter(Boolean)),
+        DT.el("div", { class: "dt-cb-rij eind" }, this.knop(DT, "Trede verwijderen", () => {
+          if (!confirm(`Trede “${tr.kort || tr.label || this.protLabel(l, tr)}” verwijderen?`)) return;
+          l.treden.splice(ti, 1); this._protOpen = null; bewaar(true);
+        }, false, "klein stil")),
+      ].filter(Boolean));
+    };
+    const rij = (l, li, sleutel, n, niv, naam, sub, form) => {
+      const open = this._protOpen === `${li}:${sleutel}`;
+      const kop = DT.el("button", { type: "button", class: "dt-cb-protkop", "aria-expanded": String(open) }, [
+        DT.el("span", { class: `dt-cb-stapn${niv ? ` dt-cb-niveau n${niv}` : ""}`, text: n }), this.protMeter(DT, niv),
+        DT.el("span", { class: "dt-cb-protnaam" }, [DT.el("b", {}, this.protTekst(DT, naam)), DT.el("small", { text: sub })]),
+        DT.el("span", { class: "dt-cb-pijl", text: open ? "▴" : "▾" }),
+      ]);
+      kop.addEventListener("click", () => { this._protOpen = open ? null : `${li}:${sleutel}`; this.teken(); });
+      return DT.el("div", { class: `dt-cb-trede${open ? " open" : ""}` }, [kop, open ? form() : null].filter(Boolean));
+    };
+    const w = P.werkwijze || (P.werkwijze = { titel: "", regels: [] });
+    return [
+      DT.el("p", { class: "dt-cb-zacht", text: "Wijzigingen gelden meteen voor alle studenten. Verander je een drempel, dan kan een signaal dat al was afgehandeld opnieuw verschijnen. In teksten kun je {meldtijd} gebruiken (de meldtijd uit Instellingen); **woord** wordt vet." }),
+      DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("h2", { text: "Algemeen" }),
+        invoer("Naam van het protocol", P.naam, (v) => { P.naam = v; }),
+        DT.el("div", { class: "dt-cb-protsub", text: "Namen van de vier niveaus" }),
+        DT.el("div", { class: "dt-cb-protrij" }, [1, 2, 3, 4].map((k) => invoer(`Niveau ${k}`, K.NIVEAUNAAM[k], (v) => { (P.niveaus ||= {})[k] = v.trim() || K.NIVEAU_STANDAARD[k]; })))]),
+      DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("h2", { text: w.titel || "Werkwijze" }),
+        invoer("Titel", w.titel, (v) => { w.titel = v; }),
+        invoer("Stappen", (w.regels || []).join("\n"), (v) => { w.regels = v.split("\n").map((x) => x.trim()).filter(Boolean); }, { rijen: Math.max(4, (w.regels || []).length + 1), hint: "één stap per regel" })]),
+      ...P.ladders.map((l, li) => DT.el("dna-card", { class: "dt-cb-kaart" }, [
+        DT.el("div", { class: "dt-cb-kaartkop" }, [DT.el("h2", { text: l.titel }), DT.el("small", { class: "dt-cb-zacht", text: `telt ${(K.TELLERS[l.teller] || { naam: l.teller }).naam}` })]),
+        invoer("Titel", l.titel, (v) => { l.titel = v; }),
+        invoer("Toelichting", l.intro, (v) => { l.intro = v; }, { rijen: 2, hint: "optioneel" }),
+        DT.el("div", { class: "dt-cb-treden" }, [
+          l.elkeKeer ? rij(l, li, "e", "Elke keer", 0, l.elkeKeer.kort || l.elkeKeer.maatregel || "Nog geen tekst", `voordat de eerste trede is bereikt${l.elkeKeer.opPagina ? "" : " · niet op de pagina"}`, () => {
+            const e = l.elkeKeer;
+            return DT.el("div", { class: "dt-cb-protform" }, [
+              invoer("Kop (op de protocolpagina)", e.kort, (v) => { e.kort = v; }, { ph: "bijv. Zelfde dag vóór 12:00 bellen" }),
+              invoer("Wat er moet gebeuren", e.maatregel, (v) => { e.maatregel = v; }, { rijen: 2, hint: "zie je na het melden" }),
+              invoer("Anders voor 18+", e.maatregel18, leegWeg(e, "maatregel18"), { rijen: 2, hint: "leeg laten als het hetzelfde is" }),
+              DT.el("div", { class: "dt-cb-protvinkjes" }, vink("Tonen op de protocolpagina", e.opPagina, vlag(e, "opPagina"))),
+            ]);
+          }) : null,
+          ...(l.treden || []).map((tr, ti) => rij(l, li, ti, this.protLabel(l, tr), tr.niveau, tr.kort || tr.label || "Nieuwe trede",
+            [tr.label, (tr.mails || []).length ? (tr.mails.length === 1 ? "1 mail" : `${tr.mails.length} mails`) : "", tr.meldafspraak ? "meldafspraak" : ""].filter(Boolean).join(" · "),
+            () => tredeForm(l, li, tr, ti))),
+        ].filter(Boolean)),
+        DT.el("div", { class: "dt-cb-rij" }, [
+          this.knop(DT, "Trede toevoegen", () => {
+            l.treden ||= [];
+            const eigen = l.treden.filter((x) => K.tredeTeller(l, x) === l.teller), laatste = eigen[eigen.length - 1];
+            const hoogste = eigen.reduce((m, x) => Math.max(m, x.vanaf), 0), plek = laatste ? l.treden.indexOf(laatste) + 1 : 0;
+            l.treden.splice(plek, 0, { vanaf: hoogste + 1, niveau: Math.min(4, laatste ? laatste.niveau + 1 : 1), label: "", kort: "", maatregel: "", mails: [] });
+            this._protOpen = `${li}:${plek}`; bewaar(true);
+          }, false, "klein"),
+          l.elkeKeer ? null : this.knop(DT, "Tekst voor “elke keer” toevoegen", () => { l.elkeKeer = { kort: "", maatregel: "", opPagina: true }; this._protOpen = `${li}:e`; bewaar(true); }, false, "klein stil"),
+        ].filter(Boolean)),
+      ])),
+      ...(P.extra || []).map((x, xi) => DT.el("dna-card", { class: "dt-cb-kaart" }, [
+        DT.el("div", { class: "dt-cb-kaartkop" }, [DT.el("h2", { text: x.titel || "Blok" }), DT.el("span", { style: "flex:1" }),
+          this.knop(DT, "Verwijderen", () => { if (confirm("Dit tekstblok verwijderen?")) { P.extra.splice(xi, 1); bewaar(true); } }, false, "klein stil")]),
+        invoer("Titel", x.titel, (v) => { x.titel = v; }), invoer("Tekst", x.tekst, (v) => { x.tekst = v; }, { rijen: 4 })])),
+      DT.el("div", { class: "dt-cb-rij" }, this.knop(DT, "Tekstblok toevoegen", () => { (P.extra ||= []).push({ titel: "Nieuw blok", tekst: "" }); bewaar(true); })),
+    ];
+  },
+
+  /* ===================================================================================== */
   /* Instellingen                                                                           */
   /* ===================================================================================== */
   instellingen(DT) {
@@ -1240,7 +1455,7 @@ DT.register({
         veld("Naam", "naam"), veld("Paraaf", "paraaf"), veld("E-mail", "email", "email"), veld("Lokaal", "lokaal", "text", c.lokaal || i.lokaal || "", "staat in mails en op het briefje")]),
       DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("h2", { text: "Meldafspraken" }),
         DT.el("label", { class: "dt-cb-veldrij" }, [DT.el("span", { text: "Meldtijd" }), meldtijd, DT.el("small", { text: "gedeeld met Tardy" })]),
-        DT.el("p", { class: "dt-cb-zacht", text: `Periodes, protocol, mentoren en mailteksten komen uit de gedeelde gegevens en pas je aan in de Tardy-app. Nu: ${K.protocol().naam || "standaardprotocol"}.` })]),
+        DT.el("p", { class: "dt-cb-zacht", text: `Periodes, mentoren en mailteksten komen uit de gedeelde gegevens en pas je aan in de Tardy-app. Het protocol (${K.protocol().naam || "standaardprotocol"}) pas je aan op het tabblad Protocol.` })]),
       DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("h2", { text: "Briefjes" }),
         DT.el("p", { text: printer ? `Bonprinter: ${printer}.` : "Geen bonprinter gekoppeld: briefjes gaan naar de gewone printer (twee per rij op A4)." }),
         DT.el("div", { class: "dt-cb-rij" }, [
@@ -1340,6 +1555,31 @@ DT.register({
       .dt-cb-haal b { flex: 0 0 200px; height: 6px; border-radius: 3px; background: var(--cb-lijnzacht); overflow: hidden; }
       .dt-cb-haal i { display: block; height: 100%; background: var(--cb-acc); transition: width .3s; }
       .dt-cb-afspraakmelding { margin: 8px 0 12px; padding: 10px 14px; border-radius: var(--cb-r); background: var(--cb-hover); border-left: 4px solid var(--cb-acc); font-size: 14px; }
+      .dt-cb-ook { margin: 0 0 12px; padding: 8px 12px; border-radius: var(--cb-r); background: var(--cb-vlak); font-size: 13px; }
+      .dt-cb-ook summary { cursor: pointer; color: var(--cb-zacht); font-size: 13px; line-height: 20px; }
+      .dt-cb-ookregel { display: flex; gap: 8px; align-items: flex-start; margin-top: 8px; } .dt-cb-ookregel.is-af { opacity: .6; }
+      .dt-cb-ookregel b, .dt-cb-ookregel small { display: block; font-size: 13px; line-height: 18px; } .dt-cb-ookregel small { color: var(--cb-zacht); }
+      .dt-cb-proc { margin: 8px 0 0; padding-left: 20px; font-size: 14px; line-height: 22px; }
+      .dt-cb-ladder { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+      .dt-cb-stap { display: grid; grid-template-columns: 96px 1fr; gap: 12px; align-items: start; padding: 10px 12px; border-radius: var(--cb-r); border: 1px solid var(--cb-lijnzacht); border-left: 4px solid var(--cb-lijn); }
+      .dt-cb-stap.s1 { border-left-color: #f2c400; } .dt-cb-stap.s2 { border-left-color: #f08a00; } .dt-cb-stap.s3 { border-left-color: #d7263d; } .dt-cb-stap.s4 { border-left-color: #8e44ad; }
+      .dt-cb-stap b { font-size: 14px; line-height: 20px; } .dt-cb-stap p { margin: 2px 0 0 !important; }
+      .dt-cb-stapn { justify-self: start; font-size: 12px; font-weight: 700; line-height: 20px; white-space: nowrap; }
+      .dt-cb-meter { display: inline-flex; gap: 2px; } .dt-cb-meter i { width: 6px; height: 14px; border-radius: 2px; background: var(--cb-lijnzacht); }
+      .dt-cb-meter.m1 i:nth-child(-n+1), .dt-cb-meter.m2 i:nth-child(-n+2), .dt-cb-meter.m3 i:nth-child(-n+3), .dt-cb-meter.m4 i { background: var(--cb-acc); }
+      .dt-cb-treden { display: flex; flex-direction: column; margin: 12px 0; border: 1px solid var(--cb-lijnzacht); border-radius: var(--cb-r); overflow: hidden; }
+      .dt-cb-trede + .dt-cb-trede { border-top: 1px solid var(--cb-lijnzacht); }
+      .dt-cb-protkop { appearance: none; width: 100%; display: grid; grid-template-columns: 110px auto 1fr auto; gap: 12px; align-items: center; padding: 10px 12px; border: 0; background: var(--cb-kaart); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+      .dt-cb-protkop:hover, .dt-cb-trede.open .dt-cb-protkop { background: var(--cb-hover); }
+      .dt-cb-protnaam b, .dt-cb-protnaam small { display: block; font-size: 14px; line-height: 20px; } .dt-cb-protnaam small { font-size: 13px; color: var(--cb-zacht); }
+      .dt-cb-pijl { color: var(--cb-zacht); }
+      .dt-cb-protform { padding: 12px 16px 16px; background: var(--cb-vlak); border-top: 1px solid var(--cb-lijnzacht); }
+      .dt-cb-protveld { display: flex; flex-direction: column; gap: 4px; margin: 0 0 12px; font-size: 13px; font-weight: 600; }
+      .dt-cb-protveld .dt-cb-veld { min-width: 0; width: 100%; box-sizing: border-box; font-weight: 400; }
+      .dt-cb-tekstvak { height: auto !important; padding: 8px 10px !important; line-height: 20px; resize: vertical; }
+      .dt-cb-protrij { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0 12px; }
+      .dt-cb-protsub { margin: 4px 0 8px; font-size: 13px; font-weight: 700; }
+      .dt-cb-protvinkjes { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 12px; }
       .dt-cb-acties3 { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; padding: 8px; border-radius: var(--cb-r); border: 1px dashed var(--cb-lijnzacht); }
       .dt-cb-actie.is-gedaan { color: var(--cb-groen); }
       .dt-cb-gevolg { display: flex; gap: 8px; align-items: baseline; margin: 0 0 8px; }
