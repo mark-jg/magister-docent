@@ -123,11 +123,14 @@
    * open shadow roots. */
   window.addEventListener("message", (e) => {
     if (!(e.data && e.data.type === "dt:attr:opnieuw" && trusted(e))) return;
-    const { selector, attr } = e.data;
-    const zoek = (r, uit = []) => { try { uit.push(...r.querySelectorAll(selector)); } catch {} r.querySelectorAll("*").forEach((x) => x.shadowRoot && zoek(x.shadowRoot, uit)); return uit; };
+    const { selector, attr, diep = true } = e.data;
+    const zoek = (r, uit = []) => { try { uit.push(...r.querySelectorAll(selector)); } catch {} if (diep) r.querySelectorAll("*").forEach((x) => x.shadowRoot && zoek(x.shadowRoot, uit)); return uit; };
+    const namen = [].concat(attr);   // één attribuut of een lijst
     for (const el of zoek(document)) {
-      const v = el.getAttribute(attr);
-      if (v != null) { el.removeAttribute(attr); el.setAttribute(attr, v); }
+      for (const n of namen) {
+        const v = el.getAttribute(n);
+        if (v != null) { el.removeAttribute(n); el.setAttribute(n, v); }
+      }
     }
   });
   window.addEventListener("message", (e) => {

@@ -1,7 +1,8 @@
 /* Te laat-balie voor de community builder (CB'er): Tardy in Magister.
  *
- * Aan te zetten bij Instellingen › Community builder. Opent schermvullend vanaf de tegel "Te laat-balie" op
- * Aanwezigheid (en via het zijpaneel). Rekent met de kern van Tardy (cb-kern.js, gegenereerd uit Tardy):
+ * Aan te zetten bij Instellingen › Community builder. Een subpagina van Aanwezigheid, net als Meldingen of
+ * Registraties: tegel "Te laat-balie", kruimelpad Aanwezigheid › Te laat-balie, en opgebouwd uit Magisters eigen
+ * paginakop, tabbladen, kaarten en knoppen (ook via het zijpaneel te openen). Rekent met de kern van Tardy (cb-kern.js, gegenereerd uit Tardy):
  * dezelfde soorten, tellingen, het verzuimprotocol met zijn ladders, de meldafspraken en mailteksten.
  *
  * Gegevens: dezelfde gedeelde map als de Tardy-app (OneDrive of Teams), met dezelfde bestanden:
@@ -24,10 +25,14 @@ DT.register({
   init(DT) {
     if (!DT.isTop) return;
     this._stop = DT.observe(() => this.tegel(DT), { debounce: 300, poll: 1500 });
+    /* Weg van Aanwezigheid: de balie sluit, net als elke andere subpagina. */
+    this._hash = () => { if (this._scherm && !/^#\/aanwezigheid\/?$/.test(location.hash)) this.sluit(); };
+    window.addEventListener("hashchange", this._hash);
   },
 
   destroy() {
     this._stop && this._stop();
+    window.removeEventListener("hashchange", this._hash);
     this.sluit();
     DT.deepQueryAll("#dt-cb-tegel").forEach((el) => el.remove());
   },
@@ -36,6 +41,9 @@ DT.register({
   tegel(DT) {
     const wrap = DT.deepQuery("att-attendance-dashboard")?.shadowRoot?.querySelector(".wrapper");
     if (!wrap) return;
+    /* Na herladen of via het zijpaneel: de balie staat nog open voor deze sessie. */
+    let nogOpen = false; try { nogOpen = sessionStorage.getItem("dt-cb-open") === "1"; } catch {}
+    if (nogOpen && !this._scherm && /^#\/aanwezigheid\/?$/.test(location.hash) && document.querySelector("mg-att-tiles")) this.open(DT);
     const oud = wrap.querySelector("#dt-cb-tegel");
     if (oud) {
       if (oud.shadowRoot?.querySelector("h1")?.textContent.trim() !== "Te laat-balie") window.postMessage({ type: "dt:attr:opnieuw", selector: "#dt-cb-tegel", attr: "heading" }, "*");
@@ -190,50 +198,76 @@ DT.register({
   },
 
   /* ===================================================================================== */
-  /* Openen en de schil                                                                     */
+  /* De pagina: een subpagina van Aanwezigheid, opgebouwd uit Magisters eigen onderdelen     */
   /* ===================================================================================== */
+  /* Paginakop (dna-page-header) met kruimelpad, tabbladen (dna-tabs), kaarten (dna-card) en knoppen
+   * (dna-button), net als Meldingen of Registraties. Magisters onderdelen negeren attributen die de extensie
+   * zet; componenten() laat het netwerk-script in de pagina ze opnieuw zetten. */
+  VIEWS: [["melden", "Melden"], ["meldafspraken", "Meldafspraken"], ["signalen", "Signalen"], ["instellingen", "Instellingen"]],
+
+  componenten() {
+    window.postMessage({ type: "dt:attr:opnieuw", diep: false, selector: ":is(#dt-cbp, .dt-cb-modal) :is(dna-page-header, dna-tabs, dna-tab-bar, dna-button, dna-card)",
+      attr: ["heading", "invert", "orientation", "variant", "fill", "size"] }, "*");
+  },
+
   async open(DT) {
     if (this._scherm) return;
+    try { sessionStorage.setItem("dt-cb-open", "1"); } catch {}
+    const tiles = document.querySelector("mg-att-tiles"), uv = tiles?.parentElement;
+    if (!uv || !/^#\/aanwezigheid\/?$/.test(location.hash)) { location.hash = "#/aanwezigheid"; return; }   // tegel() opent zodra de pagina er is
     this.css();
     const K = TardyKern;
     K.H.bewaar = () => this.bewaar();
     K.H.toon = (t) => this.melding(t);
-    const laag = DT.el("div", { class: "dt-cb", role: "dialog", "aria-modal": "true", "aria-label": "Te laat-balie" });
-    const nav = DT.el("nav", { class: "dt-cb-nav" });
-    const hoofd = DT.el("main", { class: "dt-cb-hoofd" });
-    this._stand = DT.el("div", { class: "dt-cb-stand" });
-    this._periode = DT.el("select", { class: "dt-cb-periode", "aria-label": "Periode" });
-    this._periode.addEventListener("change", () => { K.UI.periodeId = this._periode.value; this.teken(); });
-    const dicht = DT.el("button", { type: "button", class: "dt-cb-dicht", "aria-label": "Sluiten", title: "Sluiten (Esc)", html: `<svg viewBox="0 0 16 16" width="14" height="14"><path d="m4 4 8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>` });
-    dicht.addEventListener("click", () => this.sluit());
-    this._toast = DT.el("div", { class: "dt-cb-toast", role: "status", "aria-live": "polite" });
-    laag.append(DT.el("aside", { class: "dt-cb-zij" }, [
-      DT.el("div", { class: "dt-cb-merk" }, [DT.el("b", { text: "Te laat-balie" }), DT.el("small", { text: "Tardy in Magister" })]),
-      nav, this._periode, this._stand,
-    ]), DT.el("div", { class: "dt-cb-kolom" }, [DT.el("header", { class: "dt-cb-kop" }, [DT.el("h1", { class: "dt-cb-titel" }), dicht]), hoofd]), this._toast);
-    this._view = this._view || "melden";
-    for (const [id, naam] of [["melden", "Melden"], ["meldafspraken", "Meldafspraken"], ["signalen", "Signalen"], ["instellingen", "Instellingen"]]) {
-      const b = DT.el("button", { type: "button", "data-view": id }, [DT.el("span", { text: naam }), DT.el("i", { class: "dt-cb-tel" })]);
-      b.addEventListener("click", () => { this._view = id; this.teken(); });
-      nav.append(b);
+    const pagina = DT.el("section", { id: "dt-cbp", class: "dt-cb", "aria-label": "Te laat-balie" });
+    const kop = DT.el("dna-page-header", { heading: "Te laat-balie" });
+    const echt = DT.deepQuery("att-attendance-dashboard")?.shadowRoot?.querySelector("dna-page-header");
+    if (!echt || echt.hasAttribute("invert")) kop.setAttribute("invert", "");
+    const terug = DT.el("a", { href: "#/aanwezigheid", text: "Aanwezigheid" });
+    terug.addEventListener("click", (e) => { e.preventDefault(); this.sluit(); });
+    kop.append(DT.el("dna-breadcrumb", { slot: "breadcrumb" }, terug), DT.el("dna-breadcrumb", { slot: "breadcrumb", text: "Te laat-balie" }),
+      DT.el("span", { slot: "actions", class: "dt-cb-tardy", text: "powered by Tardy" }));
+    const tabs = DT.el("dna-tabs", { orientation: "horizontal" });
+    const bar = DT.el("dna-tab-bar", { slot: "tab-bar", orientation: "horizontal" });
+    const panelen = {};
+    tabs.append(bar);
+    for (const [id, naam] of this.VIEWS) {
+      bar.append(DT.el("dna-tab-button", { "data-view": id }, [DT.el("span", { text: naam }), DT.el("span", { class: "dt-cb-tel" })]));
+      const inhoud = DT.el("div", { class: "dt-cb-inhoud" });
+      tabs.append(DT.el("dna-tab", { slot: "tab", "data-view": id }, DT.el("div", { class: "dt-cb-tabblad" }, inhoud)));
+      panelen[id] = inhoud;
     }
-    this._toets = (e) => {
-      if (e.key === "Escape" && !e.target.closest?.(".dt-cb-modal") && !this._modal) { e.preventDefault(); this.sluit(); }
-      else if (e.key === "Escape" && this._modal) { e.preventDefault(); this.sluitModal(); }
-    };
+    bar.addEventListener("click", (e) => { const b = e.target.closest("dna-tab-button"); if (b && b.dataset.view !== this._view) { this._view = b.dataset.view; this.teken(); } });
+    /* Balk boven elk tabblad: stand van de gedeelde map en de periode */
+    this._stand = DT.el("span", { class: "dt-cb-stand" });
+    this._periode = DT.el("select", { class: "dt-cb-veld dt-cb-periode", "aria-label": "Periode" });
+    this._periode.addEventListener("change", () => { K.UI.periodeId = this._periode.value; this.teken(); });
+    this._balk = DT.el("div", { class: "dt-cb-balk" }, [this._stand, this._periode]);
+    this._toast = DT.el("div", { class: "dt-cb-vars dt-cb-toast", role: "status", "aria-live": "polite" });
+    pagina.append(kop, tabs);
+    document.body.append(this._toast);
+    this._toets = (e) => { if (e.key === "Escape" && this._modal) { e.preventDefault(); this.sluitModal(); } };
     document.addEventListener("keydown", this._toets, true);
-    document.body.append(laag);
-    this._scherm = { laag, nav, hoofd };
+    uv.classList.add("dt-cb-open");
+    uv.append(pagina);
+    this._view = "melden";
+    this._scherm = { laag: pagina, uv, bar, panelen, hoofd: panelen.melden };
+    this.componenten();
     await this.koppel(DT);
   },
 
+  /* Terug naar Aanwezigheid (kruimelpad), of weg van de pagina. */
   sluit() {
+    try { sessionStorage.removeItem("dt-cb-open"); } catch {}
     if (!this._scherm) return;
     clearInterval(this._timer);
     if (this._map && !this._kijkt) { this.schrijfNu().finally(() => this.bezettingVrij()); }
     this.scanStop();
+    this.sluitModal();
     document.removeEventListener("keydown", this._toets, true);
-    this._scherm.laag.remove(); this._scherm = null; this._modal = null;
+    this._scherm.uv.classList.remove("dt-cb-open");
+    this._scherm.laag.remove(); this._toast?.remove(); this._toast = null;
+    this._scherm = null;
   },
 
   /* Map openen of kiezen; daarna gegevens laden en de bezetting regelen. */
@@ -277,13 +311,11 @@ DT.register({
   },
 
   mapScherm(DT, titel, uitleg, actie = null, knop = "Map kiezen", ookKiezen = false) {
-    const h = this._scherm.hoofd;
-    this._scherm.laag.querySelector(".dt-cb-titel").textContent = "Gedeelde map";
-    const kies = DT.el("button", { type: "button", class: "dt-cb-knop hoofd", text: actie ? knop : "Map kiezen" });
-    kies.addEventListener("click", actie || (() => this.kiesMap(DT)));
-    const extra = ookKiezen || actie ? DT.el("button", { type: "button", class: "dt-cb-knop", text: "Andere map kiezen" }) : null;
-    extra?.addEventListener("click", () => this.kiesMap(DT));
-    h.replaceChildren(DT.el("div", { class: "dt-cb-leeg groot" }, [DT.el("h2", { text: titel }), DT.el("p", { text: uitleg }), DT.el("div", { class: "dt-cb-rij" }, [kies, extra])]));
+    const h = this._scherm.hoofd = this._scherm.panelen[this._view];
+    const kies = this.knop(DT, actie ? knop : "Map kiezen", actie || (() => this.kiesMap(DT)), true);
+    const extra = ookKiezen || actie ? this.knop(DT, "Andere map kiezen", () => this.kiesMap(DT)) : null;
+    h.replaceChildren(DT.el("dna-card", { class: "dt-cb-kaart dt-cb-leeg" }, [DT.el("h2", { text: titel }), DT.el("p", { text: uitleg }), DT.el("div", { class: "dt-cb-rij" }, [kies, extra])]));
+    this.componenten();
   },
 
   async kiesMap(DT) {
@@ -306,13 +338,14 @@ DT.register({
     return (vandaag ? "vandaag" : d.toLocaleDateString("nl-NL", { day: "numeric", month: "short" })) + " om " + d.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
   },
 
-  modal(titel, inhoud, knoppen = [[ "Sluiten", () => this.sluitModal() ]]) {
+  modal(titel, inhoud, knoppen = [["Sluiten", () => this.sluitModal()]]) {
     this.sluitModal();
-    const kn = knoppen.map(([t, fn, hoofd]) => { const b = DT.el("button", { type: "button", class: `dt-cb-knop${hoofd ? " hoofd" : ""}`, text: t }); b.addEventListener("click", fn); return b; });
-    const m = DT.el("div", { class: "dt-cb-modal" }, DT.el("div", { class: "dt-cb-modalin", role: "dialog", "aria-label": titel }, [DT.el("h2", { text: titel }), ...[].concat(inhoud), DT.el("div", { class: "dt-cb-rij eind" }, kn)]));
+    const kn = knoppen.map(([t, fn, hoofd]) => this.knop(DT, t, fn, hoofd));
+    const m = DT.el("div", { class: "dt-cb-vars dt-cb-modal" }, DT.el("dna-card", { class: "dt-cb-modalin", role: "dialog", "aria-label": titel }, [DT.el("h2", { text: titel }), ...[].concat(inhoud), DT.el("div", { class: "dt-cb-rij eind" }, kn)]));
     m.addEventListener("click", (e) => { if (e.target === m) this.sluitModal(); });
-    this._scherm.laag.append(m); this._modal = m;
-    (kn[kn.length - 1] || m).focus?.();
+    document.body.append(m); this._modal = m;
+    this.componenten();
+    setTimeout(() => (kn[kn.length - 1] || m).focus?.(), 50);
     return m;
   },
   sluitModal() { this._modal?.remove(); this._modal = null; },
@@ -321,13 +354,12 @@ DT.register({
     if (!this._stand) return;
     const K = TardyKern;
     const tekst = !this._map ? "Geen map gekozen"
-      : this._kijkt ? `Alleen bekijken · ${this._ander?.naam || "een collega"} werkt nu`
-      : `Map: ${this._map.name}${this._op ? ` · opgeslagen ${this.moment(this._op)}${this._door ? ` door ${this._door}` : ""}` : ""}`;
+      : this._kijkt ? `Alleen bekijken: ${this._ander?.naam || "een collega"} werkt nu in Tardy. Wijzigingen worden niet bewaard.`
+      : `Gedeelde map "${this._map.name}"${this._op ? ` · opgeslagen ${this.moment(this._op)}${this._door ? ` door ${this._door}` : ""}` : ""}`;
     this._stand.textContent = tekst;
     this._stand.classList.toggle("is-kijk", !!this._kijkt);
-    if (K.S) {
-      const nav = this._scherm?.nav; if (!nav) return;
-      const zet = (v, n) => { const i = nav.querySelector(`[data-view="${v}"] .dt-cb-tel`); if (i) i.textContent = n ? String(n) : ""; };
+    if (K.S && this._scherm) {
+      const zet = (v, n) => { const i = this._scherm.bar.querySelector(`[data-view="${v}"] .dt-cb-tel`); if (i) i.textContent = n ? String(n) : ""; };
       zet("meldafspraken", K.meldLijst().filter((m) => m.datum <= K.vandaag()).length);
       zet("signalen", K.hoogsteTreden(K.alleSignalen(K.UI.periodeId)).filter((s) => !s.afgehandeld).length);
     }
@@ -337,14 +369,14 @@ DT.register({
     if (!this._scherm) return;
     const K = TardyKern;
     if (!K.S || !this._map) return;
-    [...this._scherm.nav.children].forEach((b) => b.setAttribute("aria-current", String(b.dataset.view === this._view)));
+    this._scherm.hoofd = this._scherm.panelen[this._view];
+    this._scherm.hoofd.before(this._balk);
     this._periode.replaceChildren(...K.periodes().map((p) => DT.el("option", { value: p.id, text: `${p.naam} · ${K.kortDatum(p.start)} – ${K.kortDatum(p.eind)}` })));
     this._periode.value = K.UI.periodeId;
-    const titels = { melden: "Melden", meldafspraken: "Meldafspraken", signalen: "Signalen", instellingen: "Instellingen" };
-    this._scherm.laag.querySelector(".dt-cb-titel").textContent = titels[this._view];
     this._scherm.laag.classList.toggle("is-kijk", !!this._kijkt);
     ({ melden: () => this.melden(DT), meldafspraken: () => this.afspraken(DT), signalen: () => this.signalen(DT), instellingen: () => this.instellingen(DT) })[this._view]();
     this.tekenStand();
+    this.componenten();
   },
 
   /* ===================================================================================== */
@@ -417,14 +449,15 @@ DT.register({
     const K = TardyKern, h = this._scherm.hoofd;
     const zoek = DT.el("input", { type: "search", class: "dt-cb-zoek", placeholder: "Naam of stamnummer, of scan de pas…", autocomplete: "off", "aria-label": "Student zoeken" });
     const tijd = DT.el("input", { type: "time", class: "dt-cb-tijd", title: "Tijd van de melding; leeg = nu", "aria-label": "Tijd" });
-    const scan = DT.el("button", { type: "button", class: "dt-cb-knop", title: "Studentenpas scannen met de camera", html: `<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M2 5V3h2M12 3h2v2M14 11v2h-2M4 13H2v-2M4 8h8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>Scan pas</span>` });
+    const scan = this.knop(DT, "Scan pas", () => {});
+    scan.title = "Studentenpas scannen met de camera";
     const lijst = DT.el("div", { class: "dt-cb-hits", role: "listbox" });
     const paneel = DT.el("div", { class: "dt-cb-paneel" });
     const log = DT.el("div", { class: "dt-cb-log" });
     h.replaceChildren(
       DT.el("div", { class: "dt-cb-zoekrij" }, [zoek, tijd, scan]),
       lijst, paneel,
-      DT.el("section", { class: "dt-cb-kaart" }, [DT.el("div", { class: "dt-cb-kaartkop" }, [DT.el("h2", { text: "Vandaag" }), this.knop(DT, "Briefjes van vandaag printen", () => this.print(K.S.registraties.filter((r) => r.datum === K.vandaag() && ["telaat", "calamiteit"].includes((K.SOORT[r.soort] || {}).g)), true))]), log]),
+      DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("div", { class: "dt-cb-kaartkop" }, [DT.el("h2", { text: "Vandaag" }), this.knop(DT, "Briefjes van vandaag printen", () => this.print(K.S.registraties.filter((r) => r.datum === K.vandaag() && ["telaat", "calamiteit"].includes((K.SOORT[r.soort] || {}).g)), true))]), log]),
     );
     let hits = [], sel = 0, mzoek = 0;
     const tekenHits = (lokaal, magister = []) => {
@@ -477,8 +510,9 @@ DT.register({
     setTimeout(() => zoek.focus(), 30);
   },
 
+  /* Magisters eigen knop: primair (gevuld), gewoon (omlijnd) of stil (alleen tekst); klein = size sm. */
   knop(DT, tekst, fn, hoofd = false, extra = "") {
-    const b = DT.el("button", { type: "button", class: `dt-cb-knop${hoofd ? " hoofd" : ""}${extra ? " " + extra : ""}`, text: tekst });
+    const b = DT.el("dna-button", { class: "dt-cb-knop", text: tekst, ...(hoofd ? { variant: "primary" } : {}), ...(/stil/.test(extra) ? { fill: "clear" } : {}), ...(/klein/.test(extra) ? { size: "sm" } : {}) });
     b.addEventListener("click", fn); return b;
   },
 
@@ -499,7 +533,7 @@ DT.register({
       const meer = DT.el("select", { class: "dt-cb-meer", "aria-label": "Meer soorten" }, [DT.el("option", { value: "", text: "Meer soorten…" }),
         ...K.SOORTEN.filter((s) => ![...this.SNEL.ongeoorloofd, ...this.SNEL.geoorloofd].includes(s.c)).map((s) => DT.el("option", { value: s.c, text: s.n }))]);
       meer.addEventListener("change", () => { if (meer.value) { this.registreer(st.stamnr, meer.value, tijdVeld.value); tijdVeld.value = ""; this.teken(); } });
-      delen.push(DT.el("section", { class: "dt-cb-kaart dt-cb-student" }, [
+      delen.push(DT.el("dna-card", { class: "dt-cb-kaart dt-cb-student" }, [
         DT.el("div", { class: "dt-cb-kaartkop" }, [
           DT.el("div", { class: "dt-cb-wie" }, [
             DT.el("h2", { text: K.naamVan(st) }),
@@ -556,7 +590,7 @@ DT.register({
     const eigen = DT.el("input", { type: "text", class: "dt-cb-veld", placeholder: "Eigen reden of notitie", value: K.REDENEN.concat(K.REDENEN_CAL).includes(reg.reden) ? "" : reg.reden || "" });
     eigen.addEventListener("change", () => { reg.reden = eigen.value.trim(); this.bewaar(); this.teken(); });
     const opmerking = `${K.soortNaam(reg.soort)} ${reg.tijd}${reg.reden ? ` – ${reg.reden}` : ""}${reg.paraaf ? ` (${reg.paraaf})` : ""}`;
-    return DT.el("section", { class: `dt-cb-kaart dt-cb-uitslag n${l.niveau || 0}` }, [
+    return DT.el("dna-card", { class: `dt-cb-kaart dt-cb-uitslag n${l.niveau || 0}` }, [
       DT.el("div", { class: "dt-cb-kaartkop" }, [
         DT.el("div", { class: "dt-cb-wie" }, [DT.el("h2", { text: `${K.naamVan(st)} · ${K.soortNaam(reg.soort)} ${reg.tijd}` }), DT.el("small", { text: l.telzin || "" })]),
         this.knop(DT, "Briefje printen", () => this.print([reg])),
@@ -790,7 +824,7 @@ DT.register({
         const m = Object.assign(K.mailTekst(type, s.stamnr, pid), { naam: K.naamVan(st) });
         this.mailLijst(DT, (K.MAILSOORT[type] || { label: "Mail" }).label, `${K.naamVan(st)} · ${s.titel}`, [m]);
       }, false, "klein")));
-      return DT.el("article", { class: `dt-cb-signaal n${s.niveau}${s.afgehandeld ? " is-af" : ""}` }, [
+      return DT.el("dna-card", { class: `dt-cb-kaart dt-cb-signaal n${s.niveau}${s.afgehandeld ? " is-af" : ""}` }, [
         DT.el("div", { class: "dt-cb-kaartkop" }, [
           DT.el("div", { class: "dt-cb-wie" }, [DT.el("h3", { text: K.naamVan(st) }), DT.el("small", { text: `${st.klas || ""} · ${s.titel}${s.onderliggend ? ` · omvat ${s.onderliggend} lichtere ${s.onderliggend === 1 ? "trede" : "treden"}` : ""}` })]),
           DT.el("span", { class: `dt-cb-niveau n${s.niveau}`, text: s.consequentie }),
@@ -860,16 +894,16 @@ DT.register({
     auto.addEventListener("change", async () => { await DT.saveSettings({ cb: { autoPrint: auto.checked } }); Object.assign(K.S.instellingen, this.persoonlijk()); });
     const printer = i.bonPrinter?.naam;
     h.replaceChildren(
-      DT.el("section", { class: "dt-cb-kaart" }, [DT.el("h2", { text: "Gedeelde map" }),
+      DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("h2", { text: "Gedeelde map" }),
         DT.el("p", { text: this._map ? `In gebruik: "${this._map.name}" · revisie ${this._basis}${this._door ? ` · laatst opgeslagen door ${this._door} ${this.moment(this._op)}` : ""}.` : "Nog geen map gekozen." }),
         DT.el("p", { class: "dt-cb-zacht", text: "Dezelfde map als de Tardy-app: tardy-gegevens.json en tardy-in-gebruik.json. Jullie werken om de beurt. Een kopie van de stand blijft ook in deze browser bewaard (hooguit één per uur, de laatste 40, en bij een conflict)." }),
         DT.el("div", { class: "dt-cb-rij" }, [this.knop(DT, "Andere map kiezen", () => this.kiesMap(DT)), this.knop(DT, "Map loskoppelen", async () => { if (!confirm("De balie loskoppelen van deze map? De map zelf blijft staan.")) return; await this.bezettingVrij(); await this.kv("map", null); this._map = null; this.koppel(DT); }, false, "stil")])]),
-      DT.el("section", { class: "dt-cb-kaart" }, [DT.el("h2", { text: "Jij" }), DT.el("p", { class: "dt-cb-zacht", text: "Alleen in deze browser, niet in de gedeelde map (zoals in Tardy)." }),
+      DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("h2", { text: "Jij" }), DT.el("p", { class: "dt-cb-zacht", text: "Alleen in deze browser, niet in de gedeelde map (zoals in Tardy)." }),
         veld("Naam", "naam"), veld("Paraaf", "paraaf"), veld("E-mail", "email", "email"), veld("Lokaal", "lokaal", "text", c.lokaal || i.lokaal || "", "staat in mails en op het briefje")]),
-      DT.el("section", { class: "dt-cb-kaart" }, [DT.el("h2", { text: "Meldafspraken" }),
+      DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("h2", { text: "Meldafspraken" }),
         DT.el("label", { class: "dt-cb-veldrij" }, [DT.el("span", { text: "Meldtijd" }), meldtijd, DT.el("small", { text: "gedeeld met Tardy" })]),
         DT.el("p", { class: "dt-cb-zacht", text: `Periodes, protocol, mentoren en mailteksten komen uit de gedeelde gegevens en pas je aan in de Tardy-app. Nu: ${K.protocol().naam || "standaardprotocol"}.` })]),
-      DT.el("section", { class: "dt-cb-kaart" }, [DT.el("h2", { text: "Briefjes" }),
+      DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("h2", { text: "Briefjes" }),
         DT.el("p", { text: printer ? `Bonprinter: ${printer}.` : "Geen bonprinter gekoppeld: briefjes gaan naar de gewone printer (twee per rij op A4)." }),
         DT.el("div", { class: "dt-cb-rij" }, [
           this.knop(DT, printer ? "Andere bonprinter" : "Bonprinter koppelen", async () => {
@@ -888,110 +922,111 @@ DT.register({
   css() {
     if (document.getElementById("dt-cb-style")) return;
     const st = document.createElement("style"); st.id = "dt-cb-style";
+    /* Alles op Magisters eigen ontwerptokens (--sl-…), zodat de balie meekleurt met Magister en met het thema. */
     st.textContent = `
-      .dt-cb { --cb-bg: #F4F5F8; --cb-kaart: #fff; --cb-fg: #1D1D1F; --cb-zacht: #6E6E73; --cb-lijn: rgba(0,0,0,.08); --cb-acc: var(--dt-accent, #007AFF);
-        --cb-rood: #D70015; --cb-groen: #248A3D; position: fixed; inset: 0; z-index: 2147481000; display: grid; grid-template-columns: 240px 1fr; background: var(--cb-bg); color: var(--cb-fg);
-        font: 14px/1.4 var(--dt-font, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif); }
-      html.dt-dark .dt-cb { --cb-bg: #1C1C1E; --cb-kaart: #2C2C2E; --cb-fg: #F2F2F7; --cb-zacht: #A1A1A6; --cb-lijn: rgba(255,255,255,.1); --cb-rood: #FF6961; --cb-groen: #30D158; }
-      .dt-cb * { box-sizing: border-box; }
-      .dt-cb input[type="checkbox"] { appearance: auto !important; -webkit-appearance: checkbox !important; width: 17px !important; height: 17px !important; margin: 0 !important; opacity: 1 !important;
-        position: static !important; accent-color: var(--cb-acc); cursor: pointer; }
-      .dt-cb-zij { display: flex; flex-direction: column; gap: 14px; padding: 20px 14px; background: var(--cb-kaart); border-right: 1px solid var(--cb-lijn); }
-      .dt-cb-merk b { display: block; font-size: 19px; font-weight: 800; letter-spacing: -.02em; } .dt-cb-merk small { color: var(--cb-zacht); }
-      .dt-cb-nav { display: flex; flex-direction: column; gap: 2px; }
-      .dt-cb-nav button { appearance: none; border: 0; display: flex; justify-content: space-between; align-items: center; height: 36px; padding: 0 12px; border-radius: 10px; background: none; color: inherit; font: 600 14px/1 inherit; font-family: inherit; cursor: pointer; text-align: left; }
-      .dt-cb-nav button:hover { background: var(--cb-bg); }
-      .dt-cb-nav button[aria-current="true"] { background: color-mix(in srgb, var(--cb-acc) 14%, transparent); color: var(--cb-acc); }
-      .dt-cb-tel { font-style: normal; font-size: 12px; min-width: 20px; text-align: center; padding: 2px 6px; border-radius: 999px; background: var(--cb-acc); color: #fff; }
+      ui-view.dt-cb-open > mg-att-tiles { display: none !important; }
+      .dt-cb, .dt-cb-vars {
+        --cb-fg: var(--sl-color-tab-default-foreground, #233243); --cb-zacht: color-mix(in srgb, var(--cb-fg) 62%, transparent);
+        --cb-lijn: var(--sl-color-card-border, #bcbcbc); --cb-lijnzacht: color-mix(in srgb, var(--cb-lijn) 45%, transparent);
+        --cb-kaart: var(--sl-color-card-background, #fefefe); --cb-vlak: var(--sl-elevation-surface-raised-sunken, #f6f8fa);
+        --cb-acc: var(--sl-color-button-primary-solid-idle-background, var(--dt-accent, #056dc2));
+        --cb-hover: var(--sl-color-tab-hover-background, #ddeffe); --cb-actief: var(--sl-color-tab-active-background, #b7defd);
+        --cb-rood: var(--sl-color-border-accent-red-bold, #d7263d); --cb-groen: #1e8a4c;
+        --cb-r: var(--sl-size-borderRadius-default, 4px); --cb-rl: var(--sl-size-borderRadius-lg, 8px);
+        --cb-schaduw: var(--sl-elevation-shadow-sm, 0 2px 4px rgba(34,34,34,.08));
+        color: var(--cb-fg); font-family: var(--sl-text-typeset-font-family-body, open-sans), sans-serif; font-size: 14px; line-height: 20px; }
+      .dt-cb * , .dt-cb-vars * { box-sizing: border-box; }
+      #dt-cbp { display: block; }
+      #dt-cbp dna-tabs { display: block; }
+      #dt-cbp dna-tab { width: 100%; justify-self: stretch; }
+      .dt-cb-tardy { font-size: 12px; opacity: .8; letter-spacing: .02em; white-space: nowrap; }
+      .dt-cb-tel { margin-left: 6px; min-width: 18px; padding: 0 6px; border-radius: 999px; font-size: 11px; line-height: 18px; font-weight: 700; text-align: center; background: var(--cb-acc); color: #fff; }
       .dt-cb-tel:empty { display: none; }
-      .dt-cb-periode { height: 32px; border-radius: 8px; border: 1px solid var(--cb-lijn); background: var(--cb-bg); color: inherit; padding: 0 8px; font: inherit; }
-      .dt-cb-stand { margin-top: auto; font-size: 12px; color: var(--cb-zacht); line-height: 1.4; }
+      .dt-cb-tabblad { padding: 16px 24px 32px; display: flex; flex-direction: column; gap: 16px; }
+      .dt-cb-paneel { display: flex; flex-direction: column; gap: 16px; }
+      .dt-cb-paneel:empty { display: none; }
+      .dt-cb-inhoud { display: flex; flex-direction: column; gap: 16px; }
+      .dt-cb-balk { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+      .dt-cb-stand { color: var(--cb-zacht); font-size: 13px; }
       .dt-cb-stand.is-kijk { color: var(--cb-rood); font-weight: 600; }
-      .dt-cb-kolom { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-      .dt-cb-kop { display: flex; align-items: center; gap: 12px; padding: 18px 28px 6px; }
-      .dt-cb-titel { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -.02em; flex: 1; }
-      .dt-cb-dicht { appearance: none; border: 0; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--cb-kaart); color: inherit; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
-      .dt-cb-hoofd { flex: 1; overflow: auto; padding: 10px 28px 40px; display: flex; flex-direction: column; gap: 14px; }
-      .dt-cb.is-kijk .dt-cb-hoofd::before { content: "Alleen bekijken: een collega werkt nu in Tardy. Wijzigingen worden niet bewaard."; display: block; padding: 10px 14px; border-radius: 12px; background: color-mix(in srgb, var(--cb-rood) 12%, transparent); color: var(--cb-rood); font-weight: 600; }
-      .dt-cb-kaart, .dt-cb-signaal { background: var(--cb-kaart); border-radius: 18px; padding: 16px 18px; box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.04); }
-      .dt-cb-kaart h2, .dt-cb-signaal h3 { margin: 0; font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
-      .dt-cb-kaartkop { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
-      .dt-cb-wie { flex: 1; min-width: 200px; } .dt-cb-wie small { color: var(--cb-zacht); }
-      .dt-cb-rij { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; } .dt-cb-rij.eind { justify-content: flex-end; margin-top: 14px; }
-      .dt-cb-zacht { color: var(--cb-zacht); margin: 0; } .dt-cb-waarschuw { color: var(--cb-rood); font-weight: 600; }
-      .dt-cb-knop { appearance: none; border: 0; height: 32px; padding: 0 14px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font: 600 13px/1 inherit; font-family: inherit; cursor: pointer;
-        background: color-mix(in srgb, var(--cb-acc) 12%, transparent); color: var(--cb-acc); white-space: nowrap; }
-      .dt-cb-knop:hover { background: color-mix(in srgb, var(--cb-acc) 20%, transparent); }
-      .dt-cb-knop.hoofd { background: var(--cb-acc); color: #fff; } .dt-cb-knop.stil { background: none; color: var(--cb-zacht); }
-      .dt-cb-knop.klein { height: 26px; padding: 0 10px; font-size: 12px; }
-      .dt-cb button:focus-visible, .dt-cb input:focus-visible, .dt-cb select:focus-visible { outline: 2px solid var(--cb-acc); outline-offset: 2px; }
-      .dt-cb-zoekrij { display: flex; gap: 8px; }
-      .dt-cb-zoek { flex: 1; height: 54px; border-radius: 16px; border: 2px solid var(--cb-lijn); background: var(--cb-kaart); color: inherit; padding: 0 18px; font: 600 20px/1 inherit; font-family: inherit; }
-      .dt-cb-zoek:focus { border-color: var(--cb-acc); outline: none; }
-      .dt-cb-tijd { width: 110px; height: 54px; border-radius: 16px; border: 2px solid var(--cb-lijn); background: var(--cb-kaart); color: inherit; padding: 0 10px; font: 600 16px/1 inherit; font-family: inherit; }
-      .dt-cb-zoekrij .dt-cb-knop { height: 54px; border-radius: 16px; padding: 0 18px; }
-      .dt-cb-hits { display: flex; flex-direction: column; gap: 4px; } .dt-cb-hits:empty { display: none; }
-      .dt-cb-hit { appearance: none; border: 0; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; background: var(--cb-kaart); color: inherit; font: inherit; text-align: left; cursor: pointer; }
-      .dt-cb-hit[aria-selected="true"], .dt-cb-hit:hover { background: color-mix(in srgb, var(--cb-acc) 12%, var(--cb-kaart)); }
+      .dt-cb-periode { min-width: 240px; }
+      dna-card.dt-cb-kaart { display: block; }
+      .dt-cb-kaart h2, .dt-cb-kaart h3, .dt-cb-modalin h2 { margin: 0; font-family: var(--sl-text-typeset-font-family-heading, open-sans), sans-serif; font-size: 16px; line-height: 24px; font-weight: 700; color: var(--cb-fg); }
+      .dt-cb-kaartkop { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+      .dt-cb-wie { flex: 1; min-width: 200px; } .dt-cb-wie small { display: block; color: var(--cb-zacht); font-size: 13px; }
+      .dt-cb-rij { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; } .dt-cb-rij.eind { justify-content: flex-end; margin-top: 16px; }
+      .dt-cb-zacht { color: var(--cb-zacht); margin: 0; } .dt-cb-waarschuw { color: var(--cb-rood); font-weight: 600; margin: 0; }
+      .dt-cb-leeg { text-align: center; } .dt-cb-leeg p { color: var(--cb-zacht); } .dt-cb-leeg .dt-cb-rij { justify-content: center; }
+      .dt-cb-veld, .dt-cb-meer, .dt-cb-bulk input { height: 36px; padding: 0 10px; border: 1px solid var(--cb-lijn); border-radius: var(--cb-r); background: var(--cb-kaart); color: var(--cb-fg); font: inherit; min-width: 220px; }
+      .dt-cb-veld.klein { height: 30px; min-width: 140px; }
+      .dt-cb-redenrij .dt-cb-veld { flex: 0 1 320px; background: var(--cb-kaart) !important; }
+      .dt-cb-veld:focus, .dt-cb-zoek:focus, .dt-cb-tijd:focus, .dt-cb-meer:focus { outline: none; border-color: var(--cb-acc); box-shadow: 0 0 0 2px color-mix(in srgb, var(--cb-acc) 30%, transparent); }
+      .dt-cb input[type="checkbox"], .dt-cb-vars input[type="checkbox"] { appearance: auto !important; -webkit-appearance: checkbox !important; width: 16px !important; height: 16px !important; margin: 0 !important; opacity: 1 !important; position: static !important; accent-color: var(--cb-acc); cursor: pointer; }
+      .dt-cb-zoekrij { display: flex; gap: 8px; align-items: center; }
+      .dt-cb-zoek { flex: 1; height: 44px; padding: 0 14px 0 40px; border: 1px solid var(--cb-lijn); border-radius: var(--cb-r); background: var(--cb-kaart) no-repeat 14px 50% / 16px
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='7' cy='7' r='5' fill='none' stroke='%23778899' stroke-width='1.6'/%3E%3Cpath d='m11 11 3.5 3.5' stroke='%23778899' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+        color: var(--cb-fg); font: inherit; font-size: 16px; }
+      .dt-cb-tijd { height: 44px; width: 120px; padding: 0 10px; border: 1px solid var(--cb-lijn); border-radius: var(--cb-r); background: var(--cb-kaart); color: var(--cb-fg); font: inherit; }
+      .dt-cb-hits { display: flex; flex-direction: column; border: 1px solid var(--cb-lijn); border-radius: var(--cb-r); background: var(--cb-kaart); overflow: hidden; box-shadow: var(--cb-schaduw); }
+      .dt-cb-hits:empty { display: none; }
+      .dt-cb-hit { appearance: none; border: 0; border-top: 1px solid var(--cb-lijnzacht); display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+      .dt-cb-hit:first-child { border-top: 0; }
+      .dt-cb-hit[aria-selected="true"], .dt-cb-hit:hover { background: var(--cb-hover); }
       .dt-cb-hitnaam { flex: 1; display: flex; flex-direction: column; } .dt-cb-hitnaam small, .dt-cb-hitstand { color: var(--cb-zacht); font-size: 12px; }
-      .dt-cb-mono { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; text-transform: uppercase; background: color-mix(in srgb, var(--cb-acc) 14%, transparent); color: var(--cb-acc); }
-      .dt-cb-soorten { display: grid; grid-template-columns: 3fr 4fr; gap: 12px; }
-      .dt-cb-groep { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; padding: 10px; border-radius: 14px; }
-      .dt-cb-groep > span { grid-column: 1 / -1; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
-      .dt-cb-groep.nok { background: color-mix(in srgb, var(--cb-rood) 8%, transparent); } .dt-cb-groep.nok > span { color: var(--cb-rood); }
-      .dt-cb-groep.ok { background: color-mix(in srgb, var(--cb-groen) 8%, transparent); } .dt-cb-groep.ok > span { color: var(--cb-groen); }
-      .dt-cb-soort { appearance: none; border: 0; min-height: 64px; padding: 10px 12px; border-radius: 12px; background: var(--cb-kaart); color: inherit; font: inherit; text-align: left; cursor: pointer; display: flex; flex-direction: column; justify-content: center; gap: 2px; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
-      .dt-cb-soort b { font-size: 15px; } .dt-cb-soort small { color: var(--cb-zacht); font-size: 12px; }
-      .dt-cb-soort.nok:hover { box-shadow: inset 0 0 0 2px var(--cb-rood); } .dt-cb-soort.ok:hover { box-shadow: inset 0 0 0 2px var(--cb-groen); }
-      .dt-cb-meer { margin-top: 10px; height: 32px; border-radius: 8px; border: 1px solid var(--cb-lijn); background: var(--cb-kaart); color: inherit; padding: 0 10px; font: inherit; }
-      .dt-cb-uitslag { border-left: 6px solid var(--cb-zacht); }
-      .dt-cb-uitslag.n1 { border-left-color: #FFCC00; } .dt-cb-uitslag.n2 { border-left-color: #FF9500; } .dt-cb-uitslag.n3 { border-left-color: #FF3B30; } .dt-cb-uitslag.n4 { border-left-color: #AF52DE; }
-      .dt-cb-gevolg { display: flex; gap: 10px; align-items: baseline; margin: 0 0 8px; font-size: 15px; }
+      .dt-cb-mono { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; text-transform: uppercase; background: var(--cb-actief); color: var(--cb-fg); }
+      .dt-cb-soorten { display: grid; grid-template-columns: 3fr 4fr; gap: 16px; }
+      .dt-cb-groep { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; padding: 12px; border-radius: var(--cb-rl); border: 1px solid var(--cb-lijnzacht); }
+      .dt-cb-groep > span { grid-column: 1 / -1; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+      .dt-cb-groep.nok > span { color: var(--cb-rood); } .dt-cb-groep.ok > span { color: var(--cb-groen); }
+      .dt-cb-groep.nok { background: color-mix(in srgb, var(--cb-rood) 5%, var(--cb-kaart)); } .dt-cb-groep.ok { background: color-mix(in srgb, var(--cb-groen) 5%, var(--cb-kaart)); }
+      .dt-cb-soort { appearance: none; min-height: 60px; padding: 8px 12px; border: 1px solid var(--cb-lijn); border-radius: var(--cb-r); background: var(--cb-kaart); color: inherit; font: inherit; text-align: left; cursor: pointer; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+      .dt-cb-soort b { font-size: 14px; font-weight: 700; } .dt-cb-soort small { color: var(--cb-zacht); font-size: 12px; }
+      .dt-cb-soort:hover { background: var(--cb-hover); border-color: var(--cb-acc); }
+      .dt-cb-soort.nok:hover { border-color: var(--cb-rood); } .dt-cb-soort.ok:hover { border-color: var(--cb-groen); }
+      .dt-cb-meer { margin-top: 12px; min-width: 200px; }
+      .dt-cb-uitslag, .dt-cb-signaal { border-left: 4px solid var(--cb-lijn); }
+      .dt-cb-uitslag.n1, .dt-cb-signaal.n1 { border-left-color: #f2c400; } .dt-cb-uitslag.n2, .dt-cb-signaal.n2 { border-left-color: #f08a00; }
+      .dt-cb-uitslag.n3, .dt-cb-signaal.n3 { border-left-color: #d7263d; } .dt-cb-uitslag.n4, .dt-cb-signaal.n4 { border-left-color: #8e44ad; }
+      .dt-cb-signaal.is-af { opacity: .6; } .dt-cb-signaal p { margin: 0 0 12px; }
+      .dt-cb-gevolg { display: flex; gap: 8px; align-items: baseline; margin: 0 0 8px; }
       .dt-cb-afspraak { margin: 0 0 8px; font-weight: 600; }
-      .dt-cb-niveau { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; background: var(--cb-bg); }
-      .dt-cb-niveau.n1 { background: #FFF4C2; color: #7A5C00; } .dt-cb-niveau.n2 { background: #FFE2C2; color: #8A4B00; } .dt-cb-niveau.n3 { background: #FFD6D3; color: #A1170D; } .dt-cb-niveau.n4 { background: #EBD7F7; color: #6B2C91; }
-      .dt-cb-redenrij { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
-      .dt-cb-label { font-size: 12px; font-weight: 700; color: var(--cb-zacht); text-transform: uppercase; letter-spacing: .06em; }
+      .dt-cb-niveau { display: inline-flex; align-items: center; padding: 0 8px; border-radius: var(--cb-r); font-size: 12px; line-height: 20px; font-weight: 700; white-space: nowrap; background: var(--cb-vlak); }
+      .dt-cb-niveau.n1 { background: #fff4c2; color: #6b5200; } .dt-cb-niveau.n2 { background: #ffe3c2; color: #7a4100; } .dt-cb-niveau.n3 { background: #fdd8dc; color: #9b1424; } .dt-cb-niveau.n4 { background: #ecdcf5; color: #5e2a7e; }
+      .dt-cb-redenrij { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+      .dt-cb-label { font-size: 12px; font-weight: 700; color: var(--cb-zacht); text-transform: uppercase; letter-spacing: .04em; }
       .dt-cb-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-      .dt-cb-chip { appearance: none; border: 1px solid var(--cb-lijn); height: 30px; padding: 0 12px; border-radius: 999px; background: var(--cb-kaart); color: inherit; font: 600 13px/1 inherit; font-family: inherit; cursor: pointer; }
-      .dt-cb-chip[aria-pressed="true"] { background: var(--cb-acc); color: #fff; border-color: var(--cb-acc); }
-      .dt-cb-veld { height: 32px; border-radius: 8px; border: 1px solid var(--cb-lijn); background: var(--cb-kaart); color: inherit; padding: 0 10px; font: inherit; min-width: 220px; }
-      .dt-cb-veld.klein { min-width: 140px; height: 28px; }
-      .dt-cb-magister { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--cb-bg); font-size: 13px; }
-      .dt-cb-magister code { padding: 3px 8px; border-radius: 6px; background: var(--cb-kaart); font: 600 13px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; }
-      .dt-cb-tabel { width: 100%; border-collapse: collapse; background: var(--cb-kaart); border-radius: 14px; overflow: hidden; }
-      .dt-cb-tabel th { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--cb-zacht); padding: 10px 10px 6px; }
-      .dt-cb-tabel td { padding: 7px 10px; border-top: 1px solid var(--cb-lijn); vertical-align: middle; }
+      .dt-cb-chip { appearance: none; height: 30px; padding: 0 12px; border: 1px solid var(--cb-lijn); border-radius: 999px; background: var(--cb-kaart); color: inherit; font: inherit; font-size: 13px; cursor: pointer; }
+      .dt-cb-chip:hover { background: var(--cb-hover); }
+      .dt-cb-chip[aria-pressed="true"] { background: var(--cb-actief); border-color: var(--cb-acc); font-weight: 700; }
+      .dt-cb-magister { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 12px; border-radius: var(--cb-r); background: var(--cb-vlak); font-size: 13px; }
+      .dt-cb-magister code { padding: 2px 6px; border-radius: var(--cb-r); background: var(--cb-kaart); border: 1px solid var(--cb-lijnzacht); font: 600 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .dt-cb-tabel { width: 100%; border-collapse: collapse; }
+      .dt-cb-tabel th { text-align: left; font-size: 12px; font-weight: 700; color: var(--cb-zacht); padding: 8px; border-bottom: 1px solid var(--cb-lijn); }
+      .dt-cb-tabel td { padding: 6px 8px; border-bottom: 1px solid var(--cb-lijnzacht); vertical-align: middle; }
+      .dt-cb-tabel tr:hover td { background: color-mix(in srgb, var(--cb-hover) 50%, transparent); }
       .dt-cb-tabel td small { color: var(--cb-zacht); }
-      .dt-cb-groepkop td { font-weight: 800; background: var(--cb-bg); }
-      .dt-cb-acties { white-space: nowrap; text-align: right; } .dt-cb-acties .dt-cb-knop { margin-left: 4px; }
-      .dt-cb-bulk { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 14px; background: color-mix(in srgb, var(--cb-acc) 10%, var(--cb-kaart)); }
+      .dt-cb-groepkop td { font-weight: 700; background: var(--cb-vlak); }
+      .dt-cb-acties { white-space: nowrap; text-align: right; }
+      .dt-cb-bulk { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 12px; border-radius: var(--cb-r); background: var(--cb-hover); }
       .dt-cb-bulk[hidden] { display: none; }
-      .dt-cb-bulk input { height: 30px; border-radius: 8px; border: 1px solid var(--cb-lijn); padding: 0 8px; font: inherit; background: var(--cb-kaart); color: inherit; }
-      .dt-cb-leeg { padding: 40px; text-align: center; color: var(--cb-zacht); }
-      .dt-cb-leeg.groot { max-width: 560px; margin: 8vh auto; background: var(--cb-kaart); border-radius: 22px; color: inherit; }
-      .dt-cb-leeg.groot h2 { margin: 0 0 8px; } .dt-cb-leeg.groot .dt-cb-rij { justify-content: center; margin-top: 16px; }
-      .dt-cb-niveaugroep { display: flex; flex-direction: column; gap: 8px; } .dt-cb-niveaugroep h2 { display: flex; gap: 8px; align-items: center; margin: 6px 0 0; font-size: 15px; }
-      .dt-cb-signaal { border-left: 6px solid var(--cb-zacht); } .dt-cb-signaal p { margin: 0 0 10px; }
-      .dt-cb-signaal.n1 { border-left-color: #FFCC00; } .dt-cb-signaal.n2 { border-left-color: #FF9500; } .dt-cb-signaal.n3 { border-left-color: #FF3B30; } .dt-cb-signaal.n4 { border-left-color: #AF52DE; }
-      .dt-cb-signaal.is-af { opacity: .55; }
+      .dt-cb-bulk input { min-width: 0; }
+      .dt-cb-niveaugroep { display: flex; flex-direction: column; gap: 8px; } .dt-cb-niveaugroep h2 { display: flex; gap: 8px; align-items: center; margin: 4px 0 0; font-size: 15px; }
       .dt-cb-schakel { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
-      .dt-cb-veldrij { display: grid; grid-template-columns: 140px minmax(200px, 340px) auto; gap: 10px; align-items: center; margin: 8px 0; }
+      .dt-cb-veldrij { display: grid; grid-template-columns: 140px minmax(200px, 340px) auto; gap: 12px; align-items: center; margin: 8px 0; }
       .dt-cb-veldrij small { color: var(--cb-zacht); }
-      .dt-cb-modal { position: fixed; inset: 0; z-index: 2; display: grid; place-items: center; background: rgba(0,0,0,.35); }
-      .dt-cb-modalin { width: min(720px, 92vw); max-height: 86vh; overflow: auto; background: var(--cb-kaart); border-radius: 20px; padding: 20px 22px; box-shadow: 0 30px 80px rgba(0,0,0,.35); display: flex; flex-direction: column; gap: 10px; }
-      .dt-cb-modalin h2 { margin: 0; font-size: 18px; }
+      .dt-cb-modal { position: fixed; inset: 0; z-index: 1350; display: grid; place-items: center; background: rgba(34,34,34,.4); }
+      .dt-cb-modalin { display: flex; flex-direction: column; gap: 12px; width: min(720px, 92vw); max-height: 86vh; overflow: auto; box-shadow: var(--sl-elevation-shadow-overlay, 0 12px 32px rgba(0,0,0,.2)); }
       .dt-cb-modalin .dt-cb-veld { width: 100%; }
-      .dt-cb-mails { display: flex; flex-direction: column; gap: 10px; }
-      .dt-cb-mail { border: 1px solid var(--cb-lijn); border-radius: 12px; padding: 10px 12px; }
-      .dt-cb-mail .dt-cb-rij b { flex: 1; } .dt-cb-onderwerp { font-weight: 700; margin: 6px 0; }
-      .dt-cb-mail pre { margin: 0; white-space: pre-wrap; font: 13px/1.45 inherit; font-family: inherit; color: var(--cb-zacht); max-height: 220px; overflow: auto; }
-      .dt-cb-scanvak { position: relative; border-radius: 14px; overflow: hidden; background: #000; aspect-ratio: 4 / 3; }
+      .dt-cb-mails { display: flex; flex-direction: column; gap: 8px; }
+      .dt-cb-mail { border: 1px solid var(--cb-lijnzacht); border-radius: var(--cb-r); padding: 8px 12px; }
+      .dt-cb-mail .dt-cb-rij b { flex: 1; } .dt-cb-onderwerp { font-weight: 700; margin: 4px 0; }
+      .dt-cb-mail pre { margin: 0; white-space: pre-wrap; font: inherit; font-size: 13px; color: var(--cb-zacht); max-height: 220px; overflow: auto; }
+      .dt-cb-scanvak { position: relative; border-radius: var(--cb-rl); overflow: hidden; background: #000; aspect-ratio: 4 / 3; }
       .dt-cb-scanvak video { width: 100%; height: 100%; object-fit: cover; }
-      .dt-cb-scanvak i { position: absolute; inset: 30% 12%; border: 3px solid rgba(255,255,255,.85); border-radius: 12px; }
-      .dt-cb-toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); opacity: 0; pointer-events: none; padding: 12px 18px; border-radius: 14px; background: #1D1D1F; color: #fff; font-weight: 600; max-width: 80vw; transition: opacity .2s, transform .2s; z-index: 3; }
+      .dt-cb-scanvak i { position: absolute; inset: 30% 12%; border: 3px solid rgba(255,255,255,.85); border-radius: var(--cb-rl); }
+      .dt-cb-toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 16px); opacity: 0; pointer-events: none; padding: 10px 16px; border-radius: var(--cb-r); background: #233243; color: #fff; font-weight: 600; max-width: 80vw; transition: opacity .2s, transform .2s; z-index: 1400; box-shadow: var(--sl-elevation-shadow-overlay, 0 8px 24px rgba(0,0,0,.2)); }
       .dt-cb-toast.is-aan { opacity: 1; transform: translate(-50%, 0); } .dt-cb-toast[data-soort="err"] { background: var(--cb-rood); }
-      @media (max-width: 900px) { .dt-cb { grid-template-columns: 1fr; } .dt-cb-zij { flex-direction: row; flex-wrap: wrap; align-items: center; padding: 10px; } .dt-cb-nav { flex-direction: row; } .dt-cb-soorten { grid-template-columns: 1fr; } }
+      @media (max-width: 900px) { .dt-cb-soorten { grid-template-columns: 1fr; } .dt-cb-tabblad { padding: 12px; } }
     `;
     document.head.append(st);
   },
