@@ -401,7 +401,8 @@ DT.register({
           huidig ? knop("Standaard gebruiken", async () => { delete pr.sjablonen[k]; await bewaar(); this.profielEditor(DT, pr); }) : null].filter(Boolean))]);
     };
     this.modal(DT, `Profiel bewerken: ${pr.naam}`, [
-      DT.el("div", { class: "dt-pva-grid" }, [veld("Naam van het profiel", tekst(pr.naam, (v) => { pr.naam = v || "Profiel"; })), veld("School", tekst(pr.school, (v) => { pr.school = v; }))]),
+      DT.el("div", { class: "dt-pva-grid" }, [veld("Naam van het profiel", tekst(pr.naam, (v) => { pr.naam = v || "Profiel"; })), veld("School", tekst(pr.school, (v) => { pr.school = v; })),
+        veld("Logboektype in Magister", tekst(pr.logboekType || "Gespreksnotitie", (v) => { pr.logboekType = v.trim() || "Gespreksnotitie"; }), "zoals bij Begeleiding › Toevoegen")]),
       DT.el("h3", { class: "dt-pva-kopje", text: "Soorten plannen" }),
       DT.el("div", { class: "dt-pva-grid" }, [
         veld("Algemeen plan", tekst(so.algemeen?.naam, (v) => { (so.algemeen ||= {}).naam = v || "Plan van aanpak"; })),
@@ -555,7 +556,7 @@ DT.register({
     try {
       const bytes = await this.bytes(p);
       let bin = ""; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-      const ok = DTForms.logboek(this.NOTITIE, { magisterId: String(p.magisterId), naam: p.naam, type: "Gespreksnotitie", omschrijving: this.titel(p),
+      const ok = DTForms.logboek(this.NOTITIE, { magisterId: String(p.magisterId), naam: p.naam, type: (this._pr?.logboekType || "Gespreksnotitie"), omschrijving: this.titel(p),
         tekst: this.samenvatting(p), bijlage: { naam: this.bestandsnaam(p), base64: btoa(bin) }, bron: "Plan van aanpak" });
       if (!ok) return this.melding("De bijlage is te groot om door te geven; download het Word-document en voeg het zelf toe.");
       p.notitieOp = new Date().toISOString(); await this.bewaarPlan(p);

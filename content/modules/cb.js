@@ -26,6 +26,7 @@ DT.register({
     /* In het logboek-frame van Magister (magister-lvs): alleen de notitie invullen. */
     if (!DT.isTop) {
       if (/^\/magister-lvs\//.test(location.pathname)) this._stop = DT.observe(() => this.vulNotitie(), { debounce: 250, poll: 1000 });
+      else if (/^\/magister-berichten\//.test(location.pathname)) this._stop = DT.observe(() => DTForms.vulBericht("dt-cb-bericht"), { debounce: 400, poll: 1000 });
       return;
     }
     this._stop = DT.observe(() => { this.tegel(DT); this.vulAfspraak(); }, { debounce: 300, poll: 1500 });
@@ -1227,6 +1228,7 @@ DT.register({
           }
           K.S.lesreg[sn] = { op: vandaag, bron: "magister", ziekDatums: [...ziek].sort(), medischDatums: [...med].sort(), onUren, perioden };
           await this.ouderMails(st, id).catch(() => {});
+          await this.mentorUitMagister(st, id).catch(() => {});
         } catch { H.fout++; }
         H.klaar++;
         if (this._view === "signalen" && this._scherm) this.tekenHaal();
@@ -1401,7 +1403,7 @@ DT.register({
     return DT.el("div", { class: kort ? "dt-cb-acties-in" : "dt-cb-acties3" }, [
       knop("notitie", "Notitie in dossier", "Notitie in het dossier (logboek) in Magister", "Notitie", () => {
         const t = this.eigenTekst("notitie", vars);
-        this.notitieMaken(s.stamnr, { omschrijving: t.onderwerp, tekst: t.body });
+        this.notitieMaken(s.stamnr, { omschrijving: t.onderwerp, tekst: t.body, type: DT.settings.cb?.logboekType || "Notitie" });
       }),
       knop("mail", mails.length ? `Mail ${ontvangers.join(", ")}` : "Geen mail", mails.length ? `Concept in je mailprogramma${this.oudersMet18(st) ? " (18+, met toestemming voor contact met ouders)" : ""}` : "Bij deze stap hoort geen mail", "Mail", () => this.mailsDirect(s, pid), !mails.length),
       knop("afspraak", "Afspraak in Magister", "Afspraak met de student in Magister", "Afspraak", () => {
@@ -1473,6 +1475,44 @@ DT.register({
     this.bewaar();
     return adressen;
   },
+  /* Mentor uit Magister: de mentoren van de lopende aanmelding (/api/aanmeldingen/{id}/mentoren) en hun
+   * schoolmailadres (/api/medewerkers/{id}/contactgegevens, "Email School"). Een klasmentor (type "groep") gaat
+   * naar de klasmentoren in de gedeelde gegevens, een persoonlijke mentor naar de student. Wat met de hand
+   * (of in Tardy) is ingevuld, blijft staan; alleen lege of eerder uit Magister gehaalde gegevens worden bijgewerkt. */
+  async mentorUitMagister(st, id = null) {
+    const K = TardyKern, nu = K.vandaag();
+    id ||= st.magisterId;
+    if (!id) { const hit = (await this.zoekMagister(st.stamnr)).find((x) => x.stamnr === String(st.stamnr)); id = hit?.magisterId; if (id) st.magisterId = id; }
+    if (!id) return null;
+    const lijst = (r) => (r && r.status === 200 && r.json) ? (Array.isArray(r.json) ? r.json : r.json.items || []) : null;
+    const am = lijst(await this.apiOpnieuw(`/api/leerlingen/${encodeURIComponent(id)}/aanmeldingen`)) || [];
+    const loopt = am.filter((x) => (!x.begin || String(x.begin).slice(0, 10) <= nu) && (!x.einde || String(x.einde).slice(0, 10) >= nu));
+    const a = loopt.find((x) => x.isHoofdAanmelding) || loopt[0] || am[0];
+    if (!a) return null;
+    const mentoren = (lijst(await this.apiOpnieuw(`/api/aanmeldingen/${a.id}/mentoren`)) || []).sort((x, y) => (x.volgnummer || 9) - (y.volgnummer || 9));
+    this._mentorMail ||= {};
+    const mail = async (m) => {
+      if (m.id in this._mentorMail) return this._mentorMail[m.id];
+      const c = lijst(await this.apiOpnieuw(`/api/medewerkers/${m.id}/contactgegevens`)) || [];
+      const adressen = c.filter((x) => x.type === "emailadres" && /@/.test(x.emailadres || ""));
+      return (this._mentorMail[m.id] = (adressen.find((x) => /school|werk/i.test(x.label || "")) || adressen[0])?.emailadres || "");
+    };
+    const naam = (m) => [m.roepnaam || m.voorletters, m.tussenvoegsel, m.achternaam].filter(Boolean).join(" ") || m.naam || "";
+    const klas = a.groep?.code || st.klas;
+    let gezet = false;
+    const groep = mentoren.find((m) => [].concat(m.type || []).includes("groep"));
+    const pers = mentoren.find((m) => [].concat(m.type || []).some((t) => /persoonlijk/i.test(t)));
+    if (groep && klas) {
+      const km = (K.S.instellingen.klasMentoren ||= {}), oud = km[klas];
+      if (!oud || oud.bron === "magister" || (!oud.naam && !oud.email)) { km[klas] = { naam: naam(groep), email: await mail(groep), bron: "magister" }; gezet = true; }
+    }
+    if (pers && (st.mentorBron === "magister" || (!st.persoonlijkeMentor && !st.persoonlijkeMentorEmail))) {
+      st.persoonlijkeMentor = naam(pers); st.persoonlijkeMentorEmail = await mail(pers); st.mentorBron = "magister"; gezet = true;
+    }
+    if (!st.klas && klas) st.klas = klas;
+    if (gezet) this.bewaar();
+    return K.mentorVan(st);
+  },
   /* Vlak voor een mail aan ouders: adres ophalen als het er nog niet is (of ouder is dan een week). */
   async zorgOuders(st) {
     const K = TardyKern;
@@ -1491,7 +1531,20 @@ DT.register({
     const K = TardyKern, st = K.S.studenten[s.stamnr];
     const soorten = this.sigMails(s);
     if (soorten.some((t) => (K.MAILSOORT[t] || {}).aan === "ouders")) await this.zorgOuders(st);
+    if (soorten.some((t) => (K.MAILSOORT[t] || {}).aan === "mentor") && !K.mentorVan(st).email) await this.mentorUitMagister(st).catch(() => {});
     const mails = soorten.map((type) => this.mailVan(type, s.stamnr, pid));
+    /* Via Magister-berichten (instelling): student, ouders en mentor als Magister-bericht; overige (verzuimbureau)
+     * blijven een concept in het mailprogramma. */
+    if (DT.settings.cb?.berichtenVia === "magister") {
+      const via = mails.filter((m) => ["student", "ouders", "mentor"].includes((K.MAILSOORT[m.type] || {}).aan));
+      via.forEach((m, i) => setTimeout(() => DTForms.bericht("dt-cb-bericht", { onderwerp: m.onderwerp, tekst: m.body, bron: "de Te laat-balie",
+        ontvangers: [{ soort: { student: "student", ouders: "ouders", mentor: "mentoren" }[(K.MAILSOORT[m.type] || {}).aan], zoek: String(s.stamnr), naam: K.naamVan(st) }] }), i * 1200));
+      const rest = mails.filter((m) => !via.includes(m));
+      rest.forEach((m, i) => setTimeout(() => { const a = document.createElement("a"); a.href = `mailto:${this.adressen(m.aan)}?subject=${encodeURIComponent(m.onderwerp)}&body=${encodeURIComponent(m.body)}`; a.click(); }, (via.length + i) * 1200));
+      mails.forEach((m) => K.S.mails.push({ id: K.uid(), stamnr: s.stamnr, type: m.type, aan: m.aan, onderwerp: m.onderwerp, op: K.vandaag(), via: via.includes(m) ? "magister" : "mail" }));
+      this.melding(`${via.length ? `${via.length} Magister-${via.length === 1 ? "bericht opent" : "berichten openen"} in een nieuw tabblad` : ""}${via.length && rest.length ? "; " : ""}${rest.length ? `${rest.length} ${rest.length === 1 ? "mail" : "mails"} in je mailprogramma` : ""}. Controleer en verstuur zelf.`, "info", 8000);
+      return;
+    }
     mails.forEach((m, i) => setTimeout(() => {
       const a = document.createElement("a");
       a.href = `mailto:${this.adressen(m.aan)}?subject=${encodeURIComponent(m.onderwerp)}&body=${encodeURIComponent(m.body)}`;
@@ -1879,6 +1932,26 @@ DT.register({
     ]);
   },
 
+  /* Versturen via Outlook of via Magister-berichten, en wat Magister bij jullie toestaat (scherminstellingen). */
+  berichtenKaart(DT) {
+    const c = DT.settings.cb || {};
+    const kies = DT.el("select", { class: "dt-cb-veld" }, [DT.el("option", { value: "outlook", text: "Concept in mijn mailprogramma (Outlook)" }), DT.el("option", { value: "magister", text: "Magister-bericht (student, ouders, mentor)" })]);
+    kies.value = c.berichtenVia || "outlook";
+    kies.addEventListener("change", async () => { await DT.saveSettings({ cb: { berichtenVia: kies.value } }); this.melding("Bewaard."); });
+    const status = DT.el("p", { class: "dt-cb-zacht", text: "Rechten in Magister controleren…" });
+    (async () => {
+      const r = await DT.api("/api/m6/scherminstellingen", { full: true, timeout: 10000 });
+      const rollen = (r.json?.items || []).filter((x) => ["Docent", "Mentor"].includes(x.rol)).map((x) => x.instellingen || {});
+      const mag = (k) => rollen.some((x) => x[k] === true);
+      if (!rollen.length) { status.textContent = "Kon de rechten in Magister niet ophalen."; return; }
+      status.textContent = `In Magister: berichten schrijven ${mag("berichtenSchrijven") ? "aan" : "uit"}, berichten aan ouders ${mag("berichtenAanOuders") ? "aan" : "uit"}, terugkommaatregelen aanmaken ${mag("terugkommaatregelAanmaken") ? "aan" : "uit (meldafspraken blijven in de balie)"}.`;
+    })();
+    return DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("h2", { text: "Mails en berichten" }),
+      DT.el("label", { class: "dt-cb-veldrij" }, [DT.el("span", { text: "Versturen via" }), kies, DT.el("small", { text: "mails aan het verzuimbureau gaan altijd via je mailprogramma" })]),
+      DT.el("p", { class: "dt-cb-zacht", text: "Met Magister-berichten opent per mail een nieuw bericht in Magister met de ontvanger (de student, \"Ouders/verzorgers van\" of \"Mentoren van\"), het onderwerp en de tekst al ingevuld. Je klikt zelf op Verzenden." }),
+      status]);
+  },
+
   /* ===================================================================================== */
   /* Instellingen                                                                           */
   /* ===================================================================================== */
@@ -1903,7 +1976,11 @@ DT.register({
         DT.el("p", { class: "dt-cb-zacht", text: "Dezelfde map als de Tardy-app: tardy-gegevens.json en tardy-in-gebruik.json. Jullie werken om de beurt. Een kopie van de stand blijft ook in deze browser bewaard (hooguit één per uur, de laatste 40, en bij een conflict)." }),
         DT.el("div", { class: "dt-cb-rij" }, [this.knop(DT, "Andere map kiezen", () => this.kiesMap(DT)), this.knop(DT, "Map loskoppelen", async () => { if (!confirm("De balie loskoppelen van deze map? De map zelf blijft staan.")) return; await this.bezettingVrij(); await this.kv("map", null); this._map = null; this.koppel(DT); }, false, "stil")])]),
       DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("h2", { text: "Jij" }), DT.el("p", { class: "dt-cb-zacht", text: "Alleen in deze browser, niet in de gedeelde map (zoals in Tardy)." }),
-        veld("Naam", "naam"), veld("Paraaf", "paraaf"), veld("E-mail", "email", "email"), veld("Lokaal", "lokaal", "text", c.lokaal || i.lokaal || "", "staat in mails en op het briefje")]),
+        veld("Naam", "naam"), veld("Paraaf", "paraaf"), veld("E-mail", "email", "email"), veld("Lokaal", "lokaal", "text", c.lokaal || i.lokaal || "", "staat in mails en op het briefje"),
+        (() => { const r = veld("Logboektype bij Notitie", "logboekType", "text", c.logboekType || "Notitie", "zoals in Magister › Begeleiding › Toevoegen, bijv. Notitie of Gespreksnotitie");
+          const l = DT.el("datalist", { id: "dt-cb-logboektypes" }, ["Notitie", "Gespreksnotitie", "Afspraak", "Incident"].map((v) => DT.el("option", { value: v })));
+          r.querySelector("input").setAttribute("list", "dt-cb-logboektypes"); r.append(l); return r; })()]),
+      this.berichtenKaart(DT),
       DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("h2", { text: "Meldafspraken" }),
         DT.el("label", { class: "dt-cb-veldrij" }, [DT.el("span", { text: "Meldtijd" }), meldtijd, DT.el("small", { text: "gedeeld met Tardy" })]),
         DT.el("p", { class: "dt-cb-zacht", text: `Periodes, mentoren en mailteksten komen uit de gedeelde gegevens en pas je aan in de Tardy-app. Het protocol (${K.protocol().naam || "standaardprotocol"}) pas je aan op het tabblad Protocol.` })]),

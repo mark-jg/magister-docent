@@ -107,6 +107,75 @@ var DTForms = (() => {
     bezig[sleutel] = false;
   }
 
+  /* Nieuw bericht in Magister (frame /magister-berichten/, #/nieuw/…). Concepten staan in een wachtrij, zodat
+   * meerdere berichten tegelijk (elk in een eigen tabblad) kunnen worden klaargezet.
+   * concept: { id, t, ontvangers: [{ soort: "student"|"ouders"|"mentoren", zoek: stamnr, naam }], onderwerp, tekst, bron } */
+  async function vulBericht(sleutel) {
+    if (bezig[sleutel] || !/^#\/nieuw\//.test(location.hash) || document.getElementById("dt-bericht-banner")) return;
+    const tagInput = document.querySelector("input.dna-tag-input"), ond = document.querySelector("input[formcontrolname=onderwerp]"), ed = document.querySelector(".ProseMirror[contenteditable=true]");
+    if (!tagInput || !ond || !ed) return;
+    let rij = []; try { rij = JSON.parse(localStorage.getItem(sleutel) || "[]"); } catch {}
+    rij = rij.filter((c) => Date.now() - c.t < 5 * 60000);
+    const c = rij.find((x) => !x.genomen);
+    if (!c) return;
+    schrijf(sleutel, rij.filter((x) => x.id !== c.id));   // dit tabblad neemt dit concept
+    bezig[sleutel] = true;
+    const typ = (el, tekst) => { el.focus(); document.execCommand("insertText", false, tekst); };
+    const optie = async (bereik, zoek) => {
+      for (let i = 0; i < 25; i++) {
+        await wacht(200);
+        const o = [...bereik.querySelectorAll("[role=option]")].find((e) => e.offsetParent && e.textContent.includes(zoek) && !/Snelle acties|Mentoren van/.test(e.textContent));
+        if (o) return o;
+      }
+      return null;
+    };
+    const mislukt = [];
+    for (const o of c.ontvangers || []) {
+      try {
+        if (o.soort === "student") {
+          typ(tagInput, o.zoek);
+          const opt = await optie(document, o.zoek);
+          if (opt) { opt.click(); await wacht(300); } else mislukt.push(o.naam || o.zoek);
+          continue;
+        }
+        const label = o.soort === "ouders" ? "Ouders/verzorgers van" : "Mentoren van";
+        let snel = null;   // de snelle acties verschijnen pas als het Aan-veld open is
+        for (let i = 0; i < 15 && !snel; i++) {
+          if (i % 5 === 0) { tagInput.blur(); document.body.click(); await wacht(150); tagInput.click(); tagInput.focus(); }
+          await wacht(200);
+          snel = [...document.querySelectorAll("dna-button")].find((b) => b.textContent.trim() === label && b.offsetParent);
+        }
+        if (!snel) { mislukt.push(`${label.toLowerCase()} ${o.naam}`); continue; }
+        snel.click();
+        let dlg = null; for (let i = 0; i < 15 && !dlg; i++) { await wacht(200); dlg = document.querySelector("dna-dialog"); }
+        const zoekveld = dlg && [...dlg.querySelectorAll("input")].find((x) => x.type === "text" || !x.type);
+        if (!zoekveld) { mislukt.push(`${label.toLowerCase()} ${o.naam}`); continue; }
+        typ(zoekveld, o.zoek);
+        const opt = await optie(document, o.zoek);   // de zoekresultaten staan in een overlay buiten het venster
+        if (!opt) { mislukt.push(`${label.toLowerCase()} ${o.naam}`); [...dlg.querySelectorAll("dna-button")].find((b) => /Annuleren/.test(b.textContent))?.click(); continue; }
+        opt.click(); await wacht(400);
+        [...dlg.querySelectorAll("dna-button")].find((b) => /Toevoegen/.test(b.textContent))?.click(); await wacht(500);
+      } catch { mislukt.push(o.naam || o.zoek); }
+    }
+    /* Overgebleven zoektekst in het Aan-veld weghalen. */
+    if (tagInput.value) { tagInput.focus(); tagInput.select?.(); document.execCommand("delete"); }
+    typ(ond, c.onderwerp || "");
+    ed.focus();
+    String(c.tekst || "").split("\n").forEach((regel, i) => { if (i) document.execCommand("insertParagraph"); if (regel) document.execCommand("insertText", false, regel); });
+    const b = banner(`Ingevuld door ${c.bron || "Docent Tools"}.`, `Controleer ontvangers en tekst en klik op Verzenden.${mislukt.length ? ` Niet automatisch toegevoegd: ${mislukt.join(", ")}; voeg die zelf toe bij Aan.` : ""}`);
+    b.id = "dt-bericht-banner";
+    const kop = document.querySelector("h1, h2");
+    (kop?.parentElement || document.body).insertBefore(b, kop?.nextSibling || document.body.firstChild);
+    bezig[sleutel] = false;
+  }
+  function bericht(sleutel, concept) {
+    let rij = []; try { rij = JSON.parse(localStorage.getItem(sleutel) || "[]"); } catch {}
+    rij = rij.filter((c) => Date.now() - c.t < 5 * 60000);
+    rij.push(Object.assign({ id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, t: Date.now() }, concept));
+    schrijf(sleutel, rij);
+    window.open(`${location.origin}/op/#/berichtenOverzicht?innerUrl=${encodeURIComponent(encodeURIComponent("/nieuw/NEW"))}`, "_blank");
+  }
+
   /* Concept klaarzetten en het scherm openen. */
   function afspraak(sleutel, { stamnr, naam, onderwerp, tekst, locatie = "", datum, tijd = "09:00", minuten = 30, bron }) {
     const [hh, mm] = tijd.split(":").map(Number), eind = new Date(2000, 0, 1, hh, mm + minuten);
@@ -117,5 +186,5 @@ var DTForms = (() => {
   }
   function logboek(sleutel, concept) { return schrijf(sleutel, Object.assign({ t: Date.now() }, concept)); }
 
-  return { vulLogboek, vulAfspraak, afspraak, logboek, lees, weg };
+  return { vulLogboek, vulAfspraak, vulBericht, afspraak, logboek, bericht, lees, weg };
 })();
