@@ -936,13 +936,15 @@ DT.register({
         --cb-schaduw: var(--sl-elevation-shadow-sm, 0 2px 4px rgba(34,34,34,.08));
         color: var(--cb-fg); font-family: var(--sl-text-typeset-font-family-body, open-sans), sans-serif; font-size: 14px; line-height: 20px; }
       .dt-cb * , .dt-cb-vars * { box-sizing: border-box; }
-      #dt-cbp { display: block; }
+      /* Zelfde maten als Magisters eigen subpagina's: kop en tabbalk 2rem van de rand (dezelfde variabele die
+       * Magister op Meldingen zet), inhoud hooguit 1200px breed en gecentreerd. */
+      #dt-cbp { display: block; --dna-page-layout-max-width: min(100%, calc(100% - 2 * 2rem)); min-width: 0; }
       #dt-cbp dna-tabs { display: block; }
       #dt-cbp dna-tab { width: 100%; justify-self: stretch; }
       .dt-cb-tardy { font-size: 12px; opacity: .8; letter-spacing: .02em; white-space: nowrap; }
       .dt-cb-tel { margin-left: 6px; min-width: 18px; padding: 0 6px; border-radius: 999px; font-size: 11px; line-height: 18px; font-weight: 700; text-align: center; background: var(--cb-acc); color: #fff; }
       .dt-cb-tel:empty { display: none; }
-      .dt-cb-tabblad { padding: 16px 24px 32px; display: flex; flex-direction: column; gap: 16px; }
+      .dt-cb-tabblad { width: min(1200px, calc(100% - 4rem)); margin: 0 auto; padding: 16px 0 32px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
       .dt-cb-paneel { display: flex; flex-direction: column; gap: 16px; }
       .dt-cb-paneel:empty { display: none; }
       .dt-cb-inhoud { display: flex; flex-direction: column; gap: 16px; }
@@ -950,7 +952,12 @@ DT.register({
       .dt-cb-stand { color: var(--cb-zacht); font-size: 13px; }
       .dt-cb-stand.is-kijk { color: var(--cb-rood); font-weight: 600; }
       .dt-cb-periode { min-width: 240px; }
-      dna-card.dt-cb-kaart { display: block; }
+      dna-card.dt-cb-kaart { display: block; min-width: 0; }
+      .dt-cb-kaart, .dt-cb-kaart p, .dt-cb-kaart label, .dt-cb-kaart span, .dt-cb-kaart small, .dt-cb-kaart td, .dt-cb-modalin p { font-size: 14px; line-height: 20px; }
+      .dt-cb-kaart p, .dt-cb-modalin p { margin: 0 0 8px; overflow-wrap: anywhere; }
+      .dt-cb-kaart h2 + p { margin-top: 4px; }
+      .dt-cb-kaart small, .dt-cb-wie small, .dt-cb-tabel td small { font-size: 13px; }
+      .dt-cb input, .dt-cb select, .dt-cb-vars input, .dt-cb-vars select { font-family: inherit; font-size: 14px; }
       .dt-cb-kaart h2, .dt-cb-kaart h3, .dt-cb-modalin h2 { margin: 0; font-family: var(--sl-text-typeset-font-family-heading, open-sans), sans-serif; font-size: 16px; line-height: 24px; font-weight: 700; color: var(--cb-fg); }
       .dt-cb-kaartkop { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
       .dt-cb-wie { flex: 1; min-width: 200px; } .dt-cb-wie small { display: block; color: var(--cb-zacht); font-size: 13px; }
@@ -1012,7 +1019,8 @@ DT.register({
       .dt-cb-bulk input { min-width: 0; }
       .dt-cb-niveaugroep { display: flex; flex-direction: column; gap: 8px; } .dt-cb-niveaugroep h2 { display: flex; gap: 8px; align-items: center; margin: 4px 0 0; font-size: 15px; }
       .dt-cb-schakel { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
-      .dt-cb-veldrij { display: grid; grid-template-columns: 140px minmax(200px, 340px) auto; gap: 12px; align-items: center; margin: 8px 0; }
+      .dt-cb-veldrij { display: grid; grid-template-columns: 140px minmax(200px, 340px) 1fr; gap: 12px; align-items: center; margin: 8px 0; }
+      .dt-cb-veldrij .dt-cb-veld { width: 100%; min-width: 0; }
       .dt-cb-veldrij small { color: var(--cb-zacht); }
       .dt-cb-modal { position: fixed; inset: 0; z-index: 1350; display: grid; place-items: center; background: rgba(34,34,34,.4); }
       .dt-cb-modalin { display: flex; flex-direction: column; gap: 12px; width: min(720px, 92vw); max-height: 86vh; overflow: auto; box-shadow: var(--sl-elevation-shadow-overlay, 0 12px 32px rgba(0,0,0,.2)); }
@@ -1026,7 +1034,7 @@ DT.register({
       .dt-cb-scanvak i { position: absolute; inset: 30% 12%; border: 3px solid rgba(255,255,255,.85); border-radius: var(--cb-rl); }
       .dt-cb-toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 16px); opacity: 0; pointer-events: none; padding: 10px 16px; border-radius: var(--cb-r); background: #233243; color: #fff; font-weight: 600; max-width: 80vw; transition: opacity .2s, transform .2s; z-index: 1400; box-shadow: var(--sl-elevation-shadow-overlay, 0 8px 24px rgba(0,0,0,.2)); }
       .dt-cb-toast.is-aan { opacity: 1; transform: translate(-50%, 0); } .dt-cb-toast[data-soort="err"] { background: var(--cb-rood); }
-      @media (max-width: 900px) { .dt-cb-soorten { grid-template-columns: 1fr; } .dt-cb-tabblad { padding: 12px; } }
+      @media (max-width: 900px) { .dt-cb-soorten { grid-template-columns: 1fr; } .dt-cb-tabblad { width: calc(100% - 2rem); } }
     `;
     document.head.append(st);
   },
