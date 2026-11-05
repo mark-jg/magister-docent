@@ -389,7 +389,7 @@ function standaardMail(type, stamnr, pid, extra){
   try { return mailTekst(type, stamnr, pid, extra); } finally { S.instellingen.mailteksten=bewaard; }
 }
 function mailTekst(type, stamnr, pid, extra){
-  const st=S.studenten[stamnr], t=tellingen(stamnr,pid), p=periodeById(pid), x=extra||{};
+  const st=S.studenten[stamnr], t=(H.tellingen||tellingen)(stamnr,pid), p=periodeById(pid), x=extra||{};
   const naam=naamVan(st), roep=st.roepnaam||naam, klas=st.klas||"", per=p?p.naam.toLowerCase():"deze periode";
   const mentor=mentorVan(st), mnaam=mentor.naam||"collega", i=S.instellingen, nm=naam+(klas?" ("+klas+")":"");
   let onderwerp="", body="";

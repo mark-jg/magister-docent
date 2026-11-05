@@ -28,6 +28,11 @@ delen = [
 code = "\n".join(delen)
 # Tardy's eigen meldingen en opslag lopen in de extensie via haken.
 code = code.replace("function toon(t,lang){", "function _toonTardy(t,lang){", 1)
+# Voor de teksteditor in de extensie: mailTekst kan met voorbeeldtellingen rekenen (H.tellingen),
+# zodat de standaardtekst met plaatshouders kan worden getoond.
+oud = "const st=S.studenten[stamnr], t=tellingen(stamnr,pid), p=periodeById(pid), x=extra||{};"
+assert oud in code, "mailTekst-begin niet gevonden"
+code = code.replace(oud, oud.replace("t=tellingen(stamnr,pid)", "t=(H.tellingen||tellingen)(stamnr,pid)"), 1)
 
 EXPORT = """S:{get:()=>S,set:v=>{S=v;}}"""
 uit = f"""/* GEGENEREERD door scripts/tardy-kern.py uit Tardy (web/index.html). Niet met de hand wijzigen:
