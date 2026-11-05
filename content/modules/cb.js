@@ -382,6 +382,24 @@ DT.register({
     ({ melden: () => this.melden(DT), meldafspraken: () => this.afspraken(DT), signalen: () => this.signalen(DT), protocol: () => this.protocol(DT), instellingen: () => this.instellingen(DT) })[this._view]();
     this.tekenStand();
     this.componenten();
+    this.autoBijwerken(DT);
+  },
+  /* Eén keer per dag (per browser) het verzuim, de ouders en de mentoren uit Magister bijwerken, op de achtergrond,
+   * voor de studenten die al aan Magister gekoppeld zijn. Uit te zetten bij Instellingen. */
+  autoBijwerken(DT) {
+    const K = TardyKern;
+    if (this._autoGedaan || this._kijkt || !this._map || !K.S || DT.settings.cb?.autoBijwerken === false) return;
+    this._autoGedaan = true;
+    let laatst = null; try { laatst = localStorage.getItem("dt-cb-auto"); } catch {}
+    if (laatst === K.vandaag()) return;
+    const sns = Object.values(K.S.studenten).filter((st) => !st.archief && (st.magisterId || K.S.lesreg[st.stamnr])).map((st) => st.stamnr);
+    if (!sns.length) return;
+    setTimeout(async () => {
+      if (this._kijkt || this._haal) return;
+      this.melding(`Verzuim van ${sns.length} studenten wordt op de achtergrond bijgewerkt uit Magister…`, "info", 5000);
+      await this.haalMagister(DT, sns);
+      try { localStorage.setItem("dt-cb-auto", K.vandaag()); } catch {}
+    }, 4000);
   },
 
   /* ===================================================================================== */
@@ -1148,7 +1166,7 @@ DT.register({
     h.replaceChildren(
       this.magisterKaart(DT),
       DT.el("div", { class: "dt-cb-rij" }, [DT.el("span", { class: "dt-cb-zacht", text: `${open.length} ${open.length === 1 ? "student" : "studenten"} met een open stap in ${(K.periodeById(pid) || {}).naam || ""}` }), toggle,
-        this.knop(DT, "Overzicht per mentor…", () => this.mentorOverzicht(DT)), this.knop(DT, "Protocol bekijken", () => this._scherm.bar.querySelector('[data-view="protocol"]')?.click(), false, "stil")]),
+        this.knop(DT, "Overzicht per mentor…", () => this.mentorOverzicht(DT)), this.knop(DT, "Weekrapport mentoren…", () => this.weekrapport(DT)), this.knop(DT, "Protocol bekijken", () => this._scherm.bar.querySelector('[data-view="protocol"]')?.click(), false, "stil")]),
       ...(perNiveau.length ? perNiveau.map(([n, l]) => DT.el("dna-card", { class: "dt-cb-kaart dt-cb-niveaugroep" }, [
         DT.el("h2", {}, [DT.el("span", { class: `dt-cb-niveau n${n}`, text: `${n}` }), DT.el("span", { text: ` ${K.NIVEAUNAAM[n]} (${l.length})` })]),
         DT.el("div", { class: "dt-cb-siglijst" }, l.map(rij))]))
@@ -1591,6 +1609,38 @@ DT.register({
   vulNotitie() { return DTForms.vulLogboek("dt-cb-notitie"); },
 
 
+  /* Weekrapport: per mentor wat er de afgelopen 7 dagen gebeurde (te laat, ongeoorloofd, niet verschenen bij de
+   * meldafspraak), met de stap waar de student nu staat en de aanwezigheid uit Magister. */
+  async weekrapport(DT) {
+    const K = TardyKern, pid = K.UI.periodeId, van = K.plusDagen(K.vandaag(), -7), groepen = {};
+    const alle = this.met18(K.hoogsteTreden(K.alleSignalen(pid)));
+    const top = Object.fromEntries(this.perStudent(alle.filter((x) => !x.afgehandeld)).map((x) => [x.stamnr, x]));
+    for (const st of Object.values(K.S.studenten).filter((x) => !x.archief)) {
+      const regs = K.S.registraties.filter((r) => r.stamnr === st.stamnr && r.datum > van);
+      const tl = regs.filter((r) => (K.SOORT[r.soort] || {}).g === "telaat").length, on = regs.filter((r) => (K.SOORT[r.soort] || {}).g === "ongeoorloofd").length;
+      const nv = K.S.meldafspraken.filter((m) => m.stamnr === st.stamnr && m.status === "niet-verschenen" && m.datum > van).length;
+      const s = top[st.stamnr];
+      if (!tl && !on && !nv && !(s && s.niveau >= 3)) continue;
+      if (!K.mentorVan(st).email) await this.mentorUitMagister(st).catch(() => {});
+      const m = K.mentorVan(st), k = K.mentorSleutel(st) || "zonder-mentor";
+      (groepen[k] ||= { mentor: m, regels: [] }).regels.push({ st, tl, on, nv, s, pct: K.S.lesreg[st.stamnr]?.perioden?.[pid]?.pct });
+    }
+    const mails = Object.values(groepen).map((g) => {
+      const mnaam = g.mentor.naam || "collega";
+      g.regels.sort((a, b) => (b.s?.niveau || 0) - (a.s?.niveau || 0) || (b.tl + b.on + b.nv) - (a.tl + a.on + a.nv));
+      const lijnen = g.regels.map((r) => {
+        const week = [r.tl && `${r.tl}× te laat`, r.on && `${r.on}× ongeoorloofd`, r.nv && `${r.nv}× niet verschenen bij de meldafspraak`].filter(Boolean).join(", ");
+        return `• ${K.naamVan(r.st)} (${r.st.klas || "—"})${week ? ` — deze week: ${week}` : ""}${r.s ? `\n  Stand: ${r.s.consequentie} (${r.s.titel})` : ""}${r.pct != null ? ` · ${r.pct}% aanwezig` : ""}`;
+      }).join("\n");
+      return { aan: g.mentor.email || "", type: "mentor-overzicht", naam: `${mnaam} (${g.regels.length})`, stamnrs: g.regels.map((r) => r.st.stamnr),
+        onderwerp: `Weekrapport verzuim ${K.kortDatum(K.plusDagen(van, 1))} – ${K.kortDatum(K.vandaag())}: ${g.regels.length} student(en)`,
+        body: `Hoi ${mnaam},\n\nHierbij het weekrapport van de afgelopen week voor de studenten waarvan jij mentor bent:\n\n${lijnen}\n\nDe volledige registratie staat in Magister. Vragen of overleggen? Loop gerust even binnen in lokaal ${K.S.instellingen.lokaal || ""}.\n\n${K.ondertekening()}` };
+    }).sort((a, b) => a.naam.localeCompare(b.naam, "nl"));
+    if (!mails.length) return this.melding("Deze week is er niets te melden aan mentoren.");
+    this.bewaar();
+    this.mailLijst(DT, `Weekrapport voor ${mails.length} mentor(en)`, `${K.kortDatum(K.plusDagen(van, 1))} t/m ${K.kortDatum(K.vandaag())} · ${mails.reduce((n, m) => n + m.stamnrs.length, 0)} studenten`, mails);
+  },
+
   /* Zoals "Overzicht per mentor" in Tardy: één mail per mentor met alle studenten waar actie nodig is. */
   mentorOverzicht(DT) {
     const K = TardyKern, pid = K.UI.periodeId, p = K.periodeById(pid), groepen = {};
@@ -1946,7 +1996,10 @@ DT.register({
       if (!rollen.length) { status.textContent = "Kon de rechten in Magister niet ophalen."; return; }
       status.textContent = `In Magister: berichten schrijven ${mag("berichtenSchrijven") ? "aan" : "uit"}, berichten aan ouders ${mag("berichtenAanOuders") ? "aan" : "uit"}, terugkommaatregelen aanmaken ${mag("terugkommaatregelAanmaken") ? "aan" : "uit (meldafspraken blijven in de balie)"}.`;
     })();
-    return DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("h2", { text: "Mails en berichten" }),
+    const auto = DT.el("input", { type: "checkbox" }); auto.checked = c.autoBijwerken !== false;
+    auto.addEventListener("change", async () => { await DT.saveSettings({ cb: { autoBijwerken: auto.checked } }); this.melding("Bewaard."); });
+    return DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("h2", { text: "Magister, mails en berichten" }),
+      DT.el("label", { class: "dt-cb-schakel" }, [auto, DT.el("span", { text: "Elke dag automatisch bijwerken uit Magister (verzuim, ouders, mentoren), de eerste keer dat de balie opent" })]),
       DT.el("label", { class: "dt-cb-veldrij" }, [DT.el("span", { text: "Versturen via" }), kies, DT.el("small", { text: "mails aan het verzuimbureau gaan altijd via je mailprogramma" })]),
       DT.el("p", { class: "dt-cb-zacht", text: "Met Magister-berichten opent per mail een nieuw bericht in Magister met de ontvanger (de student, \"Ouders/verzorgers van\" of \"Mentoren van\"), het onderwerp en de tekst al ingevuld. Je klikt zelf op Verzenden." }),
       status]);

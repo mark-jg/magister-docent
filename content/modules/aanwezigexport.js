@@ -242,6 +242,113 @@ DT.register({
     document.body.append(dlg); this._dlg = dlg; sel.focus();
   },
 
+  /* ================= Bespreeklijst voor het teamoverleg =================
+   * Klas kiezen (uit Magister), periode en norm; per student aanwezigheid (%, gemist, ziek, ongeoorloofd, te
+   * laat) en de plannen van aanpak uit deze browser (open plan, eerstvolgende of verlopen evaluatie). Gesorteerd
+   * op aanwezigheid, onder de norm gemarkeerd; naar Excel te exporteren. */
+  async bespreeklijst(DT) {
+    if (this._dlg) return;
+    const peil = this.ymd(new Date());
+    let r = await DT.api(`/api/leerlingen/zoeken/filters?q=**&peildatum=${peil}`, { full: true, timeout: 12000 });
+    let klassen = r.status === 200 ? (r.json?.klassen || []) : [];
+    if (!klassen.length) { r = await DT.api(`/api/leerlingen/zoeken/filters?q=**&rol=Docent&peildatum=${peil}`, { full: true, timeout: 12000 }); klassen = r.status === 200 ? (r.json?.klassen || []) : []; }
+    if (!klassen.length) return DT.toast("Geen klassen gevonden in Magister.", "err", 5000);
+    klassen.sort((a, b) => String(a.naam).localeCompare(String(b.naam), "nl", { numeric: true }));
+    const keuzes = this.periodeKeuzes(DT).filter((k) => k.key !== "vorig");
+    const dlg = DT.el("div", { class: "dt-xk", role: "dialog", "aria-modal": "true", "aria-label": "Bespreeklijst" });
+    const klasSel = DT.el("select", { class: "dt-input" }, klassen.map((k) => DT.el("option", { value: k.naam, text: `${k.naam}${k.aantal ? ` (${k.aantal})` : ""}` })));
+    try { const v = localStorage.getItem("dt-bespreek-klas"); if (v && klassen.some((k) => k.naam === v)) klasSel.value = v; } catch {}
+    const perSel = DT.el("select", { class: "dt-input" }, keuzes.map((k) => DT.el("option", { value: k.key, text: k.naam })));
+    const nu = (DT.periodes?.() || []).find((p) => new Date() >= p.begin && new Date() <= p.einde); if (nu) perSel.value = "p:" + nu.id;
+    const norm = DT.el("input", { type: "number", class: "dt-input", value: "80", min: "0", max: "100", style: "width:80px" });
+    const status = DT.el("div", { class: "dt-xk-status", "aria-live": "polite" });
+    const balk = DT.el("div", { class: "dt-xk-bar" }, DT.el("i"));
+    const uitkomst = DT.el("div", { class: "dt-bl-uit" });
+    const start = DT.el("button", { class: "dt-btn dt-btn-primary", text: "Lijst maken" });
+    const excel = DT.el("button", { class: "dt-btn", text: "Naar Excel", disabled: "" });
+    const stop = DT.el("button", { class: "dt-btn", text: "Sluiten" });
+    let afbreken = false, bezig = false, data = null;
+    const sluit = () => { afbreken = true; dlg.remove(); this._dlg = null; document.removeEventListener("keydown", esc, true); };
+    const esc = (e) => { if (e.key === "Escape") { e.stopPropagation(); sluit(); } };
+    stop.addEventListener("click", sluit);
+    document.addEventListener("keydown", esc, true);
+    const lijst = (x) => (x && x.status === 200 && x.json) ? (Array.isArray(x.json) ? x.json : x.json.items || []) : null;
+    const wacht = (ms) => new Promise((res) => setTimeout(res, ms));
+    const api = async (url) => { let x; for (let i = 0; i < 6; i++) { x = await DT.api(url, { full: true, timeout: 25000 }); if (x.status !== 429 && x.status !== 503) return x; await wacht(1500 * 2 ** i); } return x; };
+    start.addEventListener("click", async () => {
+      if (bezig) return; bezig = true; start.disabled = true; excel.disabled = true; uitkomst.replaceChildren();
+      try { localStorage.setItem("dt-bespreek-klas", klasSel.value); } catch {}
+      const per = keuzes.find((k) => k.key === perSel.value), n = Math.max(0, Math.min(100, +norm.value || 80));
+      try {
+        status.textContent = "Klas ophalen…";
+        const z = await api(`/api/leerlingen/zoeken?q=**&top=300&skip=0&peildatum=${peil}&klassen=${encodeURIComponent(klasSel.value)}&velden=stamnummer&velden=naam`);
+        const lln = (lijst(z) || []).map((x) => ({ id: x.id, naam: this.naam(x), achternaam: x.achternaam || "", stam: String(x.code ?? x.stamnummer ?? "") }))
+          .sort((a, b) => a.achternaam.localeCompare(b.achternaam, "nl"));
+        const opslag = await chrome.storage.local.get(null);
+        const rijen = [], werk = lln.slice(); let klaar = 0;
+        const doe = async () => {
+          while (werk.length && !afbreken) {
+            const l = werk.shift();
+            const v = await api(`/api/m6/leerlingen/${l.id}/verantwoordingen?begin=${this.ymd(per.van)}&einde=${this.ymd(per.tot)}`); await wacht(120);
+            const a = await api(`/api/leerlingen/${l.id}/afspraken?status=actief&begin=${this.ymd(per.van)}&einde=${this.ymd(per.tot)}`); await wacht(120);
+            const regs = lijst(v), rooster = lijst(a), T = regs && rooster ? vzStats(regs, rooster, per.van, per.tot).totaal : null;
+            const plannen = Array.isArray(opslag[`pva:${l.id}`]) ? opslag[`pva:${l.id}`] : [];
+            const open = plannen.map((p) => ({ p, e: (p.evaluaties || []).find((x) => x.datum && !x.op && !x.doelen) })).filter((x) => x.e).sort((x, y) => x.e.datum.localeCompare(y.e.datum))[0];
+            rijen.push({ l, T, plannen: plannen.length, open });
+            klaar++; balk.firstChild.style.width = `${Math.round(100 * klaar / lln.length)}%`; status.textContent = `Student ${klaar} van ${lln.length}`;
+          }
+        };
+        await Promise.all([doe(), doe()]);
+        if (afbreken) return;
+        rijen.sort((x, y) => (x.T?.telt ? x.T.pct : 101) - (y.T?.telt ? y.T.pct : 101));
+        data = { rijen, per, n, klas: klasSel.value };
+        const onder = rijen.filter((x) => x.T?.telt && x.T.pct < n).length, laat = rijen.filter((x) => x.open && x.open.e.datum < peil).length;
+        status.textContent = `${rijen.length} studenten · ${onder} onder ${n}% · ${laat} evaluatie${laat === 1 ? "" : "s"} verlopen`;
+        const td = (t, c = "") => DT.el("td", { class: c, text: t == null ? "" : String(t) });
+        uitkomst.replaceChildren(DT.el("table", { class: "dt-bl-tabel" }, [
+          DT.el("thead", {}, DT.el("tr", {}, ["Student", "Aanwezig", "Lessen", "Gemist", "Ziek", "Ongeoorl.", "Te laat", "Plan van aanpak"].map((t) => DT.el("th", { text: t })))),
+          DT.el("tbody", {}, rijen.map(({ l, T, open, plannen }) => DT.el("tr", { class: T?.telt && T.pct < n ? (T.pct < n - 10 ? "is-rood" : "is-oranje") : "" }, [
+            td(l.naam), td(T?.telt ? `${T.pct}%` : "—", "getal"), td(T?.telt ?? "", "getal"), td(T?.afwezig ?? "", "getal"), td(T?.ziek ?? "", "getal"), td(T?.ongeoorloofd ?? "", "getal"), td(T?.teLaat ?? "", "getal"),
+            td(open ? `evaluatie ${open.e.datum < peil ? "verlopen" : ""} ${open.e.datum.split("-").reverse().join("-")}`.replace("  ", " ") : plannen ? `${plannen} plan${plannen === 1 ? "" : "nen"}, afgerond` : "", open && open.e.datum < peil ? "is-laat" : ""),
+          ]))),
+        ]), DT.el("p", { class: "dt-xk-hint", text: `Oranje: onder ${n}%. Rood: meer dan 10 procentpunt onder de norm. Plannen van aanpak komen uit deze browser.` }));
+        excel.disabled = false;
+      } catch (e) { status.textContent = `Er ging iets mis: ${e.message || e}`; }
+      bezig = false; start.disabled = false;
+    });
+    excel.addEventListener("click", () => {
+      if (!data) return;
+      const kop = ["Student", "Stamnummer", "Aanwezig %", "Lessen (tellen mee)", "Gemist", "Ziek", "Ongeoorloofd", "Te laat", "Onder norm", "Plannen van aanpak", "Eerstvolgende evaluatie"];
+      const rijen = data.rijen.map(({ l, T, open, plannen }) => [l.naam, l.stam, T?.telt ? this.pct(T.pct) : "", T?.telt ?? "", T?.afwezig ?? "", T?.ziek ?? "", T?.ongeoorloofd ?? "", T?.teLaat ?? "",
+        T?.telt && T.pct < data.n ? "ja" : "", plannen || "", open ? open.e.datum.split("-").reverse().join("-") : ""]);
+      this.schrijf(DT, `Bespreeklijst ${data.klas} ${data.per.kort || data.per.naam}`, [["Bespreeklijst", this.blad([kop, ...rijen], [28, 11, 11, 12, 9, 8, 12, 8, 11, 12, 16])]]);
+    });
+    dlg.append(DT.el("div", { class: "dt-xk-card dt-bl-card" }, [
+      DT.el("h2", { text: "Bespreeklijst voor het teamoverleg" }),
+      DT.el("p", { class: "dt-xk-sub", text: "Per student de aanwezigheid en de plannen van aanpak, gesorteerd van laag naar hoog." }),
+      DT.el("div", { class: "dt-row dt-bl-keuze" }, [
+        DT.el("label", { class: "dt-xk-field" }, [DT.el("span", { text: "Klas" }), klasSel]),
+        DT.el("label", { class: "dt-xk-field" }, [DT.el("span", { text: "Periode" }), perSel]),
+        DT.el("label", { class: "dt-xk-field" }, [DT.el("span", { text: "Norm %" }), norm]),
+      ]),
+      balk, status, uitkomst,
+      DT.el("div", { class: "dt-row dt-xk-knoppen" }, [stop, excel, start]),
+    ]));
+    document.body.append(dlg); this._dlg = dlg; this.cssBespreek(); klasSel.focus();
+  },
+  cssBespreek() {
+    if (document.getElementById("dt-bl-style")) return;
+    const st = document.createElement("style"); st.id = "dt-bl-style";
+    st.textContent = `.dt-bl-card { width: min(980px, calc(100vw - 32px)) !important; max-height: calc(100vh - 48px); overflow: auto; }
+      .dt-bl-keuze { flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+      .dt-bl-tabel { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+      .dt-bl-tabel th { text-align: left; font-size: 12px; color: #59636e; padding: 6px 8px; border-bottom: 1px solid #c8d1da; position: sticky; top: 0; background: inherit; }
+      .dt-bl-tabel td { padding: 5px 8px; border-bottom: 1px solid rgba(128,128,128,.15); } .dt-bl-tabel td.getal { text-align: right; font-variant-numeric: tabular-nums; }
+      .dt-bl-tabel tr.is-oranje td:nth-child(2) { color: #ac5000; font-weight: 700; } .dt-bl-tabel tr.is-rood td:nth-child(2) { color: #c70e13; font-weight: 700; }
+      .dt-bl-tabel td.is-laat { color: #c70e13; font-weight: 600; }`;
+    document.head.append(st);
+  },
+
   async klasBestand(DT, { lln, titel }, periode, vergelijk, voortgang) {
     const now = new Date();
     const lijst = (r) => (r && r.status === 200 && r.json) ? (Array.isArray(r.json) ? r.json : r.json.items || []) : null;
