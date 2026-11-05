@@ -1106,6 +1106,7 @@ DT.register({
           DT.el("span", { class: "dt-cb-sigtitel", text: s.titel }),
           s.ook.length ? DT.el("span", { class: "dt-cb-ookchip", title: s.ook.map((x) => `${ladderNaam(x.soort)}: ${x.consequentie} (${x.titel})`).join("\n"), text: `+${s.ook.length} ${s.ook.length === 1 ? "ladder" : "ladders"}` }) : null,
           pct != null ? DT.el("span", { class: "dt-cb-pct", title: "Aanwezig volgens Magister, deze periode", text: `${pct}%` }) : null,
+          this.oudersMet18(st) ? DT.el("span", { class: "dt-cb-pct", title: "18+, maar de student gaf in Magister toestemming voor contact met ouders/verzorgers: de mails aan ouders gaan mee", text: "18+ · ouders ✓" }) : null,
         ].filter(Boolean)),
         DT.el("div", { class: "dt-cb-sigmaat", title: s.maatregel, text: s.maatregel }),
       ]);
@@ -1130,8 +1131,8 @@ DT.register({
         this.statsRegel(DT, s.stamnr),
         DT.el("div", { class: "dt-cb-rij" }, [
           this.knop(DT, "Verzuim in Magister", () => this.openInMagister(st), false, "klein stil"),
-          s.mails.length ? this.knop(DT, "Mailteksten bekijken", async () => (s.mails.some((t) => (K.MAILSOORT[t] || {}).aan === "ouders") && await this.zorgOuders(st), this.mailLijst(DT, "Mails bij deze stap", `${K.naamVan(st)} · ${s.titel}`,
-            s.mails.map((type) => Object.assign(this.mailVan(type, s.stamnr, pid), { naam: `${K.naamVan(st)} · ${(K.MAILSOORT[type] || { label: type }).label}` })))), false, "klein stil") : null,
+          this.sigMails(s).length ? this.knop(DT, "Mailteksten bekijken", async () => (this.sigMails(s).some((t) => (K.MAILSOORT[t] || {}).aan === "ouders") && await this.zorgOuders(st), this.mailLijst(DT, "Mails bij deze stap", `${K.naamVan(st)} · ${s.titel}`,
+            this.sigMails(s).map((type) => Object.assign(this.mailVan(type, s.stamnr, pid), { naam: `${K.naamVan(st)} · ${(K.MAILSOORT[type] || { label: type }).label}` })))), false, "klein stil") : null,
           K.S.meldafspraken.some((m) => m.stamnr === s.stamnr) ? this.knop(DT, "Meldafspraken", () => this.studentHistorie(DT, s.stamnr), false, "klein stil") : null,
         ].filter(Boolean)),
       ].filter(Boolean)) : null;
@@ -1220,7 +1221,7 @@ DT.register({
             (rijen[p.id] ||= {})[sn] = { TL: c.TL || 0, ON: (c.AB_NO || 0) + (c.TL || 0), GE: c.AB_OK || 0, ZK: c.ZK || 0, AB: (c.AB_OK || 0) + (c.AB_NO || 0), UI: c.UI || 0, VR: c.VR || 0 };
           }
           K.S.lesreg[sn] = { op: vandaag, bron: "magister", ziekDatums: [...ziek].sort(), medischDatums: [...med].sort(), onUren, perioden };
-          if (K.minderjarig(st) !== false) await this.ouderMails(st, id).catch(() => {});
+          await this.ouderMails(st, id).catch(() => {});
         } catch { H.fout++; }
         H.klaar++;
         if (this._view === "signalen" && this._scherm) this.tekenHaal();
@@ -1398,7 +1399,8 @@ DT.register({
    * de notitie in Magister hebt geannuleerd). kort = compacte knoppen voor de signaallijst. */
   actieKnoppen(DT, s, st, pid, naKlik = () => this.teken(), kort = false) {
     const K = TardyKern, gedaan = (K.S.cbActies || {})[s.key] || {};
-    const ontvangers = [...new Set(s.mails.map((t) => ({ student: "student", ouders: "ouders", mentor: "mentor", bureau: "verzuimbureau" })[(K.MAILSOORT[t] || {}).aan] || "mentor"))];
+    const mails = this.sigMails(s);
+    const ontvangers = [...new Set(mails.map((t) => ({ student: "student", ouders: "ouders", mentor: "mentor", bureau: "verzuimbureau" })[(K.MAILSOORT[t] || {}).aan] || "mentor"))];
     const vars = this.signaalVars(DT, s, st, pid);
     const knop = (soort, label, uitleg, klaarLabel, fn, uit = false) => {
       const wanneer = gedaan[soort] ? new Date(gedaan[soort]) : null;
@@ -1416,7 +1418,7 @@ DT.register({
         const t = this.eigenTekst("notitie", vars);
         this.notitieMaken(s.stamnr, { omschrijving: t.onderwerp, tekst: t.body });
       }),
-      knop("mail", s.mails.length ? `Mail ${ontvangers.join(", ")}` : "Geen mail", s.mails.length ? "Concept in je mailprogramma" : "Bij deze stap hoort geen mail", "Mail", () => this.mailsDirect(s, pid), !s.mails.length),
+      knop("mail", mails.length ? `Mail ${ontvangers.join(", ")}` : "Geen mail", mails.length ? `Concept in je mailprogramma${this.oudersMet18(st) ? " (18+, met toestemming voor contact met ouders)" : ""}` : "Bij deze stap hoort geen mail", "Mail", () => this.mailsDirect(s, pid), !mails.length),
       knop("afspraak", kort ? "Afspraak" : "Afspraak in Magister", "Afspraak met de student in Magister", "Afspraak", () => {
         const t = this.eigenTekst("afspraak", vars);
         this.afspraakMaken(s.stamnr, { onderwerp: t.onderwerp, tekst: t.body, minuten: s.niveau >= 3 ? 30 : 15 });
@@ -1424,6 +1426,16 @@ DT.register({
     ]);
   },
 
+  /* 18+ met toestemming voor contact met ouders (uit Magister). */
+  oudersMet18(st) { return !!st && st.ouderToestemming === true && TardyKern.minderjarig(st) === false; },
+  /* De mails van een signaal. De kern laat mails aan ouders weg bij 18+; heeft de student in Magister
+   * toestemming gegeven voor contact met ouders, dan nemen we de mails van de trede weer volledig mee. */
+  sigMails(s) {
+    const K = TardyKern, st = K.S.studenten[s.stamnr];
+    if (!this.oudersMet18(st)) return s.mails;
+    const tr = (K.protocolLadder(s.soort)?.treden || []).find((x) => x.vanaf === s.drempel && x.niveau === s.niveau && x.label === s.consequentie);
+    return tr ? [...new Set([...(tr.mails || []), ...s.mails])] : s.mails;
+  },
   /* Meerdere adressen (ouders) in één mailto: elk adres apart gecodeerd, gescheiden door komma's. */
   adressen(aan) { return String(aan || "").split(/[,;]\s*/).map((x) => x.trim()).filter(Boolean).map(encodeURIComponent).join(","); },
 
@@ -1437,10 +1449,20 @@ DT.register({
     if (!id) { const hit = (await this.zoekMagister(st.stamnr)).find((x) => x.stamnr === String(st.stamnr)); id = hit?.magisterId; if (id) st.magisterId = id; }
     if (!id) return null;
     const lijst = (r) => (r && r.status === 200 && r.json) ? (Array.isArray(r.json) ? r.json : r.json.items || []) : null;
+    if (!st.geboortedatum) {
+      const p = await this.apiOpnieuw(`/api/leerlingen/${encodeURIComponent(id)}/personalia`);
+      const d = p?.status === 200 ? String(p.json?.geboortedatum || "").slice(0, 10) : "";
+      if (/^\d{4}-\d{2}-\d{2}$/.test(d)) st.geboortedatum = d;
+    }
     const ouders = lijst(await this.apiOpnieuw(`/api/leerlingen/${encodeURIComponent(id)}/ouders`));
     if (!ouders) return null;
+    /* Bij 18+ alleen ouders/verzorgers waarvoor de student toestemming gaf (in Magister per ouder:
+     * heeftToestemming). Bij minderjarigen staat die altijd aan. */
+    const volw = K.minderjarig(st) === false;
+    const mag = ouders.filter((o) => !volw || o.heeftToestemming === true);
+    if (volw) st.ouderToestemming = mag.length > 0; else delete st.ouderToestemming;
     const adressen = [];
-    for (const o of ouders.slice().sort((a, b) => (a.volgnummer || 9) - (b.volgnummer || 9))) {
+    for (const o of mag.slice().sort((a, b) => (a.volgnummer || 9) - (b.volgnummer || 9))) {
       const c = lijst(await this.apiOpnieuw(`/api/ouders/${encodeURIComponent(o.id)}/contactgegevens`)) || [];
       for (const x of c) {
         const mail = String(x.emailadres || "").trim();
@@ -1449,6 +1471,7 @@ DT.register({
     }
     st.ouderEmailOp = K.vandaag();
     if (adressen.length) { st.ouderEmail = adressen.join(", "); st.ouderEmailBron = "magister"; }
+    else if (st.ouderEmailBron === "magister") delete st.ouderEmail;   // toestemming ingetrokken of adres weg
     this.bewaar();
     return adressen;
   },
@@ -1468,8 +1491,9 @@ DT.register({
   /* Alle mails van deze trede als concept in het eigen mailprogramma (Outlook), en vastleggen in het dossier. */
   async mailsDirect(s, pid) {
     const K = TardyKern, st = K.S.studenten[s.stamnr];
-    if (s.mails.some((t) => (K.MAILSOORT[t] || {}).aan === "ouders")) await this.zorgOuders(st);
-    const mails = s.mails.map((type) => this.mailVan(type, s.stamnr, pid));
+    const soorten = this.sigMails(s);
+    if (soorten.some((t) => (K.MAILSOORT[t] || {}).aan === "ouders")) await this.zorgOuders(st);
+    const mails = soorten.map((type) => this.mailVan(type, s.stamnr, pid));
     mails.forEach((m, i) => setTimeout(() => {
       const a = document.createElement("a");
       a.href = `mailto:${this.adressen(m.aan)}?subject=${encodeURIComponent(m.onderwerp)}&body=${encodeURIComponent(m.body)}`;
