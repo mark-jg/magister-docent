@@ -43,12 +43,10 @@ DT.register({
   mount(DT) {
     const grid = document.querySelector("ld-hulpmiddelen .hulpmiddelen-grid");
     if (!grid) { if (this._scherm && !/\/hulpmiddelen/.test(location.hash)) this._scherm.sluit(); return; }
-    /* De kaarten worden in de extensie gemaakt, vaak voordat Magisters dna-link-card klaar is; dan negeert
-     * de kaart het heading-attribuut en toont "Heading". Opnieuw zetten laat de kaart het alsnog oppakken. */
-    for (const c of grid.querySelectorAll(".dt-lt-tegel")) {
-      const h = c.getAttribute("heading"), h1 = c.shadowRoot?.querySelector("h1");
-      if (h1 && h1.textContent.trim() !== h) { c.removeAttribute("heading"); c.setAttribute("heading", h); }
-    }
+    /* Magisters dna-link-card negeert attributen die de extensie zet en toont dan "Heading". Het netwerk-script
+     * in de pagina zet ze opnieuw; dat pakt de kaart wel op. */
+    if ([...grid.querySelectorAll(".dt-lt-tegel")].some((c) => { const h1 = c.shadowRoot?.querySelector("h1"); return h1 && h1.textContent.trim() !== c.getAttribute("heading"); }))
+      window.postMessage({ type: "dt:attr:opnieuw", selector: ".dt-lt-tegel", attr: "heading" }, "*");
     if (grid.querySelector(".dt-lt-tegel")) return;
     this.css();
     for (const t of this.TOOLS) {
@@ -500,8 +498,7 @@ DT.register({
     aanw.addEventListener("click", () => { alleenAanwezig = !alleenAanwezig; aanw.setAttribute("aria-pressed", String(alleenAanwezig)); aanw.blur(); bouw(); });
     s.extra.append(seg, maat, aanw, this.fotoKnop(DT, () => this.fotos(DT, res.lln).then(() => bouw())));
     s.laag.classList.add("dt-pk-tafel");
-    await this.fotos(DT, res.lln);
-    if (this._scherm !== s) return;
+    this.fotos(DT, res.lln);   // op de achtergrond; bij het openen worden de getrokken kaarten eerst afgewacht
 
     const beurten = () => {
       let b = this._beurten.get(res.afspraak);
@@ -519,11 +516,11 @@ DT.register({
       const onder = DT.el("div", { class: "dt-pk-onder" });
       const strook = DT.el("div", { class: "dt-pk-strook" });
       s.inhoud.replaceChildren(DT.el("div", { class: "dt-pk-licht", "aria-hidden": "true" }),
-        DT.el("div", { class: "dt-pk-kop", text: modus === "beurt" ? "Ultimate klas  /  beurt reveal" : "Ultimate klas  /  team reveal" }), podium, strook, onder);
+        DT.el("div", { class: "dt-pk-kop", text: modus === "beurt" ? "Klassenkaarten  ·  booster" : "Klassenkaarten  ·  teambooster" }), podium, strook, onder);
       if (!lijst.length) { podium.append(DT.el("p", { class: "dt-lt-leeg", text: "Er doen geen leerlingen mee." })); actie = null; return; }
 
       if (modus === "beurt") {
-        const team = ["Volgende beurt", "★", "#F5D76E", "#B8860B"];
+        const team = ["Volgende beurt", "★", "#FFD86B", "#D9901E"];
         const b = beurten();
         const ids = new Set(lijst.map((l) => l.id));
         b.geweest = b.geweest.filter((id) => ids.has(id));
@@ -538,8 +535,9 @@ DT.register({
           if (!pot.length) { b.geweest = []; pot = lijst.slice(); }
           const wie = pot[Math.floor(Math.random() * pot.length)];
           b.geweest.push(wie.id);
-          this.openPakje(DT, pak, podium, [wie], { kleur: team[2], kleur2: team[3], team: "Aan de beurt", emoji: "★", badge: klas || "Beurt",
-            label: klas ? `Klas ${klas}` : "Volgende beurt", zeldzaam: "Goud", woord: "Beurt", band: `Volgende beurt${klas ? ` · Klas ${klas}` : ""}`, tease: wie.init, teaseLabel: "Aan de beurt" }, () => {
+          this.openPakje(DT, pak, podium, [wie], { kleur: team[2], kleur2: team[3], emoji: "★", zeldzaam: true, set: klas,
+            strip: `Leerling${klas ? ` · Klas ${klas}` : ""}`, vakTitel: "Aan de beurt!", vakTekst: "Mag nu antwoord geven of de opdracht uitvoeren.",
+            nummer: `${lijst.indexOf(wie) + 1}/${lijst.length}` }, () => {
             const over = lijst.length - b.geweest.length;
             const volgende = DT.el("button", { type: "button", class: "dt-lt-hoofdknop", text: over ? "Volgende beurt" : "Iedereen is geweest · opnieuw" });
             volgende.addEventListener("click", bouw);
@@ -565,8 +563,8 @@ DT.register({
         onder.append(hint);
         actie = () => {
           actie = null; hint.remove();
-          this.openPakje(DT, pak, podium, g, { kleur, kleur2, team: `${emoji} ${naam}`, emoji, badge: `Groep ${gi + 1}`,
-            label: `Groepje ${gi + 1} van ${groepen.length}`, zeldzaam: `${g.length} spelers`, woord: naam, band: `Team ${naam} · ${g.length} spelers${klas ? ` · Klas ${klas}` : ""}`, tease: emoji, teaseLabel: "Jullie team" }, () => {
+          this.openPakje(DT, pak, podium, g, { kleur, kleur2, emoji, team: `${emoji} ${naam}`, groep: g, set: klas,
+            strip: `Groepje ${gi + 1} van ${groepen.length}${klas ? ` · Klas ${klas}` : ""}`, vakTitel: `Team ${naam}` }, () => {
             const laatste = gi === groepen.length - 1;
             const verder = DT.el("button", { type: "button", class: "dt-lt-hoofdknop", text: laatste ? "Alle groepjes bekijken" : `Volgend groepje (${gi + 2} van ${groepen.length})` });
             const klaar = () => {
@@ -588,7 +586,8 @@ DT.register({
           const [naam, emoji, kleur, kleur2] = teams[k % teams.length];
           veld.append(DT.el("section", { class: "dt-pk-groep", style: `--kleur:${kleur};--kleur2:${kleur2};animation-delay:${k * 70}ms` }, [
             DT.el("h3", {}, [DT.el("span", { text: emoji }), DT.el("span", { text: naam })]),
-            DT.el("div", { class: "dt-pk-groepkaarten" }, g.map((l) => this.kaartEl(DT, l, { kleur, kleur2, team: naam, emoji, badge: `Groep ${k + 1}`, open: true }))),
+            DT.el("div", { class: "dt-pk-groepkaarten" }, g.map((l, j) => this.kaartEl(DT, l, { kleur, kleur2, emoji, groep: g, set: klas, nummer: `${j + 1}/${g.length}`,
+              strip: `Groepje ${k + 1} van ${groepen.length}`, vakTitel: `Team ${naam}`, open: true }))),
           ]));
         });
         podium.replaceWith(veld);
@@ -658,9 +657,12 @@ DT.register({
     const el = pak.el;
     el.classList.add("is-open");
     const n = lln.length;
-    const kaarten = lln.map((l) => this.kaartEl(DT, l, stijl));
-    const waaier = DT.el("div", { class: "dt-pk-waaier", style: `--n:${n}` }, kaarten);
+    const fotosKlaar = this.fotos(DT, lln);
+    let kaarten = [];
+    const waaier = DT.el("div", { class: "dt-pk-waaier", style: `--n:${n}` });
     const toon = () => {
+      kaarten = lln.map((l, i) => this.kaartEl(DT, l, { nummer: `${i + 1}/${n}`, ...stijl }));
+      waaier.append(...kaarten);
       el.classList.add("is-weg"); setTimeout(() => el.remove(), 750);
       /* Kaartmaat: één kaart groot; een groepje zo groot als in de breedte past. */
       const vak = podium.getBoundingClientRect();
@@ -674,60 +676,40 @@ DT.register({
         const hoek = n > 1 ? mid * Math.min(7, 30 / n) : 0;
         const x = mid * stap, y = Math.abs(mid) * Math.abs(mid) * kh * .012 + (n > 1 ? kh * .06 : 0);
         k.style.setProperty("--x", `${x.toFixed(0)}px`); k.style.setProperty("--y", `${y.toFixed(0)}px`); k.style.setProperty("--r", `${hoek.toFixed(1)}deg`);
-        k.style.setProperty("--d", `${rustig ? 0 : 120 + i * 220}ms`);
+        k.style.setProperty("--d", `${rustig ? 0 : 150 + i * 480}ms`);
       });
+      /* Zeldzame kaart: lichtkrans erachter */
+      if (stijl.zeldzaam) podium.prepend(DT.el("div", { class: "dt-pk-krans", style: `--kleur:${stijl.kleur}`, "aria-hidden": "true" }));
       requestAnimationFrame(() => requestAnimationFrame(() => kaarten.forEach((k) => k.classList.add("is-uit"))));
-      if (!rustig) setTimeout(() => this.vonken(DT, podium), 500 + n * 220);
-      setTimeout(daarna, rustig ? 0 : 900 + n * 220);
+      if (!rustig) setTimeout(() => this.vonken(DT, podium), 700 + (n - 1) * 480);
+      setTimeout(daarna, rustig ? 0 : 1100 + (n - 1) * 480);
     };
-    if (rustig) return toon();
+    if (rustig) return fotosKlaar.then(toon);
+    /* Booster openen: schudden, scheurstrip eraf, kaartenstapel schuift omhoog, pakje valt weg, kaarten
+     * draaien één voor één om. */
     el.classList.add("is-schud");
     setTimeout(() => { el.classList.remove("is-schud"); el.classList.add("is-scheur"); }, 700);
-    setTimeout(() => this.walkout(DT, stijl, toon), 1000);
+    setTimeout(() => el.classList.add("is-uitschuif"), 1200);
+    const start = Date.now();
+    fotosKlaar.then(() => setTimeout(toon, Math.max(0, 1850 - (Date.now() - start))));
   },
 
-  /* Onthulling in de stijl van een Ultimate Team-"walkout": witte flits, lichttunnel met draaiende
-   * stralen, aanwijzingen die één voor één verschijnen (groepje, aantal), een groot omlijnd woord dat
-   * voorbijschuift, een lichtkrant, dan een gloeiende hint (initialen of teamdier) en een flits naar de
-   * kaarten. "Direct naar kaart" slaat het over. */
-  walkout(DT, stijl, klaar) {
-    const s = this._scherm; if (!s) return klaar();
-    const wo = DT.el("div", { class: "dt-wo", style: `--kleur:${stijl.kleur};--kleur2:${stijl.kleur2}`, "aria-hidden": "true" }, [
-      DT.el("div", { class: "dt-wo-tunnel" }, Array.from({ length: 10 }, (_, i) => DT.el("i", { style: `animation-delay:${(-i * .32).toFixed(2)}s` }))),
-      DT.el("div", { class: "dt-wo-stralen" }, Array.from({ length: 6 }, (_, i) => DT.el("i", { style: `--h:${i * 30}deg` }))),
-      DT.el("div", { class: "dt-wo-label", text: stijl.label || "" }),
-      DT.el("div", { class: "dt-wo-zeldzaam", text: stijl.zeldzaam || "" }),
-      DT.el("div", { class: "dt-wo-woord", text: stijl.woord || "" }),
-      DT.el("div", { class: "dt-wo-band" }, DT.el("span", { text: `${stijl.band || ""}     ✦     `.repeat(10) })),
-      DT.el("div", { class: "dt-wo-tease" }, [DT.el("small", { text: stijl.teaseLabel || "" }), DT.el("b", { text: stijl.tease || "" })]),
-      DT.el("div", { class: "dt-wo-flits" }),
-    ]);
-    const sla = DT.el("button", { type: "button", class: "dt-wo-sla", text: "Direct naar kaart →" });
-    wo.append(sla);
-    const timers = [];
-    let klaarGezet = false;
-    const eind = () => {
-      if (klaarGezet) return; klaarGezet = true;
-      timers.forEach(clearTimeout);
-      wo.classList.add("f-eind");
-      klaar();
-      setTimeout(() => wo.remove(), 700);
-    };
-    sla.addEventListener("click", eind);
-    s.inhoud.append(wo);
-    for (const [t, c] of [[30, "f1"], [450, "f2"], [1200, "f3"], [2400, "f4"], [2600, "f5"]]) timers.push(setTimeout(() => wo.classList.add(c), t));
-    timers.push(setTimeout(eind, 4300));
-    s.bijSluiten(() => timers.forEach(clearTimeout));
-  },
-
-  kaartEl(DT, l, { kleur, kleur2, team, emoji = "★", badge = "", open = false }) {
-    return DT.el("div", { class: `dt-pk-kaart${open ? " is-open" : ""}`, style: `--kleur:${kleur};--kleur2:${kleur2}` }, DT.el("div", { class: "dt-pk-k3d" }, [
-      DT.el("div", { class: "dt-pk-kachter" }, DT.el("span", { text: "★" })),
+  /* Ruilkaart in de stijl van een trading card game: gele rand, naam en type-icoon bovenaan, ingelijste
+   * afbeelding (pasfoto of initialen), een strook met klas of groepje, een vakje met een "vaardigheid"
+   * (aan de beurt, of met wie je in je team zit) en een setnummer onderaan. Zeldzaam = holografisch. */
+  kaartEl(DT, l, { kleur, kleur2, emoji = "★", strip = "", vakTitel = "", vakTekst = "", groep = null, set = "", nummer = "", zeldzaam = false, open = false }) {
+    const met = groep ? groep.filter((x) => x !== l).map((x) => x.naam) : [];
+    const tekst = vakTekst || (met.length ? `Speelt samen met ${met.join(", ").replace(/, ([^,]*)$/, " en $1")}.` : "");
+    return DT.el("div", { class: `dt-pk-kaart${open ? " is-open" : ""}${zeldzaam ? " is-zeldzaam" : ""}`, style: `--kleur:${kleur};--kleur2:${kleur2}` }, DT.el("div", { class: "dt-pk-k3d" }, [
+      DT.el("div", { class: "dt-pk-kachter" }, DT.el("span", { class: "dt-pk-krug" }, DT.el("b", { text: "★" }))),
       DT.el("div", { class: "dt-pk-kvoor" }, [
-        DT.el("div", { class: "dt-pk-kbadge" }, [DT.el("b", { text: emoji }), DT.el("small", { text: badge })]),
-        DT.el("div", { class: "dt-pk-kraam" }, this.gezicht(DT, l, "dt-pk-gezicht")),
-        DT.el("div", { class: "dt-pk-knaam", text: l.naam }),
-        DT.el("div", { class: "dt-pk-kteam", text: team || "" }),
+        DT.el("div", { class: "dt-pk-kbinnen" }, [
+          DT.el("div", { class: "dt-pk-kkop" }, [DT.el("b", { class: "dt-pk-knaam", text: l.naam }), DT.el("span", { class: "dt-pk-ktype", text: emoji })]),
+          DT.el("div", { class: "dt-pk-kraam" }, [this.gezicht(DT, l, "dt-pk-gezicht"), DT.el("span", { class: "dt-pk-kraamholo" })]),
+          DT.el("div", { class: "dt-pk-kstrip", text: strip }),
+          DT.el("div", { class: "dt-pk-kvak" }, [DT.el("b", {}, [DT.el("span", { class: "dt-pk-kpunt", text: emoji }), DT.el("span", { text: vakTitel })]), tekst ? DT.el("span", { text: tekst }) : null]),
+          DT.el("div", { class: "dt-pk-kvoet" }, [DT.el("span", { text: `Docent Tools${set ? ` · ${set}` : ""}` }), DT.el("span", { text: `${nummer} ${zeldzaam ? "★" : "●"}` })]),
+        ]),
         DT.el("span", { class: "dt-pk-holo" }),
         DT.el("span", { class: "dt-pk-kglans" }),
       ]),
@@ -1057,32 +1039,50 @@ DT.register({
       .dt-pk-k3d { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transform: rotateY(180deg); transition: transform 1s cubic-bezier(.3,.7,.3,1.12) calc(var(--d, 0ms) + 300ms); }
       .dt-pk-kaart.is-uit .dt-pk-k3d, .dt-pk-kaart.is-open .dt-pk-k3d { transform: none; }
       .dt-pk-kaart.is-open { position: relative; opacity: 1; transform: none; transition: none; }
-      .dt-pk-kvoor, .dt-pk-kachter { position: absolute; inset: 0; border-radius: 5% / 3.6%; backface-visibility: hidden; -webkit-backface-visibility: hidden; overflow: hidden;
-        box-shadow: 0 0 0 1px rgba(0,0,0,.18), 0 2px 0 #e6e6e6, 0 3px 0 #c9c9c9, 0 24px 44px rgba(0,0,0,.5); }
-      .dt-pk-kachter { transform: rotateY(180deg); display: grid; place-items: center; color: #FFD54A; font-size: calc(var(--kh, 46vh) * .2);
-        background: radial-gradient(circle, rgba(255,255,255,.18), transparent 60%), repeating-linear-gradient(45deg, #5B3FD9 0 10px, #4A2FC4 10px 20px); box-shadow: inset 0 0 0 calc(var(--kh, 46vh) * .025) #fff, 0 24px 44px rgba(0,0,0,.5); }
-      .dt-pk-kvoor { display: flex; flex-direction: column; align-items: center; padding: 13% 9% 15%; box-sizing: border-box; gap: 2%; border-radius: 0; box-shadow: none;
-        clip-path: polygon(50% 0, 62% 2.4%, 80% 2.4%, 92% 5.5%, 100% 11%, 100% 86%, 92% 92%, 64% 97%, 50% 100%, 36% 97%, 8% 92%, 0 86%, 0 11%, 8% 5.5%, 20% 2.4%, 38% 2.4%);
-        background:
-          linear-gradient(transparent 0 calc(100% - 3px), rgba(255,255,255,.5) 0) 50% 76% / 70% 3px no-repeat,
-          repeating-linear-gradient(135deg, rgba(255,255,255,.09) 0 2px, transparent 2px 11px),
-          radial-gradient(120% 70% at 50% 18%, color-mix(in srgb, var(--kleur) 40%, #fff), transparent 60%),
-          linear-gradient(160deg, color-mix(in srgb, var(--kleur) 70%, #fff) 0%, var(--kleur) 38%, var(--kleur2) 100%); }
-      .dt-pk-kvoor::before { content: ""; position: absolute; inset: 3%; pointer-events: none; border: 2px solid rgba(255,255,255,.45);
-        clip-path: inherit; border-radius: 0; }
-      .dt-pk-kbadge { position: absolute; left: 12%; top: 13%; display: flex; flex-direction: column; align-items: center; gap: 2px; z-index: 2; }
-      .dt-pk-kbadge b { font-size: calc(var(--kh, 46vh) * .1); line-height: 1; filter: drop-shadow(0 2px 3px rgba(0,0,0,.3)); }
-      .dt-pk-kbadge small { font-size: calc(var(--kh, 46vh) * .028); font-weight: 900; letter-spacing: .06em; text-transform: uppercase; color: rgba(20,20,40,.75); max-width: calc(var(--kh, 46vh) * .2); text-align: center; line-height: 1.1; }
-      .dt-pk-kraam { position: relative; flex: 1; width: 78%; align-self: flex-end; margin-right: -4%; overflow: hidden; background: none;
-        -webkit-mask-image: linear-gradient(180deg, #000 72%, transparent 100%); mask-image: linear-gradient(180deg, #000 72%, transparent 100%); }
-      .dt-pk-gezicht { position: absolute; inset: 0; display: grid; place-items: center; font-size: calc(var(--kh, 46vh) * .2); font-weight: 900; color: rgba(255,255,255,.95); text-transform: uppercase; letter-spacing: .02em;
-        text-shadow: 0 4px 14px rgba(0,0,0,.35); }
+      .dt-pk-kvoor, .dt-pk-kachter { position: absolute; inset: 0; border-radius: 4.6% / 3.3%; backface-visibility: hidden; -webkit-backface-visibility: hidden; overflow: hidden; }
+      .dt-pk-kachter { transform: rotateY(180deg); display: grid; place-items: center;
+        background: radial-gradient(circle at 50% 50%, rgba(255,255,255,.25), transparent 45%), repeating-conic-gradient(from 8deg at 50% 50%, #2D55C8 0 9deg, #1E3C9A 9deg 18deg), #1E3C9A;
+        box-shadow: inset 0 0 0 calc(var(--kh, 46vh) * .03) #1A2F78, inset 0 0 0 calc(var(--kh, 46vh) * .04) #F2C94C, inset 0 0 0 calc(var(--kh, 46vh) * .05) #1A2F78; }
+      .dt-pk-krug { width: 46%; aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 35% 30%, #FFF3B0, #F2C94C 45%, #C28A12);
+        box-shadow: 0 0 0 calc(var(--kh, 46vh) * .012) #1A2F78, 0 0 0 calc(var(--kh, 46vh) * .022) #F2C94C, 0 10px 30px rgba(0,0,0,.4); }
+      .dt-pk-krug b { font-size: calc(var(--kh, 46vh) * .13); color: #1A2F78; line-height: 1; }
+      .dt-pk-kvoor { padding: 4.4% 4.6%; box-sizing: border-box;
+        background: linear-gradient(135deg, #FBE58A 0%, #E6B93A 30%, #FFF0A8 52%, #D9A520 78%, #F4D774 100%);
+        box-shadow: inset 0 0 0 1px rgba(120,80,0,.35), inset 0 2px 0 rgba(255,255,255,.6); }
+      .dt-pk-kbinnen { position: relative; height: 100%; box-sizing: border-box; border-radius: 2.4% / 1.7%; padding: 4% 5% 3.5%; display: flex; flex-direction: column; gap: 2.2%;
+        background: radial-gradient(120% 60% at 50% 0%, rgba(255,255,255,.55), transparent 60%),
+          linear-gradient(175deg, color-mix(in srgb, var(--kleur) 38%, #fff) 0%, color-mix(in srgb, var(--kleur) 62%, #fff) 50%, color-mix(in srgb, var(--kleur2) 45%, #fff) 100%);
+        box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); color: #1B1B1B; }
+      .dt-pk-kkop { display: flex; align-items: center; justify-content: space-between; gap: 4%; }
+      .dt-pk-knaam { min-width: 0; font-size: calc(var(--kh, 46vh) * .062); font-weight: 900; letter-spacing: -.01em; line-height: 1.05; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .dt-pk-ktype { flex: none; width: calc(var(--kh, 46vh) * .068); aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; font-size: calc(var(--kh, 46vh) * .042);
+        background: radial-gradient(circle at 35% 30%, #fff, color-mix(in srgb, var(--kleur) 50%, #fff)); box-shadow: 0 0 0 2px rgba(0,0,0,.25), 0 2px 4px rgba(0,0,0,.25); }
+      .dt-pk-kraam { position: relative; flex: 0 0 44%; overflow: hidden; border: calc(var(--kh, 46vh) * .009) solid #CFA94A; box-shadow: inset 0 0 0 1px rgba(255,255,255,.6), 0 2px 5px rgba(0,0,0,.3);
+        background: radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--kleur) 25%, #fff) 0 18%, transparent 19%),
+          repeating-radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--kleur) 60%, #fff) 0 6%, color-mix(in srgb, var(--kleur) 85%, #000) 6% 12%); }
+      .dt-pk-gezicht { position: absolute; inset: 0; display: grid; place-items: center; font-size: calc(var(--kh, 46vh) * .15); font-weight: 900; color: #fff; text-transform: uppercase;
+        text-shadow: 0 3px 0 rgba(0,0,0,.25), 0 6px 16px rgba(0,0,0,.3); -webkit-text-stroke: 2px rgba(0,0,0,.25); }
       .dt-pk-gezicht img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-      .dt-pk-knaam { max-width: 92%; color: #14142A; text-align: center; font-size: calc(var(--kh, 46vh) * .082); font-weight: 900; letter-spacing: .01em; text-transform: uppercase; line-height: 1.05;
-        text-shadow: 0 1px 0 rgba(255,255,255,.45); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .dt-pk-kteam { text-align: center; font-size: calc(var(--kh, 46vh) * .032); font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: rgba(20,20,40,.7); }
-      .dt-pk-kteam:empty { display: none; }
-      .dt-pk-holo { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: color-dodge; opacity: .45;
+      .dt-pk-kraamholo { position: absolute; inset: 0; pointer-events: none; opacity: 0; mix-blend-mode: color-dodge;
+        background: linear-gradient(125deg, transparent 15%, rgba(255,0,150,.55) 28%, rgba(255,230,0,.55) 38%, rgba(0,255,190,.55) 48%, rgba(0,150,255,.55) 58%, rgba(190,80,255,.55) 68%, transparent 82%); background-size: 260% 260%; animation: dt-pk-holo 4s linear infinite; }
+      .dt-pk-kaart.is-zeldzaam .dt-pk-kraamholo { opacity: .7; }
+      .dt-pk-kaart.is-zeldzaam .dt-pk-kraam:has(img) .dt-pk-kraamholo { opacity: .28; }
+      .dt-pk-kstrip { margin: 0 6%; padding: .35em .6em; border-radius: 3px; text-align: center; font-size: calc(var(--kh, 46vh) * .024); font-weight: 700; font-style: italic; color: #3B2B00;
+        background: linear-gradient(90deg, #D7B04A, #F8E59A 50%, #D7B04A); box-shadow: 0 1px 2px rgba(0,0,0,.25); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .dt-pk-kstrip:empty { visibility: hidden; }
+      .dt-pk-kvak { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: .35em; padding: 3% 1% 0; border-top: 1px solid rgba(0,0,0,.18); overflow: hidden; }
+      .dt-pk-kvak b { display: flex; align-items: center; gap: .4em; font-size: calc(var(--kh, 46vh) * .042); font-weight: 900; }
+      .dt-pk-kpunt { display: inline-grid; place-items: center; width: 1.35em; aspect-ratio: 1; border-radius: 50%; font-size: .8em; background: rgba(255,255,255,.7); box-shadow: 0 0 0 1px rgba(0,0,0,.2); }
+      .dt-pk-kvak > span { font-size: calc(var(--kh, 46vh) * .028); line-height: 1.3; color: #2A2A2A; }
+      .dt-pk-kvoet { display: flex; justify-content: space-between; gap: 6px; padding-top: 2%; border-top: 1px solid rgba(0,0,0,.18); font-size: calc(var(--kh, 46vh) * .019); font-weight: 700; color: rgba(0,0,0,.55); }
+      .dt-pk-krans { align-self: center; justify-self: center; width: min(90vh, 90vw); aspect-ratio: 1; border-radius: 50%; pointer-events: none; opacity: 0;
+        background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--kleur) 55%, transparent) 0 6deg, transparent 6deg 18deg);
+        -webkit-mask: radial-gradient(closest-side, #000 25%, transparent 72%); mask: radial-gradient(closest-side, #000 25%, transparent 72%);
+        animation: dt-pk-krans 1.2s ease .5s forwards, dt-wo-draai 30s linear infinite; }
+      @keyframes dt-pk-krans { to { opacity: .9; } }
+      @keyframes dt-wo-draai { to { transform: rotate(360deg); } }
+      .dt-pk-kaart.is-zeldzaam .dt-pk-holo { opacity: .38; }
+      .dt-pk-holo { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: color-dodge; opacity: .14;
         background: linear-gradient(115deg, transparent 18%, rgba(255,0,140,.5) 30%, rgba(255,220,0,.5) 40%, rgba(0,255,200,.5) 50%, rgba(0,150,255,.5) 60%, rgba(170,80,255,.5) 70%, transparent 82%); background-size: 300% 300%;
         animation: dt-pk-holo 6s linear infinite; }
       .dt-pk-kglans { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(105deg, transparent 38%, rgba(255,255,255,.75) 50%, transparent 62%); transform: translateX(-130%); }
@@ -1096,43 +1096,6 @@ DT.register({
       .dt-pk-kaart { filter: drop-shadow(0 18px 30px rgba(0,0,0,.5)); }
       .dt-pk-groep .dt-pk-kteam { display: none; }
 
-      .dt-wo { position: absolute; inset: 0; z-index: 8; overflow: hidden; background: radial-gradient(ellipse at 50% 50%, #1B2560 0%, #080B22 70%); perspective: 600px; }
-      .dt-wo-tunnel { position: absolute; inset: 0; display: grid; place-items: center; transition: opacity .6s; }
-      .dt-wo-tunnel i { grid-area: 1 / 1; width: 60vmin; aspect-ratio: 1; border: 2px solid rgba(220,230,255,.5); box-shadow: 0 0 22px rgba(160,190,255,.35), inset 0 0 22px rgba(160,190,255,.25);
-        background: linear-gradient(135deg, rgba(255,255,255,.06), transparent 60%); animation: dt-wo-tunnel 3.2s linear infinite; }
-      .dt-wo-stralen { position: absolute; inset: 0; display: grid; place-items: center; animation: dt-wo-draai 7s linear infinite; mix-blend-mode: screen; }
-      .dt-wo-stralen i { grid-area: 1 / 1; width: 4vmin; height: 160vmax; transform: rotate(var(--h)); background: linear-gradient(180deg, transparent, rgba(255,255,255,.4) 45%, rgba(255,255,255,.65) 50%, rgba(255,255,255,.4) 55%, transparent); filter: blur(6px); }
-      .dt-wo-stralen i:nth-child(odd) { width: 9vmin; opacity: .5; }
-      .dt-wo-label, .dt-wo-zeldzaam { position: absolute; left: 0; right: 0; text-align: center; font: 900 clamp(16px, 1.8vw, 30px)/1 var(--dt-font); letter-spacing: .22em; text-transform: uppercase; color: #fff; opacity: 0;
-        text-shadow: 0 0 18px rgba(160,190,255,.8); transition: opacity .4s, transform .5s cubic-bezier(.2,.9,.3,1.2); }
-      .dt-wo-label { top: 30%; transform: translateY(16px); }
-      .dt-wo-zeldzaam { top: 22%; transform: translateY(-16px); color: color-mix(in srgb, var(--kleur) 60%, #fff); }
-      .dt-wo.f1 .dt-wo-label, .dt-wo.f3 .dt-wo-zeldzaam { opacity: 1; transform: none; }
-      .dt-wo-woord { position: absolute; top: 50%; left: 0; white-space: nowrap; transform: translate(110vw, -50%); font: 900 clamp(70px, 12vw, 220px)/1 var(--dt-font); letter-spacing: .02em; text-transform: uppercase;
-        color: transparent; -webkit-text-stroke: 3px rgba(235,242,255,.95); text-shadow: 0 0 30px rgba(140,180,255,.6); }
-      .dt-wo.f2 .dt-wo-woord { animation: dt-wo-woord 3.4s cubic-bezier(.15,.75,.85,.25) forwards; }
-      .dt-wo-band { position: absolute; left: -5%; right: -5%; top: 66%; transform: rotate(-4deg) scaleY(0); padding: .5em 0; overflow: hidden; background: rgba(8,10,30,.55);
-        border-top: 1px solid rgba(255,214,0,.5); border-bottom: 1px solid rgba(255,214,0,.5); transition: transform .35s ease; }
-      .dt-wo-band span { display: inline-block; white-space: nowrap; font: 900 clamp(14px, 1.5vw, 26px)/1 var(--dt-font); letter-spacing: .12em; text-transform: uppercase; color: #FFD60A; animation: dt-wo-band 9s linear infinite; }
-      .dt-wo.f3 .dt-wo-band { transform: rotate(-4deg) scaleY(1); }
-      .dt-wo.f4 .dt-wo-tunnel, .dt-wo.f4 .dt-wo-stralen, .dt-wo.f4 .dt-wo-band, .dt-wo.f4 .dt-wo-woord, .dt-wo.f4 .dt-wo-label, .dt-wo.f4 .dt-wo-zeldzaam { opacity: 0; transition: opacity .5s; }
-      .dt-wo-tease { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2vh; opacity: 0; transform: scale(1.3); transition: opacity .6s, transform 1.2s cubic-bezier(.2,.8,.2,1); }
-      .dt-wo-tease small { font: 800 clamp(13px, 1.2vw, 20px)/1 var(--dt-font); letter-spacing: .3em; text-transform: uppercase; color: rgba(255,255,255,.75); }
-      .dt-wo-tease b { font: 900 clamp(120px, 22vw, 380px)/1 var(--dt-font); color: #fff; letter-spacing: -.02em; text-transform: uppercase;
-        text-shadow: 0 0 20px #fff, 0 0 60px color-mix(in srgb, var(--kleur) 80%, #fff), 0 0 120px color-mix(in srgb, var(--kleur) 70%, transparent); }
-      .dt-wo.f5 .dt-wo-tease { opacity: 1; transform: none; }
-      .dt-wo-flits { position: absolute; inset: 0; background: #fff; opacity: 1; pointer-events: none; animation: dt-wo-flits .7s ease-out forwards; }
-      .dt-wo.f-eind { background: transparent; transition: background .1s; }
-      .dt-wo.f-eind > :not(.dt-wo-flits) { opacity: 0 !important; transition: opacity .15s; }
-      .dt-wo.f-eind .dt-wo-flits { animation: dt-wo-flits .7s ease-out forwards; animation-name: dt-wo-flits2; }
-      .dt-wo-sla { position: absolute; left: 3vw; bottom: 4vh; appearance: none; border: 1px solid rgba(255,255,255,.35); border-radius: 10px; padding: 10px 16px; font: 700 14px/1 var(--dt-font); color: #fff; background: rgba(10,14,40,.6); cursor: pointer; z-index: 3; }
-      .dt-wo-sla:hover { background: rgba(30,40,90,.8); }
-      @keyframes dt-wo-tunnel { 0% { transform: scale(.05) rotate(0deg); opacity: 0; } 15% { opacity: 1; } 100% { transform: scale(3.2) rotate(45deg); opacity: .15; } }
-      @keyframes dt-wo-draai { to { transform: rotate(360deg); } }
-      @keyframes dt-wo-woord { 0% { transform: translate(105vw, -50%); } 100% { transform: translate(calc(-100% - 5vw), -50%); } }
-      @keyframes dt-wo-band { to { transform: translateX(-50%); } }
-      @keyframes dt-wo-flits { from { opacity: 1; } to { opacity: 0; } }
-      @keyframes dt-wo-flits2 { 0% { opacity: 0; } 15% { opacity: 1; } 100% { opacity: 0; } }
       @keyframes dt-pk-gloed { 50% { opacity: .55; transform: scale(.94); } }
       @keyframes dt-pk-zweef { 0%, 100% { translate: 0 0; } 50% { translate: 0 -14px; } }
       @keyframes dt-pk-schaduw { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(.88); opacity: .75; } }

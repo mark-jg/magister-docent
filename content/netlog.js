@@ -118,6 +118,18 @@
   });
   /* Op verzoek van de extensie naar een Magister-scherm gaan zoals Magister dat zelf doet
    * ($state.go), bijvoorbeeld de leerlingkaart. Antwoord ok=false als dat niet lukt. */
+  /* Attributen opnieuw zetten vanuit de pagina zelf. Webcomponenten van Magister (zoals dna-link-card) reageren
+   * niet op attributen die de extensie vanuit haar eigen wereld zet; vanuit de pagina wel. Zoekt ook in
+   * open shadow roots. */
+  window.addEventListener("message", (e) => {
+    if (!(e.data && e.data.type === "dt:attr:opnieuw" && trusted(e))) return;
+    const { selector, attr } = e.data;
+    const zoek = (r, uit = []) => { try { uit.push(...r.querySelectorAll(selector)); } catch {} r.querySelectorAll("*").forEach((x) => x.shadowRoot && zoek(x.shadowRoot, uit)); return uit; };
+    for (const el of zoek(document)) {
+      const v = el.getAttribute(attr);
+      if (v != null) { el.removeAttribute(attr); el.setAttribute(attr, v); }
+    }
+  });
   window.addEventListener("message", (e) => {
     if (!(e.data && e.data.type === "dt:state:go" && trusted(e))) return;
     let ok = false, error = "";

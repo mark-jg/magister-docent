@@ -49,7 +49,10 @@ DT.register({
     const wrap = dash?.shadowRoot?.querySelector(".wrapper");
     if (this._view && !this._view.isConnected) this.sluit();
     if (this._view && !document.querySelector("mg-att-tiles")) this.sluit();
-    if (!wrap || wrap.querySelector("#dt-lb-tegel")) return;
+    const oud = wrap?.querySelector("#dt-lb-tegel");
+    /* Zelfde als bij de lestools: de kaartkop alleen vanuit de pagina laten zetten. */
+    if (oud && oud.shadowRoot?.querySelector("h1")?.textContent.trim() !== "Leaderboard") window.postMessage({ type: "dt:attr:opnieuw", selector: "#dt-lb-tegel", attr: "heading" }, "*");
+    if (!wrap || oud) return;
     const c = document.createElement("dna-link-card");
     c.id = "dt-lb-tegel";
     c.setAttribute("heading", "Leaderboard");
