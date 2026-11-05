@@ -73,13 +73,14 @@ DT.register({
     if (/^\/magister-lvs\//.test(location.pathname)) {
       this._stop = DT.observe(() => { DTForms.vulLogboek(this.NOTITIE); this.knop(DT); }, { debounce: 250, poll: 1000 });
     } else if (DT.isTop) {
-      this._stop = DT.observe(() => DTForms.vulAfspraak(this.AFSPRAAK), { debounce: 300, poll: 1500 });
+      this._stop = DT.observe(() => { DTForms.vulAfspraak(this.AFSPRAAK); this.vandaagKaart(DT); }, { debounce: 400, poll: 3000 });
     }
   },
   destroy() {
     this._stop && this._stop();
     document.getElementById("dt-pva-knop")?.remove();
     document.querySelector(".dt-pva-modal")?.remove();
+    document.getElementById("dt-pva-vandaag")?.remove();
   },
 
   /* ---------- hulpjes ---------- */
@@ -193,6 +194,7 @@ DT.register({
       ouderNaam: "", aangemaakt: new Date().toISOString(),
     };
   },
+  klein(t) { return String(t || "").charAt(0).toLowerCase() + String(t || "").slice(1); },
   vulPct(t, pct) { return String(t || "").replace(/\{pct\}/g, pct ?? "…"); },
   titel(p, pr = this._pr) {
     const so = pr ? this.soortVan(pr, p) : { naam: "Plan van aanpak" };
@@ -207,7 +209,8 @@ DT.register({
     try {
       const [s, a, eerder, std, pr] = await Promise.all([this.student(DT, id), this.aanwezigheid(DT, id), this.plannenVan(id), this.opslag("pva:standaard"), this.profiel()]);
       this._std = std || {}; this._s = s; this._a = a; this._pr = pr; this._id = id;
-      if (vanBalie) {
+      if (vanBalie?.planId) { const p = eerder.find((x) => x.id === vanBalie.planId); if (p) { this._pr = (await this.profielen()).find((x) => x.id === p.profielId) || pr; return this.formulier(DT, p); } }
+      if (vanBalie && !vanBalie.planId) {
         const soort = vanBalie.soort === "bbm" && pr.soorten?.bbm ? "bbm" : "algemeen";
         return this.formulier(DT, this.nieuwPlan(DT, s, a, pr, soort, vanBalie, eerder));
       }
@@ -324,6 +327,7 @@ DT.register({
           DT.el("td", {}, inp(`evaluaties.${i}.datum`, { type: "date" })),
           DT.el("td", {}, kies(`evaluaties.${i}.doelen`, [["", "—"], ["behaald", "behaald"], ["deels", "deels"], ["niet", "niet"]])),
           DT.el("td", {}, traject && so.vervolg ? kies(`evaluaties.${i}.vervolg`, [["", "—"], ["afsluiten", "afsluiten"], ["nieuw", "nieuw plan"], ["volgende", "volgende stap"]]) : inp(`evaluaties.${i}.afspraak`)),
+          DT.el("td", {}, (() => { const b = DT.el("button", { type: "button", class: "dt-pva-link", text: p.evaluaties[i].op ? "✓ Bekijken" : "Evalueren…" }); b.addEventListener("click", () => this.evalueren(DT, p, i)); return b; })()),
         ]))),
         pr.hints?.[p.soort] ? DT.el("p", { class: "dt-pva-zacht", text: pr.hints[p.soort] }) : null),
       sectie("Akkoord", DT.el("div", { class: "dt-pva-grid" }, [veld("Ouder/verzorger (bij minderjarige)", inp("ouderNaam", { ph: "naam" }))])),
@@ -342,6 +346,105 @@ DT.register({
     /* SLB, opleidingsmanager en coach onthouden voor het volgende plan (in deze browser). */
     const std = { slb: p.slb || "", om: p.om || this._std?.om || "", coach: p.coach || this._std?.coach || "" };
     if (JSON.stringify(std) !== JSON.stringify(this._std || {})) { this._std = std; this.opslag("pva:standaard", std); }
+  },
+
+  /* ---------- evalueren: per doel, notitie in Magister en het vervolg ---------- */
+  evalueren(DT, p, i) {
+    const pr = this._pr, so = this.soortVan(pr, p), e = p.evaluaties[i] ||= {}, traject = p.soort !== "algemeen";
+    const doelen = (p.doelen || []).filter((d) => d.doel);
+    e.datum ||= this.vandaag();
+    const bewaar = () => this.bewaarPlan(p);
+    const kies = (waarde, opties, zet) => { const s = DT.el("select", { class: "dt-pva-veld" }, opties.map(([v, t]) => DT.el("option", { value: v, text: t }))); s.value = waarde || ""; s.addEventListener("change", () => { zet(s.value); bewaar(); }); return s; };
+    const RES = [["", "—"], ["behaald", "behaald"], ["deels", "deels"], ["niet", "niet behaald"]];
+    const totaal = () => { const r = doelen.map((d) => d.resultaat).filter(Boolean); return !r.length ? "" : r.every((x) => x === "behaald") ? "behaald" : r.some((x) => x !== "niet") ? "deels" : "niet"; };
+    const toel = DT.el("textarea", { class: "dt-pva-veld", rows: "3", placeholder: "Wat zag je, wat zegt de student, wat spreek je af?" }); toel.value = e.toelichting || "";
+    toel.addEventListener("input", () => { e.toelichting = toel.value; if (!traject) e.afspraak = toel.value.split("\n")[0]; bewaar(); });
+    const tekst = () => {
+      const r = [`Evaluatie van het ${this.klein(this.titel(p))} van ${this.lang(p.datum)}, op ${this.lang(e.datum)}.`, ""];
+      if (doelen.length) r.push("Doelen:", ...doelen.map((d) => `- ${d.doel}: ${({ behaald: "behaald", deels: "deels behaald", niet: "niet behaald" })[d.resultaat] || "nog niet beoordeeld"}`), "");
+      if (e.toelichting) r.push(e.toelichting, "");
+      if (e.vervolg) r.push(`Vervolg: ${({ afsluiten: "plan afsluiten", nieuw: "nieuw plan", volgende: `volgende stap (${so.kort || so.naam})` })[e.vervolg]}.`);
+      return r.join("\n").trim();
+    };
+    const vervolgStap = () => { const st = so.stappen || [], j = st.findIndex(([k]) => k === p.stap); return st[j + 1] || null; };
+    const knoppen = [["Terug naar het plan", () => this.formulier(DT, p)],
+      ["Evaluatienotitie in Magister", async () => {
+        e.doelen = totaal() || e.doelen; e.op = new Date().toISOString(); await this.bewaarPlan(p);
+        const ok = DTForms.logboek(this.NOTITIE, { magisterId: String(p.magisterId), naam: p.naam, type: pr.logboekType || "Gespreksnotitie", omschrijving: `Evaluatie: ${this.titel(p)}`, tekst: tekst(), bron: "Plan van aanpak" });
+        if (!ok) return this.melding("Dat lukte niet.");
+        document.querySelector(".dt-pva-modal")?.remove();
+        if (this.studentId() !== String(p.magisterId)) location.hash = `#/overview/${p.magisterId}`;
+        DTForms.vulLogboek(this.NOTITIE);
+      }, true]];
+    if (e.vervolg === "volgende" || e.vervolg === "nieuw" || (!traject && totaal() && totaal() !== "behaald")) {
+      const st = vervolgStap();
+      knoppen.splice(1, 0, [e.vervolg === "volgende" && st ? `Plan voor ${st[1].replace(/:.*/, "")} maken` : "Nieuw plan maken", async () => {
+        e.doelen = totaal() || e.doelen; e.op ||= new Date().toISOString(); await this.bewaarPlan(p);
+        const n = this.nieuwPlan(DT, this._s || p, this._a || { tekst: p.aanwezigheid, pct: p.pct }, pr, p.soort, { redenen: p.redenen, toelichting: `Vervolg op het ${this.klein(this.titel(p))} van ${this.lang(p.datum)}. ${e.toelichting || ""}`.trim() }, await this.plannenVan(p.magisterId));
+        if (e.vervolg === "volgende" && st) n.stap = st[0];
+        n.doelen = doelen.filter((d) => d.resultaat !== "behaald").map((d) => ({ doel: d.doel, bewijs: d.bewijs })).concat([{}]);
+        n.vorigPlan = p.id;
+        this.formulier(DT, n);
+      }]);
+    }
+    this.modal(DT, `Evaluatie: ${this.titel(p)} · ${p.naam}`, [
+      DT.el("div", { class: "dt-pva-grid" }, [DT.el("label", { class: "dt-pva-label" }, [DT.el("span", { text: "Datum evaluatie" }), (() => { const d = DT.el("input", { type: "date", class: "dt-pva-veld" }); d.value = e.datum; d.addEventListener("input", () => { e.datum = d.value; bewaar(); }); return d; })()])]),
+      doelen.length ? DT.el("table", { class: "dt-pva-tabel" }, [DT.el("thead", {}, DT.el("tr", {}, ["Doel", "Waaraan zie je het", "Uiterlijk", "Resultaat"].map((t) => DT.el("th", { text: t })))),
+        DT.el("tbody", {}, doelen.map((d) => DT.el("tr", {}, [DT.el("td", { text: d.doel }), DT.el("td", { text: d.bewijs || "" }), DT.el("td", { text: d.uiterlijk || "" }),
+          DT.el("td", {}, kies(d.resultaat, RES, (v) => { d.resultaat = v; e.doelen = totaal(); }))])))])
+        : DT.el("p", { class: "dt-pva-zacht", text: "Dit plan heeft nog geen doelen." }),
+      DT.el("label", { class: "dt-pva-label" }, [DT.el("span", { text: "Toelichting en afspraken" }), toel]),
+      traject && so.vervolg ? DT.el("label", { class: "dt-pva-label" }, [DT.el("span", { text: "Vervolg" }), kies(e.vervolg, [["", "—"], ["afsluiten", "plan afsluiten"], ["nieuw", "nieuw plan"], ["volgende", `volgende stap${vervolgStap() ? ` (${vervolgStap()[1].replace(/:.*/, "")})` : ""}`]], (v) => { e.vervolg = v; this.evalueren(DT, p, i); })]) : null,
+      pr.hints?.[p.soort] ? DT.el("p", { class: "dt-pva-zacht", text: pr.hints[p.soort] }) : null,
+    ].filter(Boolean), knoppen);
+  },
+
+  /* ---------- Vandaag: mijn plannen en evaluaties ---------- */
+  /* Kaart op het startscherm met de evaluaties die eraan komen of verlopen zijn, uit alle plannen in deze browser.
+   * Klik: het logboek van de student opent met het plan. */
+  async vandaagKaart(DT) {
+    const kolom = document.querySelector("#vandaag-agenda") && (document.querySelector(".small-widgets") || document.querySelector("#vandaag-notificatie")?.parentElement);
+    const kaart = document.getElementById("dt-pva-vandaag");
+    if (!kolom) { kaart?.remove(); return; }
+    if (this._vBezig || (kaart?.isConnected && Date.now() - (this._vOp || 0) < 60000)) return;
+    this._vBezig = true;
+    try {
+      const alles = await chrome.storage.local.get(null), vandaag = this.vandaag(), alleProfielen = await this.profielen();
+      const rijen = [];
+      for (const [k, lijst] of Object.entries(alles)) {
+        if (!/^pva:\d+$/.test(k) || !Array.isArray(lijst)) continue;
+        for (const p of lijst) {
+          const e = (p.evaluaties || []).find((x) => x.datum && !x.op && !x.doelen);
+          if (!e) continue;
+          const pr = alleProfielen.find((x) => x.id === p.profielId) || alleProfielen[0];
+          rijen.push({ p, e, pr, dagen: Math.round((new Date(`${e.datum}T12:00`) - new Date(`${vandaag}T12:00`)) / 864e5) });
+        }
+      }
+      rijen.sort((a, b) => a.dagen - b.dagen);
+      this._vOp = Date.now();
+      if (!rijen.length) { kaart?.remove(); return; }
+      this.css();
+      const k = kaart?.isConnected ? kaart : DT.el("dna-card", { id: "dt-pva-vandaag", class: "dt-pva-vandaag" });
+      if (!k.isConnected) { const mede = kolom.querySelector("#vandaag-mededelingen"); if (mede) kolom.insertBefore(k, mede); else kolom.append(k); }
+      k.replaceChildren(
+        DT.el("div", { class: "dt-pva-vkop" }, [DT.el("b", { text: "Plannen van aanpak" }), DT.el("small", { text: `${rijen.filter((r) => r.dagen <= 7).length} evaluatie${rijen.filter((r) => r.dagen <= 7).length === 1 ? "" : "s"} deze week of verlopen` })]),
+        ...rijen.slice(0, 8).map((r) => {
+          const a = DT.el("button", { type: "button", class: `dt-pva-vrij${r.dagen < 0 ? " is-laat" : r.dagen <= 7 ? " is-binnenkort" : ""}` }, [
+            DT.el("span", {}, [DT.el("b", { text: r.p.naam }), DT.el("small", { text: ` ${r.p.klas || ""} · ${this.titel(r.p, r.pr)}` })]),
+            DT.el("span", { class: "dt-pva-vdatum", text: r.dagen < 0 ? `${-r.dagen} d te laat` : r.dagen === 0 ? "vandaag" : `over ${r.dagen} d` }),
+          ]);
+          a.addEventListener("click", () => this.naarPlan(DT, r.p));
+          return a;
+        }),
+        ...(rijen.length > 8 ? [DT.el("small", { class: "dt-pva-zacht", text: `en nog ${rijen.length - 8}` })] : []),
+      );
+    } finally { this._vBezig = false; }
+  },
+  async naarPlan(DT, p) {
+    DTForms.logboek(this.OPEN, { magisterId: String(p.magisterId), planId: p.id });
+    const acc = await DT.api("/api/account", { full: true, timeout: 8000 }), pid = acc.json?.Persoon?.Id ?? acc.json?.persoon?.id ?? "";
+    const binnen = encodeURIComponent(encodeURIComponent(`/begeleiding-page/leerling/${p.magisterId}/Alle%20rollen/${pid}/logboek`));
+    location.hash = `#/begeleiding/Alle%20rollen/leerling/${p.magisterId}/////?innerUrl=${binnen}`;
   },
 
   /* ---------- profielen beheren: kiezen, kopiëren, bewerken, delen ---------- */
@@ -568,8 +671,8 @@ DT.register({
   evaluatie(p) {
     const ev = (p.evaluaties || []).find((e) => e.datum && !e.doelen) || (p.evaluaties || []).find((e) => e.datum);
     if (!ev) return this.melding("Vul eerst een evaluatiedatum in.");
-    DTForms.afspraak(this.AFSPRAAK, { stamnr: p.stamnr, naam: p.naam, onderwerp: `Evaluatie ${this.titel(p).toLowerCase()}: ${p.naam}`, datum: ev.datum, tijd: "09:00", minuten: 30, bron: "Plan van aanpak",
-      tekst: `Evaluatie van het ${this.titel(p).toLowerCase()} van ${this.lang(p.datum)}.\n\nDoelen:\n${(p.doelen || []).filter((d) => d.doel).map((d) => `- ${d.doel}`).join("\n") || "-"}` });
+    DTForms.afspraak(this.AFSPRAAK, { stamnr: p.stamnr, naam: p.naam, onderwerp: `Evaluatie ${this.klein(this.titel(p))}: ${p.naam}`, datum: ev.datum, tijd: "09:00", minuten: 30, bron: "Plan van aanpak",
+      tekst: `Evaluatie van het ${this.klein(this.titel(p))} van ${this.lang(p.datum)}.\n\nDoelen:\n${(p.doelen || []).filter((d) => d.doel).map((d) => `- ${d.doel}`).join("\n") || "-"}` });
     this.melding("Magister opent een nieuwe afspraak in een nieuw tabblad, al ingevuld. Controleer en klik daar op Opslaan.");
     p.afspraakOp = new Date().toISOString(); this.bewaarPlan(p);
   },
@@ -615,6 +718,12 @@ DT.register({
       .dt-pva-kopje { margin: 8px 0 4px; font-size: 15px; font-weight: 700; color: #0b385c; }
       .dt-pva-profielrij { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 12px; padding: 10px 12px; border: 1px solid #c8d1da; border-radius: 4px; }
       .dt-pva-profielrij small { color: #59636e; } .dt-pva-acties { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; }
+      .dt-pva-vandaag { display: block; margin: 0 0 16px; padding: 12px 16px; }
+      .dt-pva-vkop { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 0 0 6px; } .dt-pva-vkop small { color: #59636e; }
+      .dt-pva-vrij { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 4px; border: 0; border-top: 1px solid #f0f2f5; background: none; font: 14px/20px open-sans, sans-serif; text-align: left; cursor: pointer; color: inherit; }
+      .dt-pva-vrij:hover { background: #f0f8ff; } .dt-pva-vrij small { color: #59636e; }
+      .dt-pva-vdatum { flex: none; font-size: 12px; padding: 0 8px; border-radius: 999px; background: #f0f2f5; }
+      .dt-pva-vrij.is-binnenkort .dt-pva-vdatum { background: #fff2e8; color: #ac5000; } .dt-pva-vrij.is-laat .dt-pva-vdatum { background: #ffdfe0; color: #a41014; }
       .dt-pva-toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 16px); opacity: 0; z-index: 2100; padding: 10px 16px; border-radius: 4px; background: #233243; color: #fff; font: 600 14px/20px open-sans, sans-serif; max-width: 80vw; transition: .2s; }
       .dt-pva-toast.is-aan { opacity: 1; transform: translate(-50%, 0); }
     `;
