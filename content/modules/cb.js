@@ -207,7 +207,7 @@ DT.register({
   /* Paginakop (dna-page-header) met kruimelpad, tabbladen (dna-tabs), kaarten (dna-card) en knoppen
    * (dna-button), net als Meldingen of Registraties. Magisters onderdelen negeren attributen die de extensie
    * zet; componenten() laat het netwerk-script in de pagina ze opnieuw zetten. */
-  VIEWS: [["melden", "Melden"], ["meldafspraken", "Meldafspraken"], ["signalen", "Signalen"], ["plannen", "Plannen"], ["protocol", "Protocol"], ["instellingen", "Instellingen"]],
+  VIEWS: [["melden", "Melden"], ["meldafspraken", "Meldafspraken"], ["signalen", "Signalen"], ["protocol", "Protocol"], ["instellingen", "Instellingen"]],
 
   componenten() {
     window.postMessage({ type: "dt:attr:opnieuw", diep: false, selector: ":is(#dt-cbp, .dt-cb-modal) :is(dna-page-header, dna-tabs, dna-tab-bar, dna-button, dna-card)",
@@ -365,7 +365,6 @@ DT.register({
     if (K.S && this._scherm) {
       const zet = (v, n) => { const i = this._scherm.bar.querySelector(`[data-view="${v}"] .dt-cb-tel`); if (i) i.textContent = n ? String(n) : ""; };
       zet("meldafspraken", K.meldLijst().filter((m) => m.datum <= K.vandaag()).length);
-      zet("plannen", this.plannen().filter((p) => (p.evaluaties || []).some((e) => e.datum && !e.doelen && e.datum <= K.plusDagen(K.vandaag(), 7))).length);
       zet("signalen", this.perStudent(K.hoogsteTreden(K.alleSignalen(K.UI.periodeId)).filter((s) => !s.afgehandeld)).length);
     }
   },
@@ -379,7 +378,7 @@ DT.register({
     this._periode.replaceChildren(...K.periodes().map((p) => DT.el("option", { value: p.id, text: `${p.naam} · ${K.kortDatum(p.start)} – ${K.kortDatum(p.eind)}` })));
     this._periode.value = K.UI.periodeId;
     this._scherm.laag.classList.toggle("is-kijk", !!this._kijkt);
-    ({ melden: () => this.melden(DT), meldafspraken: () => this.afspraken(DT), signalen: () => this.signalen(DT), plannen: () => this.pvaLijst(DT), protocol: () => this.protocol(DT), instellingen: () => this.instellingen(DT) })[this._view]();
+    ({ melden: () => this.melden(DT), meldafspraken: () => this.afspraken(DT), signalen: () => this.signalen(DT), protocol: () => this.protocol(DT), instellingen: () => this.instellingen(DT) })[this._view]();
     this.tekenStand();
     this.componenten();
   },
@@ -1136,11 +1135,7 @@ DT.register({
         this.statsRegel(DT, s.stamnr),
         DT.el("div", { class: "dt-cb-rij" }, [
           this.knop(DT, "Verzuim in Magister", () => this.openInMagister(st), false, "klein stil"),
-          this.knop(DT, "Plan van aanpak", () => {
-            const bestaand = this.plannen().filter((x) => x.stamnr === s.stamnr).sort((a, b) => b.datum.localeCompare(a.datum))[0];
-            if (bestaand && bestaand.signaalKey === s.key) return this.pvaFormulier(DT, bestaand);
-            this.pvaFormulier(DT, this.pvaNieuw(s.stamnr, { soort: /Blijf Bij Ma|BBM/i.test(`${s.consequentie} ${s.maatregel}`) ? "bbm" : "algemeen", signaal: s }));
-          }, false, "klein stil"),
+          this.knop(DT, "Plan van aanpak", () => this.pvaOpenen(s, st), false, "klein stil"),
           this.sigMails(s).length ? this.knop(DT, "Mailteksten bekijken", async () => (this.sigMails(s).some((t) => (K.MAILSOORT[t] || {}).aan === "ouders") && await this.zorgOuders(st), this.mailLijst(DT, "Mails bij deze stap", `${K.naamVan(st)} · ${s.titel}`,
             this.sigMails(s).map((type) => Object.assign(this.mailVan(type, s.stamnr, pid), { naam: `${K.naamVan(st)} · ${(K.MAILSOORT[type] || { label: type }).label}` })))), false, "klein stil") : null,
           K.S.meldafspraken.some((m) => m.stamnr === s.stamnr) ? this.knop(DT, "Meldafspraken", () => this.studentHistorie(DT, s.stamnr), false, "klein stil") : null,
@@ -1338,54 +1333,15 @@ DT.register({
     const d = datum || K.volgendeSchooldag(K.vandaag()), t = tijd || K.S.instellingen.meldTijd || "08:30";
     const [hh, mm] = t.split(":").map(Number), eind = new Date(2000, 0, 1, hh, mm + minuten);
     const concept = { t: Date.now(), stamnr: String(sn), naam: K.naamVan(st), onderwerp, locatie: K.S.instellingen.lokaal || "", datum: K.dmy(d),
-      van: t, tot: `${String(eind.getHours()).padStart(2, "0")}:${String(eind.getMinutes()).padStart(2, "0")}`, tekst };
+      van: t, tot: `${String(eind.getHours()).padStart(2, "0")}:${String(eind.getMinutes()).padStart(2, "0")}`, tekst, bron: "de Te laat-balie" };
     try { localStorage.setItem("dt-cb-afspraak", JSON.stringify(concept)); } catch {}
     window.open(`${location.origin}/op/#/afspraak/afspraak/nieuw`, "_blank");
     this.melding("Magister opent de nieuwe afspraak in een nieuw tabblad, al ingevuld. Controleer en klik daar op Opslaan.", "info", 7000);
   },
 
   /* Op #/afspraak/afspraak/nieuw: het concept invullen zoals een gebruiker dat zou doen. */
-  async vulAfspraak() {
-    if (this._vult || !/^#\/afspraak\/afspraak\/nieuw/.test(location.hash)) return;
-    let c = null; try { c = JSON.parse(localStorage.getItem("dt-cb-afspraak") || "null"); } catch {}
-    if (!c || Date.now() - c.t > 3 * 60000) return;
-    const onderwerp = document.getElementById("onderwerp"); if (!onderwerp) return;
-    this._vult = true;
-    try { localStorage.removeItem("dt-cb-afspraak"); } catch {}
-    const wacht = (ms) => new Promise((r) => setTimeout(r, ms));
-    const zet = (el, v) => { if (!el) return; el.focus(); el.value = v; for (const t of ["input", "change", "blur"]) el.dispatchEvent(new Event(t, { bubbles: true })); };
-    const hoofd = document.querySelector("ui-view[name=main]");
-    /* Deelnemer: zoeken op stamnummer (anders op naam) en de juiste uit de lijst kiezen. */
-    const zoek = document.getElementById("search-field");
-    let gevonden = false;
-    for (const q of [c.stamnr, c.naam]) {
-      if (!zoek || gevonden) break;
-      zet(zoek, q); zoek.focus();
-      for (let i = 0; i < 25 && !hoofd.querySelector("li.item.person"); i++) await wacht(200);
-      const items = [...hoofd.querySelectorAll("li.item.person")];
-      const doel = items.find((li) => li.textContent.includes(c.stamnr)) || (items.length === 1 ? items[0] : null);
-      if (!doel) continue;
-      for (let i = 0; i < 12 && !doel.classList.contains("selected"); i++) { zoek.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", keyCode: 40, which: 40, bubbles: true })); await wacht(80); }
-      for (const t of ["keydown", "keyup"]) zoek.dispatchEvent(new KeyboardEvent(t, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
-      gevonden = true; await wacht(300);
-    }
-    zet(onderwerp, c.onderwerp); zet(document.getElementById("locatie"), c.locatie);
-    zet(document.getElementById("Startdatum"), c.datum); zet(document.getElementById("Einddatum"), c.datum);
-    const tijden = [...hoofd.querySelectorAll("input.time-input")];
-    zet(tijden[0], c.van); zet(tijden[1], c.tot);
-    const ed = hoofd.querySelector(".ta-bind[contenteditable=true]");
-    if (ed && c.tekst) {
-      ed.focus();
-      ed.innerHTML = c.tekst.split("\n").map((r) => `<p>${TardyKern.esc(r) || "<br>"}</p>`).join("");
-      for (const t of ["input", "keyup", "blur"]) ed.dispatchEvent(new Event(t, { bubbles: true }));
-    }
-    const titel = hoofd.querySelector("h1, h2");
-    const melding = DT.el("div", { class: "dt-cb-vars dt-cb-afspraakmelding" }, [DT.el("b", { text: "Ingevuld door de Te laat-balie." }),
-      DT.el("span", { text: gevonden ? ` ${c.naam} staat bij de deelnemers. Controleer datum, tijd en tekst en klik op Opslaan.` : ` ${c.naam} is niet automatisch gevonden: voeg de student zelf toe bij Deelnemers en klik daarna op Opslaan.` })]);
-    (titel?.parentElement || hoofd).insertBefore(melding, titel?.nextSibling || hoofd.firstChild);
-    this.css();
-    this._vult = false;
-  },
+  vulAfspraak() { return DTForms.vulAfspraak("dt-cb-afspraak"); },
+
 
   /* ===================================================================================== */
   /* Drie acties per signaal: notitie in het dossier, mail, afspraak — afgevinkt na gebruik  */
@@ -1548,13 +1504,30 @@ DT.register({
 
   /* Notitie: het logboek van de student openen in een nieuw tabblad; daar kiest de balie Toevoegen › Notitie
    * en vult omschrijving en inhoud in. Jij loopt de stappen na en klikt op Opslaan. */
+  /* Plan van aanpak staat bij de begeleiding van de student (module pva.js). Vanuit een signaal: het logboek
+   * openen en het formulier daar laten openen, met de aanleiding van het signaal. */
+  async pvaOpenen(s, st) {
+    const K = TardyKern;
+    if (!DT.settings.pva?.enabled) return this.melding("Zet eerst de module Plan van aanpak aan (zijpaneel of instellingen).", "err");
+    let id = st.magisterId;
+    if (!id) { const hit = (await this.zoekMagister(s.stamnr)).find((x) => x.stamnr === String(s.stamnr)); id = hit?.magisterId; if (id) { st.magisterId = id; this.bewaar(); } }
+    if (!id) return this.melding("Deze student is niet in Magister gevonden.", "err");
+    const verzuim = ["telaat", "ongeoorloofd", "nietgemeld", "ziek", "medisch", "calamiteit"].includes(s.soort);
+    DTForms.logboek("dt-pva-open", { magisterId: String(id), soort: /Blijf Bij Ma|BBM/i.test(`${s.consequentie} ${s.maatregel}`) ? "bbm" : "algemeen",
+      redenen: [verzuim ? "verzuim" : "voortgang", ...(s.soort === "nietgemeld" ? ["afspraken"] : [])],
+      toelichting: `${s.titel} in ${(K.periodeById(K.UI.periodeId) || {}).naam || "deze periode"} (peildatum ${K.langDatum(K.vandaag())}). Stap in het verzuimprotocol: ${s.consequentie}.` });
+    const pid = await this.persoonId();
+    const binnen = encodeURIComponent(encodeURIComponent(`/begeleiding-page/leerling/${id}/Alle%20rollen/${pid || ""}/logboek`));
+    window.open(`${location.origin}/op/#/begeleiding/Alle%20rollen/leerling/${id}/////?innerUrl=${binnen}`, "_blank");
+    this.melding("De begeleiding van de student opent in een nieuw tabblad, met het plan van aanpak.", "info", 6000);
+  },
   async notitieMaken(sn, { omschrijving, tekst, type = "Notitie", bijlage = null }) {
     const K = TardyKern, st = K.S.studenten[sn];
     let id = st.magisterId;
     if (!id) { const hit = (await this.zoekMagister(sn)).find((x) => x.stamnr === String(sn)); id = hit?.magisterId; if (id) { st.magisterId = id; this.bewaar(); } }
     if (!id) return this.melding("Deze student is niet in Magister gevonden.", "err");
     const pid = await this.persoonId();
-    try { localStorage.setItem("dt-cb-notitie", JSON.stringify({ t: Date.now(), magisterId: String(id), naam: K.naamVan(st), omschrijving, tekst, type, bijlage })); }
+    try { localStorage.setItem("dt-cb-notitie", JSON.stringify({ t: Date.now(), magisterId: String(id), naam: K.naamVan(st), omschrijving, tekst, type, bijlage, bron: "de Te laat-balie" })); }
     catch { if (bijlage) { this.melding("De bijlage is te groot om door te geven; download het Word-document en voeg het zelf toe.", "err", 8000); bijlage = null; } }
     const binnen = encodeURIComponent(encodeURIComponent(`/begeleiding-page/leerling/${id}/Alle%20rollen/${pid || ""}/logboek`));
     window.open(`${location.origin}/op/#/begeleiding/Alle%20rollen/leerling/${id}/////?innerUrl=${binnen}`, "_blank");
@@ -1562,61 +1535,8 @@ DT.register({
   },
 
   /* In het logboek-frame (magister-lvs): Toevoegen › Notitie kiezen en het formulier invullen. */
-  async vulNotitie() {
-    if (this._vultN) return;
-    let c = null; try { c = JSON.parse(localStorage.getItem("dt-cb-notitie") || "null"); } catch {}
-    if (!c || Date.now() - c.t > 3 * 60000) return;
-    const wacht = (ms) => new Promise((r) => setTimeout(r, ms));
-    const h = location.hash;
-    if (!c.gekozen && new RegExp(`^#/overview/${c.magisterId}\\b`).test(h)) {
-      const knop = [...document.querySelectorAll("dna-button")].find((b) => /Toevoegen/.test(b.textContent));
-      if (!knop) return;
-      this._vultN = true;
-      knop.click();
-      let item = null;
-      for (let i = 0; i < 20 && !item; i++) {
-        await wacht(150);
-        const norm = (t) => t.trim().replace(/^\d+\w?\.\s*/, "").toLowerCase();   // "07. Gespreksnotitie (Algemeen)" → "gespreksnotitie (algemeen)"
-        item = [...document.querySelectorAll("dna-menu-item")].find((m) => norm(m.textContent).startsWith(c.type.toLowerCase()));
-      }
-      if (item) { c.gekozen = true; try { localStorage.setItem("dt-cb-notitie", JSON.stringify(c)); } catch {} item.click(); }
-      this._vultN = false;
-      return;
-    }
-    if (c.gekozen && /^#\/create\//.test(h)) {
-      const veld = document.querySelector("input[formcontrolname=omschrijving]");
-      const ed = document.querySelector(".ProseMirror[contenteditable=true]");
-      if (!veld || !ed) return;
-      this._vultN = true;
-      try { localStorage.removeItem("dt-cb-notitie"); } catch {}
-      veld.focus(); veld.value = c.omschrijving;
-      for (const t of ["input", "change", "blur"]) veld.dispatchEvent(new Event(t, { bubbles: true }));
-      ed.focus();
-      c.tekst.split("\n").forEach((regel, i) => {
-        if (i) document.execCommand("insertParagraph");
-        if (regel) document.execCommand("insertText", false, regel);
-      });
-      /* Bijlage (plan van aanpak): het bestand in Magisters eigen bestandskiezer zetten. */
-      let bijlage = "";
-      if (c.bijlage?.base64) {
-        const inp = document.querySelector("input[type=file]");
-        try {
-          const bin = atob(c.bijlage.base64), bytes = new Uint8Array(bin.length);
-          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-          const dt = new DataTransfer();
-          dt.items.add(new File([bytes], c.bijlage.naam, { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
-          inp.files = dt.files;
-          inp.dispatchEvent(new Event("change", { bubbles: true }));
-          bijlage = ` Het plan van aanpak (${c.bijlage.naam}) staat bij Bijlage.`;
-        } catch { bijlage = " De bijlage kon niet worden toegevoegd: voeg het Word-document zelf toe bij Bijlage."; }
-      }
-      const melding = DT.el("div", { style: "margin:0 0 12px;padding:10px 14px;border-radius:4px;background:#ddeffe;border-left:4px solid #056dc2;font:14px/20px open-sans,sans-serif;color:#233243" },
-        [DT.el("b", { text: "Ingevuld door de Te laat-balie. " }), DT.el("span", { text: `${c.type} voor ${c.naam}: controleer de tekst, loop de stappen na met Volgende en klik op Opslaan.${bijlage}` })]);
-      const form = veld.closest("form") || veld.closest("dna-card") || document.body;
-      form.parentElement?.insertBefore(melding, form);
-      this._vultN = false;
-    }
-  },
+  vulNotitie() { return DTForms.vulLogboek("dt-cb-notitie"); },
+
 
   /* Zoals "Overzicht per mentor" in Tardy: één mail per mentor met alle studenten waar actie nodig is. */
   mentorOverzicht(DT) {
@@ -1647,274 +1567,6 @@ DT.register({
     }).sort((a, b) => a.naam.localeCompare(b.naam, "nl"));
     if (!mails.length) return this.melding("Er is op dit moment niets te melden aan mentoren.");
     this.mailLijst(DT, `Overzicht voor ${mails.length} mentor(en)`, `${p ? p.naam : ""} · ${mails.reduce((n, m) => n + m.stamnrs.length, 0)} studenten`, mails);
-  },
-
-  /* ===================================================================================== */
-  /* Plan van aanpak (algemeen en Blijf Bij Ma), volgens de templates en instructie van MIP/MEP */
-  /* ===================================================================================== */
-  /* Plannen staan in de gedeelde gegevens (S.cbPva), zodat collega's ze bij de evaluatie terugvinden. Het
-   * formulier volgt het template; export als Word-document in het eigen template (PvaDocx + assets/pva). De
-   * gespreksnotitie in Magister (07. Gespreksnotitie) krijgt een samenvatting en het document als bijlage. */
-  PVA_VAKKEN: ["Project", "Intro branche", "MarCom / Muziekmarketing & promotie", "Professional Skills", "Digital Tools", "Creatie"],
-  PVA_LEERLIJNEN: ["Adviseren over mediaproducten", "Voorbereiden van de mediaproductie", "Coördineren van de mediaproductie", "Professioneel handelen", "Vakvaardigheden"],
-  PVA_LEERLIJNVAK: { 1: "Pitch", 2: "PRM", 3: "BO Branche in Beeld" },
-  PVA_REDENEN: [["voortgang", "studievoortgang"], ["verzuim", "verzuim"], ["werkhouding", "inzet en werkhouding"], ["afspraken", "afspraken niet nagekomen"], ["anders", "anders"]],
-  PVA_STAPPEN: [["brief1", "Brief 1: SLB"], ["brief2", "Brief 2: SLB en collega"], ["brief3", "Brief 3: SLB en opleidingsmanager"], ["vsa", "Na negatief VSA"]],
-
-  plannen() { const S = TardyKern.S; if (!Array.isArray(S.cbPva)) S.cbPva = []; return S.cbPva; },
-  pvaTitel(p) {
-    return p.soort === "bbm" ? `Plan van aanpak Blijf Bij Ma · ${(this.PVA_STAPPEN.find(([k]) => k === p.stap) || [, ""])[1].replace(/:.*/, "")}` : "Plan van aanpak algemeen";
-  },
-  /* Aanwezigheid zoals het template vraagt: % (aantal van aantal lessen), ziek, ongeoorloofd, te laat. */
-  pvaAanwezigheid(sn, pid) {
-    const K = TardyKern, t = K.tellingen(sn, pid), pr = K.S.lesreg[sn]?.perioden?.[pid], p = K.periodeById(pid);
-    const delen = [];
-    if (pr?.pct != null) delen.push(`${pr.pct}%${pr.telt ? ` (${pr.telt - (pr.afwezig || 0)} van ${pr.telt} lessen)` : ""}`);
-    delen.push(`${t.ziekDatums.length} ${t.ziekDatums.length === 1 ? "ziekdag" : "ziekdagen"}`, `${t.ongeoorloofd}× ongeoorloofd`, `${t.teLaat}× te laat`);
-    return { tekst: `${delen.join(", ")}${p ? ` (${p.naam.toLowerCase()}, peildatum ${K.langDatum(K.vandaag())})` : ""}`, pct: pr?.pct ?? null };
-  },
-  pvaNieuw(sn, { soort = "algemeen", signaal = null } = {}) {
-    const K = TardyKern, st = K.S.studenten[sn] || {}, pid = K.UI.periodeId, c = DT.settings.cb || {};
-    const vandaag = K.vandaag(), verzuim = !signaal || ["telaat", "ongeoorloofd", "nietgemeld", "ziek", "medisch", "calamiteit"].includes(signaal.soort);
-    const eerder = this.plannen().filter((p) => p.stamnr === sn && p.soort === "bbm").map((p) => p.stap);
-    const stap = eerder.includes("brief2") ? "brief3" : eerder.includes("brief1") ? "brief2" : "brief1";
-    const a = this.pvaAanwezigheid(sn, pid);
-    const toelichting = signaal ? `${signaal.titel} in ${(K.periodeById(pid) || {}).naam || "deze periode"} (peildatum ${K.langDatum(vandaag)}). Stap in het verzuimprotocol: ${signaal.consequentie}.` : "";
-    return {
-      id: K.uid(), stamnr: sn, soort, stap, datum: vandaag, slb: c.naam || K.S.instellingen.cbNaam || "", om: c.pvaOm || "", coach: c.pvaCoach || "",
-      geboortedatum: st.geboortedatum ? K.dmy(st.geboortedatum) : "",
-      aanwezig: { student: true, ouders: K.minderjarig(st) !== false || this.oudersMet18(st), collega: "" },
-      redenen: signaal ? [verzuim ? "verzuim" : "voortgang", ...(signaal.soort === "nietgemeld" ? ["afspraken"] : [])] : [], anders: "",
-      toelichting, leerlijnen: { 1: {}, 2: {}, 3: {}, 4: {}, 5: {} }, vakken: {}, basis: { Nederlands: {}, Rekenen: {}, Engels: {} },
-      aanwezigheid: a.tekst, pct: a.pct,
-      doelen: [{}, {}, {}], acties: [{ wie: "Student" }, { wie: "Student" }, { wie: "SLB" }], woorden: {},
-      evaluaties: [{ datum: K.volgendeSchooldag(K.plusDagen(vandaag, verzuim ? 20 : 34)) }, ...(soort === "bbm" ? [] : [{}])],
-      ouderNaam: "", aangemaakt: new Date().toISOString(), door: K.S.instellingen.cbNaam || "", signaalKey: signaal?.key || null,
-    };
-  },
-  /* De gegevens voor het Word-document (PvaDocx). */
-  pvaDocData(p) {
-    const K = TardyKern, st = K.S.studenten[p.stamnr] || {};
-    const lang = (d) => (d ? K.langDatum(d) : "");
-    return Object.assign({}, p, { naam: K.naamVan(st), klas: st.klas || "", datumTekst: lang(p.datum),
-      evaluaties: (p.evaluaties || []).map((e) => Object.assign({}, e, { datumTekst: lang(e.datum) })) });
-  },
-  async pvaBytes(p) {
-    const r = await fetch(chrome.runtime.getURL(`assets/pva/${p.soort === "bbm" ? "bbm" : "algemeen"}.docx`));
-    if (!r.ok) throw new Error("template niet gevonden");
-    return PvaDocx.vul(new Uint8Array(await r.arrayBuffer()), this.pvaDocData(p));
-  },
-  pvaBestandsnaam(p) {
-    const K = TardyKern, st = K.S.studenten[p.stamnr] || {};
-    const naam = [st.achternaam, st.roepnaam].filter(Boolean).join("_").replace(/[^\p{L}\p{N}_-]+/gu, "_");
-    return `PvA_${p.soort === "bbm" ? `BBM_${p.stap}_` : ""}${naam || p.stamnr}_${p.datum}.docx`;
-  },
-  async pvaDownload(p) {
-    try {
-      const bytes = await this.pvaBytes(p);
-      const url = URL.createObjectURL(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
-      const a = DT.el("a", { href: url, download: this.pvaBestandsnaam(p) }); document.body.append(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
-      p.gedownload = new Date().toISOString(); this.bewaar();
-    } catch (e) { this.melding(`Het Word-document maken lukte niet: ${e.message || e}`, "err"); }
-  },
-  pvaSamenvatting(p) {
-    const K = TardyKern, regels = [];
-    const redenen = (p.redenen || []).map((r) => (r === "anders" ? `anders: ${p.anders || ""}` : (this.PVA_REDENEN.find(([k]) => k === r) || [, r])[1]));
-    regels.push(`${this.pvaTitel(p)}, besproken op ${K.langDatum(p.datum)}.`);
-    const aanw = [p.aanwezig?.student && "student", p.aanwezig?.ouders && "ouder(s)/verzorger(s)", p.aanwezig?.collega && `collega: ${p.aanwezig.collega}`].filter(Boolean);
-    if (aanw.length) regels.push(`Aanwezig: ${aanw.join(", ")}.`);
-    if (redenen.length) regels.push(`Reden: ${redenen.join(", ")}.`);
-    if (p.toelichting) regels.push("", `Aanleiding: ${p.toelichting}`);
-    if (p.aanwezigheid) regels.push(`Aanwezigheid: ${p.aanwezigheid}`);
-    const doelen = (p.doelen || []).filter((d) => d.doel);
-    if (doelen.length) regels.push("", "Doelen:", ...doelen.map((d) => `- ${d.doel}${d.bewijs ? ` (${d.bewijs})` : ""}${d.uiterlijk ? `, uiterlijk ${d.uiterlijk}` : ""}`));
-    const acties = (p.acties || []).filter((x) => x.wat);
-    if (acties.length) regels.push("", "Afspraken:", ...acties.map((x) => `- ${x.wie || "?"}: ${x.wat}${x.wanneer ? ` (${x.wanneer})` : ""}`));
-    const ev = (p.evaluaties || []).find((e) => e.datum);
-    if (ev) regels.push("", `Evaluatie: ${K.langDatum(ev.datum)}.`);
-    regels.push("", "Het volledige plan van aanpak zit als bijlage bij deze notitie.");
-    return regels.join("\n");
-  },
-  async pvaNotitie(p) {
-    try {
-      const bytes = await this.pvaBytes(p);
-      let bin = ""; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-      await this.notitieMaken(p.stamnr, { type: "Gespreksnotitie", omschrijving: this.pvaTitel(p), tekst: this.pvaSamenvatting(p),
-        bijlage: { naam: this.pvaBestandsnaam(p), base64: btoa(bin) } });
-      p.notitieOp = new Date().toISOString(); this.bewaar();
-    } catch (e) { this.melding(`De gespreksnotitie voorbereiden lukte niet: ${e.message || e}`, "err"); }
-  },
-  pvaEvaluatieAfspraak(p) {
-    const K = TardyKern, st = K.S.studenten[p.stamnr] || {}, ev = (p.evaluaties || []).find((e) => e.datum && !e.doelen) || (p.evaluaties || []).find((e) => e.datum);
-    if (!ev) return this.melding("Vul eerst een evaluatiedatum in.", "err");
-    this.afspraakMaken(p.stamnr, { onderwerp: `Evaluatie ${this.pvaTitel(p).toLowerCase()}: ${K.naamVan(st)}`, datum: ev.datum, tijd: "09:00", minuten: 30,
-      tekst: `Evaluatie van het ${this.pvaTitel(p).toLowerCase()} van ${K.langDatum(p.datum)}.\n\nDoelen:\n${(p.doelen || []).filter((d) => d.doel).map((d) => `- ${d.doel}`).join("\n") || "-"}\n\nAangemaakt vanuit de Te laat-balie (Tardy).` });
-    p.afspraakOp = new Date().toISOString(); this.bewaar();
-  },
-
-  /* Het formulier, opgebouwd zoals het template. Elke wijziging wordt meteen bewaard. */
-  pvaFormulier(DT, p) {
-    const K = TardyKern, st = K.S.studenten[p.stamnr] || {};
-    if (!this.plannen().includes(p)) this.plannen().push(p);
-    const bewaar = () => { p.gewijzigd = new Date().toISOString(); this.bewaar(); };
-    const opnieuw = () => { const y = this._modal?.querySelector('.dt-cb-modalin')?.scrollTop || 0; this.pvaFormulier(DT, p); const mi = this._modal?.querySelector('.dt-cb-modalin'); if (mi) mi.scrollTop = y; };
-    const pad = (k) => k.split(".").reduce((o, x) => (o[x] ??= {}), p);
-    const lees = (k) => { const d = k.split("."), l = d.pop(); return d.reduce((o, x) => o?.[x], p)?.[l]; };
-    const schrijf = (k, v) => { const d = k.split("."), l = d.pop(); (d.length ? pad(d.join(".")) : p)[l] = v; bewaar(); };
-    const inp = (k, { type = "text", ph = "", lijst = null, cls = "" } = {}) => {
-      const e = DT.el("input", { type, class: `dt-cb-veld dt-cb-pvaveld ${cls}`, placeholder: ph, ...(lijst ? { list: lijst } : {}),
-        ...(cls === "mini" ? { style: "width:64px;display:inline-block" } : cls === "klein" ? { style: "width:200px;flex:0 0 200px" } : {}) });
-      e.value = lees(k) ?? ""; e.addEventListener("input", () => schrijf(k, e.value)); return e;
-    };
-    const vak = (k, rijen = 2, ph = "") => { const e = DT.el("textarea", { class: "dt-cb-veld dt-cb-tekstvak dt-cb-pvaveld", rows: String(rijen), placeholder: ph }); e.value = lees(k) ?? ""; e.addEventListener("input", () => schrijf(k, e.value)); return e; };
-    const kies = (k, opties, na = null) => {
-      const e = DT.el("select", { class: "dt-cb-veld dt-cb-pvaveld" }, opties.map(([v, t]) => DT.el("option", { value: v, text: t })));
-      e.value = lees(k) ?? ""; e.addEventListener("change", () => { schrijf(k, e.value); na?.(); }); return e;
-    };
-    const vinkje = (label, aan, zet) => { const c = DT.el("input", { type: "checkbox" }); c.checked = !!aan; c.addEventListener("change", () => { zet(c.checked); bewaar(); }); return DT.el("label", { class: "dt-cb-schakel" }, [c, DT.el("span", { text: label })]); };
-    const veldrij = (label, ...el) => DT.el("label", { class: "dt-cb-protveld" }, [DT.el("span", { text: label }), ...el]);
-    const sectie = (nr, titel, ...inhoud) => DT.el("section", { class: "dt-cb-pvasectie" }, [DT.el("h3", {}, [DT.el("span", { class: "dt-cb-pvanr", text: String(nr) }), ` ${titel}`]), ...inhoud]);
-    const VV = [["", "—"], ["voldaan", "voldaan"], ["niet voldaan", "niet voldaan"], ["–", "n.v.t."]];
-    const standen = DT.el("datalist", { id: "dt-cb-pva-standen" }, ["stap 1 behaald", "stap 2 behaald", "op koers", "niet op koers", "niet behaald", "nog niet beoordeeld"].map((v) => DT.el("option", { value: v })));
-    const bbm = p.soort === "bbm";
-
-    const kop = DT.el("div", { class: "dt-cb-pvakop" }, [
-      veldrij("Formulier", kies("soort", [["algemeen", "Plan van aanpak algemeen"], ["bbm", "Plan van aanpak Blijf Bij Ma"]], () => {
-        if (p.soort === "bbm") p.evaluaties = p.evaluaties.slice(0, 1); else if (p.evaluaties.length < 2) p.evaluaties.push({});
-        bewaar(); opnieuw();
-      })),
-      bbm ? veldrij("Stap", kies("stap", this.PVA_STAPPEN)) : null,
-      veldrij("Datum gesprek", inp("datum", { type: "date" })),
-    ].filter(Boolean));
-    const gegevens = sectie(1, "Gegevens",
-      DT.el("div", { class: "dt-cb-pvagrid" }, [
-        veldrij("Naam", DT.el("input", { class: "dt-cb-veld dt-cb-pvaveld", value: K.naamVan(st), disabled: "" })),
-        veldrij("Studentnummer", DT.el("input", { class: "dt-cb-veld dt-cb-pvaveld", value: p.stamnr, disabled: "" })),
-        veldrij("Klas", DT.el("input", { class: "dt-cb-veld dt-cb-pvaveld", value: st.klas || "", disabled: "" })),
-        veldrij("Geboortedatum", inp("geboortedatum", { ph: "dd-mm-jjjj" })),
-        veldrij("SLB", inp("slb")),
-        ...(bbm ? [veldrij("Opleidingsmanager", inp("om")), veldrij("Begeleidingscoach", inp("coach"))] : []),
-      ]),
-      DT.el("div", { class: "dt-cb-protvinkjes" }, [
-        vinkje("student", p.aanwezig?.student, (v) => { pad("aanwezig").student = v; }),
-        vinkje(`ouder(s)/verzorger(s)${K.minderjarig(st) === false ? (this.oudersMet18(st) ? " (18+, met toestemming)" : " (18+: alleen met toestemming)") : " (minderjarig: uitnodigen)"}`, p.aanwezig?.ouders, (v) => { pad("aanwezig").ouders = v; }),
-        DT.el("span", { class: "dt-cb-schakel" }, [DT.el("span", { text: "collega:" }), inp("aanwezig.collega", { ph: "naam", cls: "klein" })]),
-      ]));
-    const aanleiding = sectie(2, "Aanleiding",
-      DT.el("div", { class: "dt-cb-protvinkjes" }, [
-        ...this.PVA_REDENEN.map(([k, t]) => vinkje(t, (p.redenen || []).includes(k), (v) => { p.redenen = (p.redenen || []).filter((x) => x !== k); if (v) p.redenen.push(k); })),
-        inp("anders", { ph: "anders: …", cls: "klein" }),
-      ]),
-      veldrij("Toelichting", vak("toelichting", 3, "Twee of drie zinnen, alleen feiten, met een peildatum. Geen oordeel over de persoon.")));
-    const ll = DT.el("table", { class: "dt-cb-tabel dt-cb-pvatabel" }, [
-      DT.el("thead", {}, DT.el("tr", {}, ["Leerlijn", "Stand", "Vak", "Vakvaardigheid", "Inzet en werkhouding"].map((t) => DT.el("th", { text: t })))),
-      DT.el("tbody", {}, [
-        ...[1, 2, 3].map((n) => DT.el("tr", {}, [DT.el("td", { text: `${n}. ${this.PVA_LEERLIJNEN[n - 1]}` }), DT.el("td", {}, inp(`leerlijnen.${n}.stand`, { lijst: "dt-cb-pva-standen" })),
-          DT.el("td", { text: this.PVA_LEERLIJNVAK[n] }), DT.el("td", { text: "–" }), DT.el("td", {}, kies(`leerlijnen.${n}.iw`, VV))])),
-        DT.el("tr", {}, [DT.el("td", { text: "4. Professioneel handelen" }), DT.el("td", {}, inp("leerlijnen.4.stand", { lijst: "dt-cb-pva-standen" })),
-          DT.el("td", { colspan: "3" }, [DT.el("span", { text: "Inzet en werkhouding " }), inp("leerlijnen.4.iwVoldaan", { type: "number", cls: "mini" }),
-            DT.el("span", { text: ` van 9 voldaan (op koers vanaf 6) en ${p.pct ?? "…"}% aanwezig (norm 80%).` })])]),
-        ...this.PVA_VAKKEN.map((v, i) => DT.el("tr", {}, [
-          DT.el("td", { text: i ? "" : "5. Vakvaardigheden" }), DT.el("td", {}, i ? "" : inp("leerlijnen.5.stand", { lijst: "dt-cb-pva-standen" })),
-          DT.el("td", { text: v }), DT.el("td", {}, kies(`vakken.${v}.vv`, VV)), DT.el("td", {}, kies(`vakken.${v}.iw`, VV))])),
-      ]),
-    ]);
-    const basis = DT.el("table", { class: "dt-cb-tabel dt-cb-pvatabel" }, [
-      DT.el("thead", {}, DT.el("tr", {}, ["Basisvaardigheid", "Getoetst tot nu toe", "Behaald", "Stand"].map((t) => DT.el("th", { text: t })))),
-      DT.el("tbody", {}, [...["Nederlands", "Rekenen", "Engels"].map((v) => DT.el("tr", {}, [DT.el("td", { text: v }),
-        DT.el("td", {}, inp(`basis.${v}.getoetst`)), DT.el("td", {}, inp(`basis.${v}.behaald`)), DT.el("td", {}, inp(`basis.${v}.stand`, { lijst: "dt-cb-pva-standen" }))])),
-        DT.el("tr", {}, [DT.el("td", { text: "Burgerschap" }), DT.el("td", { text: "nog niet getoetst" }), DT.el("td", { text: "–" }), DT.el("td", { text: "telt nu niet mee" })])]),
-    ]);
-    const aanwKnop = this.knop(DT, "Opnieuw uit Magister", () => { const a = this.pvaAanwezigheid(p.stamnr, K.UI.periodeId); p.aanwezigheid = a.tekst; p.pct = a.pct; bewaar(); opnieuw(); }, false, "klein stil");
-    const waar = sectie(3, "Waar sta je nu", standen, ll, basis, veldrij("Aanwezigheid", vak("aanwezigheid", 2)), aanwKnop,
-      DT.el("p", { class: "dt-cb-zacht", text: "De stand per leerlijn komt uit het leerlijndiagram in Simulise; de aanwezigheid uit Magister." }));
-    const lijst = (k, kolommen, nieuw) => {
-      const rijen = p[k] || (p[k] = []);
-      return DT.el("div", {}, [
-        DT.el("table", { class: "dt-cb-tabel dt-cb-pvatabel" }, [
-          DT.el("thead", {}, DT.el("tr", {}, [...kolommen.map(([, t]) => DT.el("th", { text: t })), DT.el("th")])),
-          DT.el("tbody", {}, rijen.map((_, i) => DT.el("tr", {}, [...kolommen.map(([v, , opt]) => DT.el("td", {}, inp(`${k}.${i}.${v}`, opt || {}))),
-            DT.el("td", {}, rijen.length > 1 ? this.knop(DT, "×", () => { rijen.splice(i, 1); bewaar(); opnieuw(); }, false, "klein stil") : "")]))),
-        ]),
-        this.knop(DT, "Regel toevoegen", () => { rijen.push(nieuw()); bewaar(); opnieuw(); }, false, "klein stil"),
-      ]);
-    };
-    const doelen = sectie(4, "Wat ga je behalen", lijst("doelen", [["doel", "Doel", { ph: "meetbaar, gekoppeld aan vakken en toetsen" }], ["bewijs", "Waaraan zie je het"], ["uiterlijk", "Uiterlijk", { ph: "datum" }]], () => ({})),
-      DT.el("p", { class: "dt-cb-zacht", text: "De student formuleert de doelen mee." }));
-    const acties = sectie(5, "Acties en afspraken", lijst("acties", [["wie", "Wie", { lijst: "dt-cb-pva-wie" }], ["wat", "Doet wat"], ["wanneer", "Wanneer"]], () => ({ wie: "Student" })),
-      DT.el("datalist", { id: "dt-cb-pva-wie" }, ["Student", "SLB", "Docent", "Ouder/verzorger", "Begeleidingscoach", "Opleidingsmanager"].map((v) => DT.el("option", { value: v }))));
-    const woorden = sectie(6, "In jouw woorden",
-      veldrij("Waardoor loopt het nu niet zoals je wilt?", vak("woorden.waardoor", 2)),
-      veldrij("Wat ga jij vanaf nu anders doen?", vak("woorden.anders", 2)),
-      veldrij("Wat heb je nodig van school of van thuis?", vak("woorden.nodig", 2)),
-      DT.el("p", { class: "dt-cb-zacht", text: "Laat de student dit zelf invullen of formuleren; dit is de kern van het gesprek." }));
-    const evaluatie = sectie(7, "Evaluatie",
-      DT.el("table", { class: "dt-cb-tabel dt-cb-pvatabel" }, [
-        DT.el("thead", {}, DT.el("tr", {}, ["Datum", "Doelen", bbm ? "Vervolg" : "Afspraak en vervolg"].map((t) => DT.el("th", { text: t })))),
-        DT.el("tbody", {}, (p.evaluaties || []).map((_, i) => DT.el("tr", {}, [
-          DT.el("td", {}, inp(`evaluaties.${i}.datum`, { type: "date" })),
-          DT.el("td", {}, kies(`evaluaties.${i}.doelen`, [["", "—"], ["behaald", "behaald"], ["deels", "deels"], ["niet", "niet"]])),
-          DT.el("td", {}, bbm ? kies(`evaluaties.${i}.vervolg`, [["", "—"], ["afsluiten", "afsluiten"], ["nieuw", "nieuw plan"], ["volgende", "volgende brief"]]) : inp(`evaluaties.${i}.afspraak`)),
-        ]))),
-      ]),
-      DT.el("p", { class: "dt-cb-zacht", text: bbm ? "Geef de student per brief 4 tot 6 weken. Doelen niet behaald: de volgende stap in Blijf Bij Ma." : "Eerste evaluatie na 4 tot 6 weken; bij verzuim eerder, na 2 tot 3 weken." }));
-    const akkoord = sectie(8, "Akkoord", DT.el("div", { class: "dt-cb-pvagrid" }, [
-      veldrij("Ouder/verzorger (bij minderjarige)", inp("ouderNaam", { ph: "naam" })),
-      DT.el("p", { class: "dt-cb-zacht", text: bbm && p.stap === "brief3" ? "Student, SLB en opleidingsmanager tekenen; de student ondertekent verplicht." : "Student en SLB tekenen altijd." }),
-    ]));
-    const status = [p.gedownload && `Word gedownload ${this.moment(p.gedownload)}`, p.notitieOp && `gespreksnotitie klaargezet ${this.moment(p.notitieOp)}`, p.afspraakOp && `evaluatie ingepland ${this.moment(p.afspraakOp)}`].filter(Boolean);
-    const m = this.modal(`${this.pvaTitel(p)}: ${K.naamVan(st)}`, [
-      DT.el("p", { class: "dt-cb-zacht", text: `${st.klas || ""} · ${p.stamnr}${status.length ? ` · ${status.join(" · ")}` : ""}. Wijzigingen worden meteen bewaard in de gedeelde map.` }),
-      kop, gegevens, aanleiding, waar, doelen, acties, woorden, evaluatie, akkoord,
-    ], [
-      ["Verwijderen", () => { if (!confirm("Dit plan van aanpak verwijderen? Het Word-document en de notitie in Magister blijven bestaan.")) return; TardyKern.S.cbPva = this.plannen().filter((x) => x !== p); this.bewaar(); this.sluitModal(); this.teken(); }],
-      ["Sluiten", () => { this.sluitModal(); this.teken(); }],
-      ["Word downloaden", () => this.pvaDownload(p)],
-      ["Evaluatie inplannen", () => this.pvaEvaluatieAfspraak(p)],
-      ["Gespreksnotitie in Magister", () => this.pvaNotitie(p), true],
-    ]);
-    m.classList.add("breed", "dt-cb-pvamodal");
-    if (bbm && p.om) DT.saveSettings({ cb: { pvaOm: p.om, pvaCoach: p.coach || "" } });
-  },
-  pvaStudentKiezen(DT) {
-    const K = TardyKern;
-    const zoek = DT.el("input", { type: "search", class: "dt-cb-veld", placeholder: "Zoek student op naam of stamnummer" });
-    const soort = DT.el("select", { class: "dt-cb-veld" }, [DT.el("option", { value: "algemeen", text: "Plan van aanpak algemeen" }), DT.el("option", { value: "bbm", text: "Plan van aanpak Blijf Bij Ma" })]);
-    const hits = DT.el("div", { class: "dt-cb-hits klein" });
-    zoek.addEventListener("input", () => hits.replaceChildren(...this.zoekLokaal(zoek.value).map((st) => {
-      const b = DT.el("button", { type: "button", class: "dt-cb-hit" }, [DT.el("b", { text: K.naamVan(st) }), DT.el("small", { text: ` ${st.klas || ""} · ${st.stamnr}` })]);
-      b.addEventListener("click", () => this.pvaFormulier(DT, this.pvaNieuw(st.stamnr, { soort: soort.value })));
-      return b;
-    })));
-    this.modal("Nieuw plan van aanpak", [soort, zoek, hits]);
-    setTimeout(() => zoek.focus(), 30);
-  },
-  /* Tabblad Plannen: alle plannen, met de eerstvolgende evaluatie. */
-  pvaLijst(DT) {
-    const K = TardyKern, h = this._scherm.hoofd, vandaag = K.vandaag();
-    const volgende = (p) => (p.evaluaties || []).find((e) => e.datum && !e.doelen)?.datum || null;
-    const lijst = this.plannen().slice().sort((a, b) => (volgende(a) || "9") .localeCompare(volgende(b) || "9") || b.datum.localeCompare(a.datum));
-    const rij = (p) => {
-      const st = K.S.studenten[p.stamnr] || { stamnr: p.stamnr, roepnaam: p.stamnr }, v = volgende(p);
-      const dagen = v ? Math.round((new Date(`${v}T12:00`) - new Date(`${vandaag}T12:00`)) / 864e5) : null;
-      const open = this.knop(DT, "Openen", () => this.pvaFormulier(DT, p), false, "klein");
-      return DT.el("tr", {}, [
-        DT.el("td", {}, [this.naamKnop(DT, st), DT.el("small", { text: ` ${st.klas || ""}` })]),
-        DT.el("td", { text: this.pvaTitel(p).replace("Plan van aanpak ", "") }),
-        DT.el("td", { text: K.kortDatum(p.datum) }),
-        DT.el("td", {}, v ? DT.el("span", { class: `dt-cb-uitkomst ${dagen < 0 ? "nok" : dagen <= 7 ? "open" : "gepland"}`, text: `${K.kortDatum(v)} · ${dagen < 0 ? `${-dagen} dagen geleden` : dagen === 0 ? "vandaag" : `over ${dagen} dagen`}` }) : DT.el("span", { class: "dt-cb-zacht", text: "afgerond" })),
-        DT.el("td", { text: [p.notitieOp && "notitie", p.afspraakOp && "afspraak", p.gedownload && "Word"].filter(Boolean).join(" · ") || "—" }),
-        DT.el("td", { class: "dt-cb-acties" }, [open, this.knop(DT, "Word", () => this.pvaDownload(p), false, "klein stil")]),
-      ]);
-    };
-    h.replaceChildren(
-      DT.el("div", { class: "dt-cb-rij" }, [DT.el("span", { class: "dt-cb-zacht", text: `${lijst.length} ${lijst.length === 1 ? "plan" : "plannen"} van aanpak` }), this.knop(DT, "Nieuw plan van aanpak", () => this.pvaStudentKiezen(DT), true)]),
-      lijst.length ? DT.el("table", { class: "dt-cb-tabel" }, [
-        DT.el("thead", {}, DT.el("tr", {}, ["Student", "Plan", "Gesprek", "Volgende evaluatie", "In Magister", ""].map((t) => DT.el("th", { text: t })))),
-        DT.el("tbody", {}, lijst.map(rij)),
-      ]) : DT.el("div", { class: "dt-cb-leeg" }, DT.el("p", { text: "Nog geen plannen van aanpak. Maak er een vanuit een signaal (uitklappen) of met Nieuw plan van aanpak." })),
-    );
   },
 
   /* ===================================================================================== */
@@ -2435,15 +2087,6 @@ DT.register({
       .dt-cb-sigknoppen .dt-cb-acties-in { gap: 6px; }
       .dt-cb-sig.is-open .dt-cb-sigmaat { display: none; }
       .dt-cb-detailknoppen { margin: 0 0 10px; } .dt-cb-detailknoppen .dt-cb-acties3 { margin: 0; }
-      .dt-cb-pvamodal .dt-cb-modalin { width: min(1100px, calc(100vw - 48px)); }
-      .dt-cb-pvakop { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 12px; padding: 12px; border-radius: var(--cb-r); background: var(--cb-vlak); }
-      .dt-cb-pvasectie { border-top: 1px solid var(--cb-lijnzacht); padding-top: 12px; }
-      .dt-cb-pvasectie h3 { margin: 0 0 10px; font-size: 16px; line-height: 24px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-      .dt-cb-pvanr { display: inline-grid; place-items: center; width: 24px; height: 24px; background: var(--cb-fg); color: var(--cb-kaart); font-size: 13px; border-radius: 2px; }
-      .dt-cb-pvagrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 12px; }
-      .dt-cb-pvaveld { min-width: 0 !important; width: 100%; box-sizing: border-box; }
-      .dt-cb-pvaveld.klein { width: 200px; height: 30px; } .dt-cb-pvaveld.mini { width: 64px; height: 30px; display: inline-block; }
-      .dt-cb-pvatabel { margin: 0 0 12px; } .dt-cb-pvatabel td { padding: 4px 8px; vertical-align: middle; font-size: 13px; } .dt-cb-pvatabel td .dt-cb-veld { height: 32px; }
       .dt-cb-voorbeeld { margin: 0; padding: 12px; border-radius: var(--cb-r); background: var(--cb-vlak); border: 1px solid var(--cb-lijnzacht); white-space: pre-wrap; font: 13px/19px var(--sl-text-typeset-font-family-body, open-sans), sans-serif; max-height: 320px; overflow: auto; }
       .dt-cb-chip.is-extra { border-style: dashed; }
       .dt-cb-acties3 { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; padding: 8px; border-radius: var(--cb-r); border: 1px dashed var(--cb-lijnzacht); }

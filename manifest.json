@@ -57,6 +57,8 @@
         "content/modules/leaderboard.js",
         "content/modules/lestools.js",
         "content/modules/pva-docx.js",
+        "content/modules/magisterforms.js",
+        "content/modules/pva.js",
         "content/modules/cb-kern.js",
         "content/modules/cb.js",
         "content/boot.js"
