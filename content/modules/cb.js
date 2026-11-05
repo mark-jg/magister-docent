@@ -23,7 +23,11 @@ DT.register({
   _scherm: null,
 
   init(DT) {
-    if (!DT.isTop) return;
+    /* In het logboek-frame van Magister (magister-lvs): alleen de notitie invullen. */
+    if (!DT.isTop) {
+      if (/^\/magister-lvs\//.test(location.pathname)) this._stop = DT.observe(() => this.vulNotitie(), { debounce: 250, poll: 1000 });
+      return;
+    }
     this._stop = DT.observe(() => { this.tegel(DT); this.vulAfspraak(); }, { debounce: 300, poll: 1500 });
     /* Weg van Aanwezigheid: de balie sluit, net als elke andere subpagina. */
     this._hash = () => { if (this._scherm && !/^#\/aanwezigheid\/?$/.test(location.hash)) this.sluit(); };
@@ -823,10 +827,8 @@ DT.register({
     toggle.firstChild.addEventListener("change", (e) => { this._metAfgehandeld = e.target.checked; this.teken(); });
     const kaart = (s) => {
       const st = K.S.studenten[s.stamnr] || {};
-      const mails = DT.el("div", { class: "dt-cb-chips" }, s.mails.map((type) => this.knop(DT, (K.MAILSOORT[type] || { label: type }).label, () => {
-        const m = Object.assign(K.mailTekst(type, s.stamnr, pid), { naam: K.naamVan(st) });
-        this.mailLijst(DT, (K.MAILSOORT[type] || { label: "Mail" }).label, `${K.naamVan(st)} · ${s.titel}`, [m]);
-      }, false, "klein")));
+      const bekijk = s.mails.length ? this.knop(DT, "Mailteksten bekijken", () => this.mailLijst(DT, "Mails bij deze trede", `${K.naamVan(st)} · ${s.titel}`,
+        s.mails.map((type) => Object.assign(K.mailTekst(type, s.stamnr, pid), { naam: `${K.naamVan(st)} · ${(K.MAILSOORT[type] || { label: type }).label}` }))), false, "klein stil") : null;
       return DT.el("dna-card", { class: `dt-cb-kaart dt-cb-signaal n${s.niveau}${s.afgehandeld ? " is-af" : ""}` }, [
         DT.el("div", { class: "dt-cb-kaartkop" }, [
           DT.el("div", { class: "dt-cb-wie" }, [DT.el("h3", { text: K.naamVan(st) }), DT.el("small", { text: `${st.klas || ""} · ${s.titel}${s.onderliggend ? ` · omvat ${s.onderliggend} lichtere ${s.onderliggend === 1 ? "trede" : "treden"}` : ""}` })]),
@@ -834,12 +836,11 @@ DT.register({
         ]),
         DT.el("p", { text: s.maatregel }),
         this.statsRegel(DT, s.stamnr),
-        DT.el("div", { class: "dt-cb-rij" }, [mails,
-          this.knop(DT, "Afspraak in Magister", () => this.afspraakMaken(s.stamnr, { onderwerp: `${s.consequentie}: ${K.naamVan(st)}`,
-            tekst: `${s.titel} in ${(K.periodeById(pid) || {}).naam || "deze periode"}.\n\n${s.maatregel}\n\nAangemaakt vanuit de Te laat-balie (Tardy).`, minuten: s.niveau >= 3 ? 30 : 15 }), false, "klein"),
+        this.actieKnoppen(DT, s, st, pid),
+        DT.el("div", { class: "dt-cb-rij" }, [
           s.afgehandeld ? this.knop(DT, "Heropen", () => { K.zetAfh(s.key, null); this.teken(); }, false, "klein stil")
             : this.knop(DT, "Afgehandeld", () => { const mee = K.handelAf(s.key); this.teken(); this.melding(mee ? `Afgehandeld, met ${mee} lichtere trede${mee === 1 ? "" : "n"} die hierin opgaat.` : "Afgehandeld."); }, true, "klein"),
-          this.knop(DT, "Verzuim in Magister", () => this.openInMagister(st), false, "klein stil")]),
+          this.knop(DT, "Verzuim in Magister", () => this.openInMagister(st), false, "klein stil"), bekijk].filter(Boolean)),
       ]);
     };
     const perNiveau = [4, 3, 2, 1].map((n) => [n, zicht.filter((s) => s.niveau === n)]).filter(([, l]) => l.length);
@@ -1077,6 +1078,110 @@ DT.register({
     this._vult = false;
   },
 
+  /* ===================================================================================== */
+  /* Drie acties per signaal: notitie in het dossier, mail, afspraak — afgevinkt na gebruik  */
+  /* ===================================================================================== */
+  /* Wat er per signaal al gedaan is staat in de gedeelde gegevens (S.cbActies[signaalsleutel]), zodat een
+   * collega en de Tardy-app het ook zien. Opslaan in Magister doe je zelf in Magisters eigen formulier. */
+  actieGedaan(key, soort) {
+    const S = TardyKern.S;
+    (S.cbActies ||= {})[key] = Object.assign({}, S.cbActies[key], { [soort]: new Date().toISOString() });
+    this.bewaar();
+  },
+
+  actieKnoppen(DT, s, st, pid) {
+    const K = TardyKern, gedaan = (K.S.cbActies || {})[s.key] || {};
+    const per = (K.periodeById(pid) || {}).naam || "deze periode";
+    const stand = this.statsRegel(DT, s.stamnr)?.textContent || "";
+    const ontvangers = [...new Set(s.mails.map((t) => ({ student: "student", ouders: "ouders", mentor: "mentor", bureau: "verzuimbureau" })[(K.MAILSOORT[t] || {}).aan] || "mentor"))];
+    const knop = (soort, label, klaarLabel, fn, uit = false) => {
+      const wanneer = gedaan[soort] ? new Date(gedaan[soort]) : null;
+      const b = this.knop(DT, wanneer ? `✓ ${klaarLabel}` : label, () => { fn(); this.actieGedaan(s.key, soort); this.teken(); }, false, `klein${wanneer ? " stil" : ""}`);
+      b.classList.add("dt-cb-actie"); if (wanneer) b.classList.add("is-gedaan");
+      b.title = wanneer ? `${klaarLabel} op ${wanneer.toLocaleDateString("nl-NL", { day: "numeric", month: "long" })} om ${wanneer.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}. Klik om het opnieuw te doen.` : "";
+      if (uit) b.setAttribute("disabled", "");
+      return b;
+    };
+    return DT.el("div", { class: "dt-cb-acties3" }, [
+      knop("notitie", "Notitie in dossier", "Notitie gemaakt", () => this.notitieMaken(s.stamnr, {
+        omschrijving: `${s.consequentie}: ${s.titel}`,
+        tekst: `${s.titel} in ${per}.\n${stand ? `${stand}\n` : ""}\nMaatregel volgens het verzuimprotocol: ${s.maatregel}\n\nVastgelegd vanuit de Te laat-balie (Tardy)${K.S.instellingen.cbNaam ? ` door ${K.S.instellingen.cbNaam}` : ""}.` })),
+      knop("mail", s.mails.length ? `Mail ${ontvangers.join(", ")}` : "Geen mail bij deze trede", "Mail klaargezet", () => this.mailsDirect(s, pid), !s.mails.length),
+      knop("afspraak", "Afspraak in Magister", "Afspraak gepland", () => this.afspraakMaken(s.stamnr, { onderwerp: `${s.consequentie}: ${K.naamVan(st)}`,
+        tekst: `${s.titel} in ${per}.\n\n${s.maatregel}\n\nAangemaakt vanuit de Te laat-balie (Tardy).`, minuten: s.niveau >= 3 ? 30 : 15 })),
+    ]);
+  },
+
+  /* Alle mails van deze trede als concept in het eigen mailprogramma (Outlook), en vastleggen in het dossier. */
+  mailsDirect(s, pid) {
+    const K = TardyKern, st = K.S.studenten[s.stamnr];
+    const mails = s.mails.map((type) => K.mailTekst(type, s.stamnr, pid));
+    mails.forEach((m, i) => setTimeout(() => {
+      const a = document.createElement("a");
+      a.href = `mailto:${encodeURIComponent(m.aan || "")}?subject=${encodeURIComponent(m.onderwerp)}&body=${encodeURIComponent(m.body)}`;
+      a.click();
+    }, i * 900));
+    mails.forEach((m) => K.S.mails.push({ id: K.uid(), stamnr: s.stamnr, type: m.type, aan: m.aan, onderwerp: m.onderwerp, op: K.vandaag() }));
+    const zonder = mails.filter((m) => !m.aan).length;
+    this.melding(`${mails.length} ${mails.length === 1 ? "mail staat" : "mails staan"} klaar in je mailprogramma${zonder ? `; bij ${zonder} ontbreekt het adres` : ""}.`, zonder ? "err" : "info", 7000);
+  },
+
+  /* Notitie: het logboek van de student openen in een nieuw tabblad; daar kiest de balie Toevoegen › Notitie
+   * en vult omschrijving en inhoud in. Jij loopt de stappen na en klikt op Opslaan. */
+  async notitieMaken(sn, { omschrijving, tekst, type = "Notitie" }) {
+    const K = TardyKern, st = K.S.studenten[sn];
+    let id = st.magisterId;
+    if (!id) { const hit = (await this.zoekMagister(sn)).find((x) => x.stamnr === String(sn)); id = hit?.magisterId; if (id) { st.magisterId = id; this.bewaar(); } }
+    if (!id) return this.melding("Deze student is niet in Magister gevonden.", "err");
+    const pid = await this.persoonId();
+    try { localStorage.setItem("dt-cb-notitie", JSON.stringify({ t: Date.now(), magisterId: String(id), naam: K.naamVan(st), omschrijving, tekst, type })); } catch {}
+    const binnen = encodeURIComponent(encodeURIComponent(`/begeleiding-page/leerling/${id}/Alle%20rollen/${pid || ""}/logboek`));
+    window.open(`${location.origin}/op/#/begeleiding/Alle%20rollen/leerling/${id}/////?innerUrl=${binnen}`, "_blank");
+    this.melding("Het logboek van de student opent in een nieuw tabblad met de notitie al ingevuld. Loop de stappen na en klik op Opslaan.", "info", 7000);
+  },
+
+  /* In het logboek-frame (magister-lvs): Toevoegen › Notitie kiezen en het formulier invullen. */
+  async vulNotitie() {
+    if (this._vultN) return;
+    let c = null; try { c = JSON.parse(localStorage.getItem("dt-cb-notitie") || "null"); } catch {}
+    if (!c || Date.now() - c.t > 3 * 60000) return;
+    const wacht = (ms) => new Promise((r) => setTimeout(r, ms));
+    const h = location.hash;
+    if (!c.gekozen && new RegExp(`^#/overview/${c.magisterId}\\b`).test(h)) {
+      const knop = [...document.querySelectorAll("dna-button")].find((b) => /Toevoegen/.test(b.textContent));
+      if (!knop) return;
+      this._vultN = true;
+      knop.click();
+      let item = null;
+      for (let i = 0; i < 20 && !item; i++) {
+        await wacht(150);
+        item = [...document.querySelectorAll("dna-menu-item")].find((m) => new RegExp(`(^|\\s)${c.type}$`, "i").test(m.textContent.trim()));
+      }
+      if (item) { c.gekozen = true; try { localStorage.setItem("dt-cb-notitie", JSON.stringify(c)); } catch {} item.click(); }
+      this._vultN = false;
+      return;
+    }
+    if (c.gekozen && /^#\/create\//.test(h)) {
+      const veld = document.querySelector("input[formcontrolname=omschrijving]");
+      const ed = document.querySelector(".ProseMirror[contenteditable=true]");
+      if (!veld || !ed) return;
+      this._vultN = true;
+      try { localStorage.removeItem("dt-cb-notitie"); } catch {}
+      veld.focus(); veld.value = c.omschrijving;
+      for (const t of ["input", "change", "blur"]) veld.dispatchEvent(new Event(t, { bubbles: true }));
+      ed.focus();
+      c.tekst.split("\n").forEach((regel, i) => {
+        if (i) document.execCommand("insertParagraph");
+        if (regel) document.execCommand("insertText", false, regel);
+      });
+      const melding = DT.el("div", { style: "margin:0 0 12px;padding:10px 14px;border-radius:4px;background:#ddeffe;border-left:4px solid #056dc2;font:14px/20px open-sans,sans-serif;color:#233243" },
+        [DT.el("b", { text: "Ingevuld door de Te laat-balie. " }), DT.el("span", { text: `Notitie voor ${c.naam}: controleer de tekst, loop de stappen na met Volgende en klik op Opslaan.` })]);
+      const form = veld.closest("form") || veld.closest("dna-card") || document.body;
+      form.parentElement?.insertBefore(melding, form);
+      this._vultN = false;
+    }
+  },
+
   /* Zoals "Overzicht per mentor" in Tardy: één mail per mentor met alle studenten waar actie nodig is. */
   mentorOverzicht(DT) {
     const K = TardyKern, pid = K.UI.periodeId, p = K.periodeById(pid), groepen = {};
@@ -1235,6 +1340,8 @@ DT.register({
       .dt-cb-haal b { flex: 0 0 200px; height: 6px; border-radius: 3px; background: var(--cb-lijnzacht); overflow: hidden; }
       .dt-cb-haal i { display: block; height: 100%; background: var(--cb-acc); transition: width .3s; }
       .dt-cb-afspraakmelding { margin: 8px 0 12px; padding: 10px 14px; border-radius: var(--cb-r); background: var(--cb-hover); border-left: 4px solid var(--cb-acc); font-size: 14px; }
+      .dt-cb-acties3 { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; padding: 8px; border-radius: var(--cb-r); border: 1px dashed var(--cb-lijnzacht); }
+      .dt-cb-actie.is-gedaan { color: var(--cb-groen); }
       .dt-cb-gevolg { display: flex; gap: 8px; align-items: baseline; margin: 0 0 8px; }
       .dt-cb-afspraak { margin: 0 0 8px; font-weight: 600; }
       .dt-cb-niveau { display: inline-flex; align-items: center; padding: 0 8px; border-radius: var(--cb-r); font-size: 12px; line-height: 20px; font-weight: 700; white-space: nowrap; background: var(--cb-vlak); }
