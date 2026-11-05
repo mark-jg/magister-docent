@@ -97,8 +97,17 @@ DT.register({
     await chrome.storage.local.set({ [sleutel]: waarde });
   },
   async plannenVan(id) {
+    /* Gedeelde map (als gekozen en toegestaan): plannen van collega's samenvoegen, de nieuwste versie wint. */
+    let lokaal = (await this.opslag(`pva:${id}`)) || [];
+    const gedeeld = await this.leesGedeeld(id).catch(() => []);
+    if (gedeeld.length) {
+      const per = new Map(lokaal.map((p) => [p.id, p]));
+      for (const g of gedeeld) { const l = per.get(g.id); if (!l || (g.gewijzigd || "") > (l.gewijzigd || "")) per.set(g.id, g); }
+      const samen = [...per.values()];
+      if (JSON.stringify(samen) !== JSON.stringify(lokaal)) { lokaal = samen; await this.opslag(`pva:${id}`, lokaal); }
+    }
     /* Plannen van vóór de profielen (0.45) horen bij MIP/MEP en hadden vakken als {vv, iw}. */
-    return ((await this.opslag(`pva:${id}`)) || []).map((p) => {
+    return lokaal.map((p) => {
       if (p.profielId) return p;
       p.profielId = "ma-mipmep";
       for (const v of Object.values(p.vakken || {})) { if ("vv" in v || "iw" in v) { v[1] = v.vv; v[2] = v.iw; delete v.vv; delete v.iw; } }
@@ -111,8 +120,52 @@ DT.register({
     p.gewijzigd = new Date().toISOString();
     if (i >= 0) lijst[i] = p; else lijst.push(p);
     await this.opslag(`pva:${p.magisterId}`, lijst);
+    clearTimeout(this._gt); this._gt = setTimeout(() => this.schrijfGedeeld(p).catch(() => {}), 1500);
   },
-  async verwijderPlan(p) { await this.opslag(`pva:${p.magisterId}`, (await this.plannenVan(p.magisterId)).filter((x) => x.id !== p.id)); },
+  async verwijderPlan(p) {
+    await this.opslag(`pva:${p.magisterId}`, ((await this.opslag(`pva:${p.magisterId}`)) || []).filter((x) => x.id !== p.id));
+    const d = await this.gedeeldeMap(); if (d) await d.removeEntry(`${p.magisterId}_${p.id}.json`).catch(() => {});
+  },
+
+  /* ---------- delen via een gedeelde map (OneDrive of Teams), net als de Te laat-balie ---------- */
+  /* Elk plan is een eigen bestand <leerling>_<plan>.json in de submap "Plannen van aanpak". De koppeling (map)
+   * staat in IndexedDB van Magister; Chrome vraagt één keer per sessie om toestemming. */
+  db() { return new Promise((ok, nok) => { const r = indexedDB.open("dt-pva", 1); r.onupgradeneeded = () => r.result.createObjectStore("kv"); r.onsuccess = () => ok(r.result); r.onerror = () => nok(r.error); }); },
+  async kv(k, v) {
+    const db = await this.db();
+    return new Promise((ok) => { const t = db.transaction("kv", v === undefined ? "readonly" : "readwrite"), st = t.objectStore("kv");
+      const r = v === undefined ? st.get(k) : v === null ? st.delete(k) : st.put(v, k); r.onsuccess = () => ok(r.result); r.onerror = () => ok(null); });
+  },
+  async gedeeldeMap(vraag = false) {
+    const h = await this.kv("map").catch(() => null); if (!h) return null;
+    let p = await h.queryPermission({ mode: "readwrite" });
+    if (p !== "granted" && vraag) p = await h.requestPermission({ mode: "readwrite" }).catch(() => "denied");
+    if (p !== "granted") return null;
+    return h.getDirectoryHandle("Plannen van aanpak", { create: true });
+  },
+  async kiesMap() {
+    if (!window.showDirectoryPicker) return this.melding("Deze browser kan geen map kiezen.");
+    try {
+      const h = await window.showDirectoryPicker({ id: "dt-pva", mode: "readwrite" });
+      await this.kv("map", h); await this.gedeeldeMap(true);
+      this.melding(`Gedeelde map gekoppeld: ${h.name}. Plannen worden voortaan ook daar bewaard.`);
+      return h;
+    } catch (e) { if (e?.name !== "AbortError") this.melding(`Map kiezen lukte niet: ${e.message || e}`); return null; }
+  },
+  async leesGedeeld(id) {
+    const d = await this.gedeeldeMap(); if (!d) return [];
+    const uit = [];
+    for await (const [naam, e] of d.entries()) {
+      if (e.kind !== "file" || !naam.startsWith(`${id}_`) || !naam.endsWith(".json")) continue;
+      try { uit.push(JSON.parse(await (await e.getFile()).text())); } catch {}
+    }
+    return uit;
+  },
+  async schrijfGedeeld(p) {
+    const d = await this.gedeeldeMap(); if (!d) return;
+    const f = await d.getFileHandle(`${p.magisterId}_${p.id}.json`, { create: true }), w = await f.createWritable();
+    await w.write(JSON.stringify(Object.assign({}, p, { gedeeldDoor: this._s?.ik || p.slb || "" }), null, 1)); await w.close();
+  },
 
   /* ---------- knop in het logboek ---------- */
   studentId() { return (location.hash.match(/^#\/overview\/(\d+)/) || [])[1] || null; },
@@ -209,6 +262,7 @@ DT.register({
     try {
       const [s, a, eerder, std, pr] = await Promise.all([this.student(DT, id), this.aanwezigheid(DT, id), this.plannenVan(id), this.opslag("pva:standaard"), this.profiel()]);
       this._std = std || {}; this._s = s; this._a = a; this._pr = pr; this._id = id;
+      if (!(await this.opslag("pva:welkom"))) return this.welkom(DT, () => this.openen(DT, id, vanBalie));
       if (vanBalie?.planId) { const p = eerder.find((x) => x.id === vanBalie.planId); if (p) { this._pr = (await this.profielen()).find((x) => x.id === p.profielId) || pr; return this.formulier(DT, p); } }
       if (vanBalie && !vanBalie.planId) {
         const soort = vanBalie.soort === "bbm" && pr.soorten?.bbm ? "bbm" : "algemeen";
@@ -231,7 +285,7 @@ DT.register({
     this.modal(DT, `Plan van aanpak: ${s.naam}`, [
       DT.el("p", { class: "dt-pva-zacht", text: `Profiel: ${pr.naam}${pr.school ? ` (${pr.school})` : ""}. Eerdere plannen staan in deze browser; het definitieve plan staat als bijlage bij de gespreksnotitie in het logboek.` }),
       eerder.length ? DT.el("div", { class: "dt-pva-lijst" }, eerder.slice().sort((x, y) => y.datum.localeCompare(x.datum)).map(rij)) : DT.el("p", { text: "Nog geen plannen voor deze student." }),
-    ], [["Profielen", () => this.profielBeheer(DT)], ["Sluiten", null], ...nieuw]);
+    ], [["Uitleg", () => this.uitleg(DT)], ["Profielen", () => this.profielBeheer(DT)], ["Sluiten", null], ...nieuw]);
   },
 
   /* ---------- het formulier, opgebouwd volgens het profiel ---------- */
@@ -339,6 +393,7 @@ DT.register({
       ["Verwijderen", async () => { if (!confirm("Dit plan van aanpak uit deze browser verwijderen? Een notitie in Magister blijft bestaan.")) return; await this.verwijderPlan(p); this.overzicht(DT); }],
       ["Terug", () => this.overzicht(DT)],
       ["Word downloaden", () => this.download(p)],
+      ["Afdrukken of PDF", () => this.afdrukken(p)],
       ["Evaluatie inplannen", () => this.evaluatie(p)],
       ["Gespreksnotitie in Magister", () => this.notitie(p), true],
     ]);
@@ -346,6 +401,69 @@ DT.register({
     /* SLB, opleidingsmanager en coach onthouden voor het volgende plan (in deze browser). */
     const std = { slb: p.slb || "", om: p.om || this._std?.om || "", coach: p.coach || this._std?.coach || "" };
     if (JSON.stringify(std) !== JSON.stringify(this._std || {})) { this._std = std; this.opslag("pva:standaard", std); }
+  },
+
+  /* ---------- uitleg ---------- */
+  welkom(DT, verder) {
+    const kies = (id, tekst, hoofd) => [tekst, async () => { await this.opslag("pva:profiel", id); await this.opslag("pva:welkom", new Date().toISOString()); this._pr = await this.profiel(id); verder(); }, hoofd];
+    this.modal(DT, "Welkom bij Plan van aanpak", [
+      DT.el("p", { text: "Hiermee maak je bij de begeleiding van een student een plan van aanpak: vooraf ingevuld met wat Magister weet (naam, klas, geboortedatum, aanwezigheid), als Word of PDF, en als gespreksnotitie met het plan als bijlage in het logboek. Bij de evaluatie leg je per doel vast of het behaald is en maak je meteen het vervolgplan." }),
+      DT.el("p", { text: "Welk formulier gebruik je? Een profiel bepaalt de leerlijnen, vakken, redenen, het traject (zoals Blijf Bij Ma) en het Word-sjabloon. Je kunt dit later altijd wijzigen bij Profielen, of het profielbestand van je team importeren." }),
+      DT.el("p", { class: "dt-pva-zacht", text: "Plannen staan in deze browser. Wil je ze met collega's delen, koppel dan bij Profielen een gedeelde map in OneDrive of Teams." }),
+    ], [["Uitleg", () => this.uitleg(DT, () => this.welkom(DT, verder))], kies("standaard", "Standaard (leeg)"), kies("ma-mipmep", "MIP/MEP Mediacollege", true)]);
+  },
+  uitleg(DT, terug = null) {
+    const blok = (titel, ...regels) => DT.el("section", { class: "dt-pva-sectie" }, [DT.el("h3", { text: titel }), ...regels.map((r) => DT.el("p", { text: r }))]);
+    this.modal(DT, "Uitleg: Plan van aanpak", [
+      blok("Waar", "Bij een student: Begeleiding › Logboek › knop Plan van aanpak (naast + Toevoegen). Vanuit de Te laat-balie: uitklappen bij een signaal › Plan van aanpak. Op Vandaag staat een kaart met evaluaties die eraan komen of verlopen zijn."),
+      blok("Invullen", "Gegevens, aanwezigheid (% van de lessen, ziek, ongeoorloofd, te laat) en of de student minderjarig is komen uit Magister. De rest vul je in tijdens het gesprek; alles wordt meteen bewaard. De stand per leerlijn vul je zelf in.", "In jouw woorden: laat de student dit zelf formuleren."),
+      blok("Klaar met het gesprek", "Gespreksnotitie in Magister: Magister opent een logboekitem met een samenvatting en het plan als bijlage; controleer en klik op Opslaan. Evaluatie inplannen: een afspraak in Magister op de evaluatiedatum. Word downloaden of Afdrukken of PDF voor de student of ouders."),
+      blok("Evalueren", "Bij Evaluatie › Evalueren… vink je per doel behaald, deels of niet aan, met toelichting en vervolg. De evaluatienotitie gaat naar het logboek; bij een volgende stap of nieuw plan maak je meteen het vervolgplan met de doelen die nog openstaan."),
+      blok("Profielen en Word-sjabloon", "Een profiel bepaalt het formulier. Kopieer een profiel om het aan te passen en deel het als .json-bestand. Eigen huisstijl: download het voorbeeldsjabloon, maak het op in Word en laat de plaatshouders staan: {naam}, {studentnummer}, {klas}, {geboortedatum}, {slb}, {datum}, {opleidingsmanager}, {begeleidingscoach}, {collega}, {toelichting}, {anders}, {aanwezigheid}, {pct}, {ouder}, {soort}, {stap}, {school}, {evaluatie}, {woorden.waardoor}, {woorden.anders}, {woorden.nodig}. Vakjes: {x:student}, {x:ouders}, {x:collega}, {x:reden.<code>}, {x:stap.<code>}. Herhalende tabelrijen: {doel.doel} {doel.bewijs} {doel.uiterlijk}, {actie.wie} {actie.wat} {actie.wanneer}, {vak.leerlijn} {vak.stand} {vak.naam} {vak.k1} {vak.k2}, {basis.naam} {basis.getoetst} {basis.behaald} {basis.stand}, {evaluatie.datum} {evaluatie.afspraak} met {x:evaluatie.behaald|deels|niet} en {x:evaluatie.vervolg.afsluiten|nieuw|volgende}."),
+      blok("Delen en privacy", "Zonder gedeelde map staan plannen alleen in deze browser; het definitieve plan staat als bijlage in het logboek van Magister. Met een gedeelde map (OneDrive/Teams) staan ze ook daar, één bestand per plan. Er gaat niets naar andere diensten."),
+    ], [[terug ? "Terug" : "Sluiten", terug || null]]);
+  },
+
+  /* ---------- afdrukken of opslaan als PDF ---------- */
+  /* Een nette afdrukversie in een nieuw venster; via Afdrukken › "Opslaan als PDF" wordt het een PDF. */
+  afdrukken(p) {
+    const pr = this._pr, c = this.ctx(p, pr), v = c.velden, x = (k) => (c.vinkjes[k] ? "☒" : "☐"), so = this.soortVan(pr, p), traject = p.soort !== "algemeen";
+    const e = (t) => String(t ?? "").replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[m]).replace(/\n/g, "<br>");
+    const kop = (n, t) => `<h2><span>${n}</span> ${e(t)}</h2>`;
+    const tabel = (koppen, rijen) => `<table>${koppen ? `<thead><tr>${koppen.map((k) => `<th>${e(k)}</th>`).join("")}</tr></thead>` : ""}<tbody>${rijen.map((r) => `<tr>${r.map((c2) => `<td>${c2}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+    const kv = (paren) => tabel(null, paren.map(([a, b]) => [`<span class="l">${e(a)}</span>`, b]));
+    let n = 0;
+    const delen = [
+      `<h1>${e(so.naam)}</h1><div class="naam">${e(v.naam)}</div><div class="sub">${e([pr.school, pr.naam].filter(Boolean).join(" · "))}</div>`,
+      kop(++n, "Gegevens") + kv([["Naam", e(v.naam)], ["Studentnummer", e(v.studentnummer)], ["Klas", e(v.klas)], ["Geboortedatum", e(v.geboortedatum)], ["SLB", e(v.slb)], ["Datum gesprek", e(v.datum)],
+        ...(traject ? [["Opleidingsmanager", e(v.opleidingsmanager)], ["Begeleidingscoach", e(v.begeleidingscoach)]] : []),
+        ["Aanwezig", `${x("student")} student &nbsp; ${x("ouders")} ouder(s)/verzorger(s) &nbsp; ${x("collega")} collega: ${e(v.collega)}`]]),
+      kop(++n, "Aanleiding") + kv([...(traject && (so.stappen || []).length ? [["Stap", so.stappen.map(([k, t]) => `${x(`stap.${k}`)} ${e(t)}`).join(" &nbsp; ")]] : []),
+        ["Reden", (pr.redenen || []).map(([k, t]) => `${x(`reden.${k}`)} ${e(t)}${k === "anders" && v.anders ? `: ${e(v.anders)}` : ""}`).join(" &nbsp; ")], ["Toelichting", e(v.toelichting)]]),
+      kop(++n, "Waar sta je nu") + (c.rijen.vak.length ? tabel(["Leerlijn", "Stand", "Vak", ...(pr.kolommen || [])], c.rijen.vak.map((r) => [e(r.leerlijn), e(r.stand), e(r.naam), ...(pr.kolommen || []).map((_, i) => e(r[`k${i + 1}`]))])) : "")
+        + (c.rijen.basis.length ? tabel([pr.basisTitel || "Basisvaardigheid", "Getoetst tot nu toe", "Behaald", "Stand"], c.rijen.basis.map((r) => [e(r.naam), e(r.getoetst), e(r.behaald), e(r.stand)])) : "")
+        + kv([["Aanwezigheid", e(v.aanwezigheid)]]),
+      kop(++n, "Wat ga je behalen") + tabel(["Doel", "Waaraan zie je het", "Uiterlijk"], (c.rijen.doel.length ? c.rijen.doel : [{}]).map((r) => [e(r.doel), e(r.bewijs), e(r.uiterlijk)])),
+      kop(++n, "Acties en afspraken") + tabel(["Wie", "Doet wat", "Wanneer"], (c.rijen.actie.length ? c.rijen.actie : [{}]).map((r) => [e(r.wie), e(r.wat), e(r.wanneer)])),
+      kop(++n, "In jouw woorden") + kv([["Waardoor loopt het nu niet zoals je wilt?", e(v["woorden.waardoor"])], ["Wat ga jij vanaf nu anders doen?", e(v["woorden.anders"])], ["Wat heb je nodig van school of van thuis?", e(v["woorden.nodig"])]]),
+      kop(++n, "Evaluatie") + tabel(["Datum", "Doelen", traject && so.vervolg ? "Vervolg" : "Afspraak en vervolg"], c.rijen.evaluatie.map((r) => [e(r.datum),
+        ["behaald", "deels", "niet"].map((k) => `${r.x[`evaluatie.${k}`] ? "☒" : "☐"} ${k}`).join(" &nbsp; "),
+        traject && so.vervolg ? [["afsluiten", "afsluiten"], ["nieuw", "nieuw plan"], ["volgende", "volgende stap"]].map(([k, t]) => `${r.x[`evaluatie.vervolg.${k}`] ? "☒" : "☐"} ${t}`).join(" &nbsp; ") : e(r.afspraak)])),
+      kop(++n, "Akkoord") + `<div class="teken">${[["Student", v.naam], ["Ouder/verzorger (bij minderjarige)", v.ouder], ["Studieloopbaanbegeleider", v.slb], ...(traject ? [["Opleidingsmanager", v.opleidingsmanager]] : [])]
+        .map(([w, nm]) => `<div><b>${e(w)}</b><span>Naam: ${e(nm)}</span><span>Datum en handtekening</span></div>`).join("")}</div>`,
+    ];
+    const html = `<!doctype html><html lang="nl"><head><meta charset="utf-8"><title>${e(this.bestandsnaam(p).replace(/\.docx$/, ""))}</title><style>
+      @page { size: A4; margin: 16mm 15mm; } body { font: 10pt/1.4 Arial, sans-serif; color: #222; margin: 0; }
+      h1 { font-size: 20pt; margin: 0; } .naam { font-size: 15pt; color: #6b6b6b; margin-top: 2pt; } .sub { color: #6b6b6b; font-size: 9pt; border-bottom: 1.5pt solid #222; padding-bottom: 6pt; margin-bottom: 8pt; }
+      h2 { font-size: 12pt; margin: 14pt 0 4pt; break-after: avoid; } h2 span { background: #222; color: #fff; padding: 0 5pt; margin-right: 4pt; }
+      table { width: 100%; border-collapse: collapse; margin: 0 0 6pt; break-inside: auto; } tr { break-inside: avoid; }
+      th { text-align: left; font-size: 8.5pt; background: #f2f2f2; padding: 3pt 5pt; border-bottom: 1pt solid #c8c8c8; } td { padding: 3pt 5pt; border-bottom: .5pt solid #c8c8c8; vertical-align: top; }
+      td .l { color: #555; } td:first-child { width: 28%; } .teken { display: grid; grid-template-columns: 1fr 1fr; gap: 10pt; } .teken div { border-top: 1pt solid #c8c8c8; padding-top: 4pt; min-height: 60pt; display: flex; flex-direction: column; gap: 2pt; } .teken span { color: #555; font-size: 9pt; }
+    </style></head><body>${delen.join("")}</body></html>`;
+    const w = window.open("", "_blank");
+    if (!w) return this.melding("Het afdrukvenster werd geblokkeerd; sta pop-ups toe voor Magister.");
+    w.document.open(); w.document.write(html); w.document.close();
+    setTimeout(() => { w.focus(); w.print(); }, 400);
   },
 
   /* ---------- evalueren: per doel, notitie in Magister en het vervolg ---------- */
@@ -474,10 +592,23 @@ DT.register({
         this.melding(`Profiel ${pr.naam} geïmporteerd en gekozen.`); this.profielBeheer(DT);
       } catch (e) { this.melding(`Importeren lukte niet: ${e.message || e}`); }
     });
+    const h = await this.kv("map").catch(() => null), toegang = h ? await h.queryPermission({ mode: "readwrite" }) : null;
+    const mapKnop = (t, fn) => { const b = DT.el("button", { type: "button", class: "dt-pva-link", text: t }); b.addEventListener("click", fn); return b; };
+    const mapRij = DT.el("div", { class: "dt-pva-profielrij" }, [
+      DT.el("span", {}, [DT.el("b", { text: "Gedeelde map" }), DT.el("small", { text: h ? ` ${h.name}${toegang === "granted" ? "" : " · toestemming nodig"}` : " niet gekoppeld: plannen staan alleen in deze browser" })]),
+      DT.el("span", { class: "dt-pva-acties" }, [
+        h && toegang !== "granted" ? mapKnop("Toestemming geven", async () => { await this.gedeeldeMap(true); this.profielBeheer(DT); }) : null,
+        mapKnop(h ? "Andere map…" : "Map kiezen…", async () => { if (await this.kiesMap()) this.profielBeheer(DT); }),
+        h ? mapKnop("Loskoppelen", async () => { await this.kv("map", null); this.profielBeheer(DT); }) : null,
+      ].filter(Boolean)),
+    ]);
     this.modal(DT, "Profielen voor Plan van aanpak", [
       DT.el("p", { class: "dt-pva-zacht", text: "Een profiel bepaalt de inhoud van het formulier: leerlijnen en vakken, basisvaardigheden, redenen, het traject en zijn stappen, evaluatietermijnen en het Word-sjabloon. Kies het profiel van jouw opleiding, kopieer een bestaand profiel om het aan te passen, of importeer het profielbestand van je team." }),
       DT.el("div", { class: "dt-pva-lijst" }, alle.map(rij)), imp,
-    ], [["Profiel importeren…", () => imp.click()], ["Terug", () => (this._s ? this.overzicht(DT) : document.querySelector(".dt-pva-modal")?.remove())]]);
+      DT.el("h3", { class: "dt-pva-kopje", text: "Delen met collega's" }),
+      DT.el("p", { class: "dt-pva-zacht", text: "Kies een map in OneDrive of Teams die je met je team deelt (bijvoorbeeld dezelfde map als de Te laat-balie). Plannen worden dan ook daar bewaard, in de submap \"Plannen van aanpak\"; collega's met dezelfde map zien en bewerken dezelfde plannen. De nieuwste versie wint." }),
+      mapRij,
+    ], [["Uitleg", () => this.uitleg(DT)], ["Profiel importeren…", () => imp.click()], ["Terug", () => (this._s ? this.overzicht(DT) : document.querySelector(".dt-pva-modal")?.remove())]]);
   },
   async profielEditor(DT, pr) {
     const bewaar = async () => { await this.bewaarProfiel(pr); if (this._pr?.id === pr.id) this._pr = pr; };
