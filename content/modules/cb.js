@@ -1099,6 +1099,7 @@ DT.register({
         this.teken();
         this.melding(mee ? `Afgehandeld, met ${mee} lichtere ${mee === 1 ? "stap" : "stappen"} die hierin ${mee === 1 ? "opgaat" : "opgaan"}.` : "Afgehandeld.");
       };
+      const heropen = () => { K.zetAfh(s.key, null); this.teken(); };
       const pct = K.S.lesreg[s.stamnr]?.perioden?.[pid]?.pct;
       const wat = DT.el("div", { class: "dt-cb-sigwat" }, [
         DT.el("div", { class: "dt-cb-sigregel" }, [
@@ -1115,14 +1116,17 @@ DT.register({
         pijl,
         DT.el("div", { class: "dt-cb-sigwie" }, [this.naamKnop(DT, st), DT.el("small", { text: st.klas || "" })]),
         wat,
-        DT.el("div", { class: "dt-cb-sigknoppen" }, [
+        isOpen ? null : DT.el("div", { class: "dt-cb-sigknoppen" }, [
           this.actieKnoppen(DT, s, st, pid, undefined, true),
-          s.afgehandeld ? this.knop(DT, "Heropen", () => { K.zetAfh(s.key, null); this.teken(); }, false, "klein stil")
-            : this.knop(DT, "Afgehandeld", afhandelen, true, "klein"),
+          s.afgehandeld ? this.ikoonKnop(DT, "heropen", "Heropen", heropen) : this.ikoonKnop(DT, "af", "Afgehandeld", afhandelen, { hoofd: true }),
         ]),
-      ]);
+      ].filter(Boolean));
       const detail = isOpen ? DT.el("div", { class: "dt-cb-sigdetail" }, [
         DT.el("p", { text: s.maatregel }),
+        DT.el("div", { class: "dt-cb-rij dt-cb-detailknoppen" }, [
+          this.actieKnoppen(DT, s, st, pid),
+          s.afgehandeld ? this.knop(DT, "Heropen", heropen, false, "klein") : this.knop(DT, "Afgehandeld", afhandelen, true, "klein"),
+        ]),
         omvat ? DT.el("p", { class: "dt-cb-zacht", text: `Omvat ${omvat} lichtere ${omvat === 1 ? "stap" : "stappen"}; die worden met Afgehandeld meegenomen.` }) : null,
         ...s.ook.map((x) => DT.el("div", { class: `dt-cb-ookregel${x.afgehandeld ? " is-af" : ""}` }, [
           DT.el("span", { class: `dt-cb-niveau n${x.niveau}`, text: x.consequentie }),
@@ -1388,6 +1392,22 @@ DT.register({
     this.bewaar();
   },
 
+  /* Kleine iconknop voor de ingeklapte signaalregel; de naam staat in de tooltip en voor schermlezers. */
+  IKOON: {
+    notitie: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 11h7M9 14.5h7M9 18h4"/>',
+    mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/>',
+    afspraak: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+    af: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+    heropen: '<path d="M4 12a8 8 0 1 0 2.3-5.6"/><path d="M4 4v4.5h4.5"/>',
+  },
+  ikoonKnop(DT, soort, label, fn, { gedaan = false, uit = false, hoofd = false } = {}) {
+    const b = DT.el("button", { type: "button", class: `dt-cb-ikoon${gedaan ? " is-gedaan" : ""}${hoofd ? " is-hoofd" : ""}`, title: label, "aria-label": label });
+    b.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${this.IKOON[soort]}</svg>${gedaan ? '<span class="dt-cb-vink" aria-hidden="true">✓</span>' : ""}`;
+    if (uit) b.disabled = true;
+    b.addEventListener("click", (e) => { e.stopPropagation(); fn(); });
+    return b;
+  },
+
   actieTerug(key, soort) {
     const S = TardyKern.S, a = (S.cbActies || {})[key];
     if (!a) return;
@@ -1404,6 +1424,9 @@ DT.register({
     const vars = this.signaalVars(DT, s, st, pid);
     const knop = (soort, label, uitleg, klaarLabel, fn, uit = false) => {
       const wanneer = gedaan[soort] ? new Date(gedaan[soort]) : null;
+      const moment = wanneer ? `${wanneer.toLocaleDateString("nl-NL", { day: "numeric", month: "long" })} om ${wanneer.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}` : "";
+      if (kort) return this.ikoonKnop(DT, soort, wanneer ? `${klaarLabel} op ${moment}. Klik om het opnieuw te doen; klap de regel uit om terug te zetten.` : `${label}: ${uitleg}`,
+        () => { fn(); this.actieGedaan(s.key, soort); naKlik(); }, { gedaan: !!wanneer, uit });
       const b = this.knop(DT, wanneer ? `✓ ${klaarLabel}` : label, () => { fn(); this.actieGedaan(s.key, soort); naKlik(); }, false, `klein${wanneer ? " stil" : ""}`);
       b.classList.add("dt-cb-actie"); if (wanneer) b.classList.add("is-gedaan");
       b.title = wanneer ? `${klaarLabel} op ${wanneer.toLocaleDateString("nl-NL", { day: "numeric", month: "long" })} om ${wanneer.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}. Klik om het opnieuw te doen.` : uitleg;
@@ -1414,12 +1437,12 @@ DT.register({
       return DT.el("span", { class: "dt-cb-actiegroep" }, [b, terug]);
     };
     return DT.el("div", { class: kort ? "dt-cb-acties-in" : "dt-cb-acties3" }, [
-      knop("notitie", kort ? "Notitie" : "Notitie in dossier", "Notitie in het dossier (logboek) in Magister", "Notitie", () => {
+      knop("notitie", "Notitie in dossier", "Notitie in het dossier (logboek) in Magister", "Notitie", () => {
         const t = this.eigenTekst("notitie", vars);
         this.notitieMaken(s.stamnr, { omschrijving: t.onderwerp, tekst: t.body });
       }),
       knop("mail", mails.length ? `Mail ${ontvangers.join(", ")}` : "Geen mail", mails.length ? `Concept in je mailprogramma${this.oudersMet18(st) ? " (18+, met toestemming voor contact met ouders)" : ""}` : "Bij deze stap hoort geen mail", "Mail", () => this.mailsDirect(s, pid), !mails.length),
-      knop("afspraak", kort ? "Afspraak" : "Afspraak in Magister", "Afspraak met de student in Magister", "Afspraak", () => {
+      knop("afspraak", "Afspraak in Magister", "Afspraak met de student in Magister", "Afspraak", () => {
         const t = this.eigenTekst("afspraak", vars);
         this.afspraakMaken(s.stamnr, { onderwerp: t.onderwerp, tekst: t.body, minuten: s.niveau >= 3 ? 30 : 15 });
       }),
@@ -2103,7 +2126,25 @@ DT.register({
       .dt-cb-terug:hover { background: var(--cb-hover); color: var(--cb-fg); }
       .dt-cb-sigdetail { padding: 0 16px 12px 52px; } .dt-cb-sigdetail p { margin: 0 0 8px !important; font-size: 14px; }
       .dt-cb-sigdetail .dt-cb-ookregel { margin: 0 0 8px; }
-      @media (max-width: 1100px) { .dt-cb-sigrij { grid-template-columns: 24px minmax(0, 1fr); } .dt-cb-sigwat, .dt-cb-sigknoppen { grid-column: 2; } .dt-cb-sigknoppen { justify-content: flex-start; } }
+      .dt-cb-siglijst { container-type: inline-size; }
+      .dt-cb-sigregel { overflow: hidden; } .dt-cb-sigregel .dt-cb-niveau { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
+      .dt-cb-sigtitel { flex: 0 1 auto; min-width: 0; }
+      @container (max-width: 720px) {
+        .dt-cb-sigrij { grid-template-columns: 24px minmax(0, 1fr) auto; }
+        .dt-cb-sigwie { grid-column: 2; grid-row: 1; } .dt-cb-sigknoppen { grid-column: 3; grid-row: 1; }
+        .dt-cb-sigwat { grid-column: 2 / 4; grid-row: 2; }
+        .dt-cb-sigdetail { padding-left: 16px; }
+      }
+      .dt-cb-ikoon { position: relative; appearance: none; width: 34px; height: 32px; display: inline-grid; place-items: center; padding: 0; border: 1px solid var(--cb-acc); border-radius: var(--cb-r); background: var(--cb-kaart); color: var(--cb-acc); cursor: pointer; }
+      .dt-cb-ikoon:hover { background: var(--cb-hover); }
+      .dt-cb-ikoon:focus-visible { outline: 2px solid var(--cb-acc); outline-offset: 2px; }
+      .dt-cb-ikoon.is-hoofd { background: var(--cb-acc); color: #fff; } .dt-cb-ikoon.is-hoofd:hover { filter: brightness(1.1); }
+      .dt-cb-ikoon.is-gedaan { border-color: var(--cb-groen); color: var(--cb-groen); background: color-mix(in srgb, var(--cb-groen) 8%, var(--cb-kaart)); }
+      .dt-cb-ikoon:disabled { border-color: var(--cb-lijnzacht); color: var(--cb-lijn); cursor: default; background: none; }
+      .dt-cb-vink { position: absolute; right: -5px; top: -6px; width: 15px; height: 15px; border-radius: 50%; background: var(--cb-groen); color: #fff; font-size: 10px; line-height: 15px; text-align: center; font-weight: 700; }
+      .dt-cb-sigknoppen .dt-cb-acties-in { gap: 6px; }
+      .dt-cb-sig.is-open .dt-cb-sigmaat { display: none; }
+      .dt-cb-detailknoppen { margin: 0 0 10px; } .dt-cb-detailknoppen .dt-cb-acties3 { margin: 0; }
       .dt-cb-voorbeeld { margin: 0; padding: 12px; border-radius: var(--cb-r); background: var(--cb-vlak); border: 1px solid var(--cb-lijnzacht); white-space: pre-wrap; font: 13px/19px var(--sl-text-typeset-font-family-body, open-sans), sans-serif; max-height: 320px; overflow: auto; }
       .dt-cb-chip.is-extra { border-style: dashed; }
       .dt-cb-acties3 { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; padding: 8px; border-radius: var(--cb-r); border: 1px dashed var(--cb-lijnzacht); }
