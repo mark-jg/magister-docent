@@ -551,7 +551,10 @@ function ldEindPadding(main) {
   return v;
 }
 function lesdashKopPass(root, on) {
-  const uiv = root.querySelector('ui-view[name="main"]');
+  /* Meestal staan kop en inhoud direct in ui-view main; op het tabblad Hulpmiddelen zitten ze in
+   * ld-hulpmiddelen (zonder zijpaneel). Dat element is dan de "host"; de ui-view blijft de maatstaf. */
+  const view = root.querySelector('ui-view[name="main"]');
+  const uiv = view && (view.querySelector(":scope > section.ld-section") ? view : view.querySelector(":scope > ld-hulpmiddelen"));
   const main = on && uiv ? uiv.querySelector(":scope > section.ld-section") : null;
   const hb = main ? uiv.querySelector(":scope > .head-bar") : null;
   if (!main || !hb) {
@@ -561,13 +564,16 @@ function lesdashKopPass(root, on) {
     if (ldKopRO) { ldKopRO.disconnect(); ldKopRO = null; ldKopMain = null; }
     return;
   }
+  /* Bij wisselen tussen tabbladen kan de host veranderen: kaart en klasse van een vorige host weg. */
+  root.querySelectorAll(".dt-ld-kop").forEach((k) => { if (k.parentElement !== uiv) k.remove(); });
+  root.querySelectorAll(".dt-ld-on").forEach((u) => { if (u !== uiv) { u.classList.remove("dt-ld-on"); u.style.removeProperty("--dt-kop-l"); u.style.removeProperty("--dt-kop-r"); } });
   let kop = uiv.querySelector(":scope > .dt-ld-kop");
   if (!kop) { kop = document.createElement("div"); kop.className = "dt-ld-kop"; kop.setAttribute("aria-hidden", "true"); uiv.prepend(kop); }
   uiv.classList.add("dt-ld-on");
   const meet = () => {
     if (!kop.isConnected) return;
-    const ur = uiv.getBoundingClientRect(), mr = main.getBoundingClientRect(), pad = ldEindPadding(main);
-    const binnenL = ur.left + uiv.clientLeft, binnenR = binnenL + uiv.clientWidth;
+    const ur = view.getBoundingClientRect(), mr = main.getBoundingClientRect(), pad = ldEindPadding(main);
+    const binnenL = ur.left + view.clientLeft, binnenR = binnenL + view.clientWidth;
     const l = Math.round(mr.left + pad.l - binnenL);
     const r = Math.round(binnenR - (mr.right - pad.r));
     const top = parseFloat(getComputedStyle(kop).top) || 28;
@@ -576,7 +582,7 @@ function lesdashKopPass(root, on) {
       if (!el.offsetParent) continue;
       onder = Math.max(onder, el.getBoundingClientRect().bottom);
     }
-    const h = onder ? Math.round(onder - ur.top - uiv.clientTop + uiv.scrollTop + 16 - top) : 0;
+    const h = onder ? Math.round(onder - ur.top - view.clientTop + view.scrollTop + 16 - top) : 0;
     const zet = (k, v) => { if (uiv.style.getPropertyValue(k) !== v) uiv.style.setProperty(k, v); };
     zet("--dt-kop-l", `${l}px`); zet("--dt-kop-r", `${r}px`);
     /* Per eigenschap en alleen bij verschil: opnieuw zetten zou de CSS-overgang telkens herstarten */
@@ -1236,65 +1242,66 @@ function appleCss(p, dark, accent, top = (typeof window === "undefined" || windo
     .collapse-sidebar aside .head-bar .toggle-button { width: 38px !important; height: 38px !important; background: ${t.glass ? t.glassStrong : t.surface} !important; box-shadow: ${t.glass ? `${t.glassEdge}, 0 4px 14px rgba(31,41,61,.12)` : t.card} !important; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} }
     .collapse-sidebar aside .head-bar .toggle-button:hover { background: ${t.tintStrong} !important; }
     .collapse-sidebar aside { overflow: visible !important; }
-    ui-view.dt-ld-on > .aside-toggle-slide { display: none !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .aside-toggle-slide { display: none !important; }
+    ld-hulpmiddelen.dt-ld-on { display: block !important; }
     /* Lesdashboard: titel, tabbladen en werkbalk als één kaart (vlak .dt-ld-kop, maat via lesdashKopPass) */
-    ui-view.dt-ld-on > .dt-ld-kop { position: absolute; top: 28px; box-sizing: border-box; pointer-events: none; border-radius: ${t.glass ? "22px" : "16px"}; background: ${ldCard}; box-shadow: ${ldShadow}; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} transition: left .2s linear, right .2s linear; }
-    ui-view.dt-ld-on > .head-bar { top: 46px !important; height: 40px !important; line-height: 40px !important; left: calc(var(--dt-kop-l, 330px) + 18px) !important; right: calc(var(--dt-kop-r, 24px) + 16px) !important; margin: 0 !important; background: transparent !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; border-radius: 0 !important; transition: right .2s linear; }
-    ui-view.dt-ld-on > .head-bar h1, ui-view.dt-ld-on > .head-bar h1 a { margin-left: 0 !important; padding-left: 0 !important; }
-    ui-view.dt-ld-on > .head-bar h1 { height: 40px !important; line-height: 40px !important; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .dt-ld-kop { position: absolute; top: 28px; box-sizing: border-box; pointer-events: none; border-radius: ${t.glass ? "22px" : "16px"}; background: ${ldCard}; box-shadow: ${ldShadow}; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} transition: left .2s linear, right .2s linear; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar { top: 46px !important; height: 40px !important; line-height: 40px !important; left: calc(var(--dt-kop-l, 330px) + 18px) !important; right: calc(var(--dt-kop-r, 24px) + 16px) !important; margin: 0 !important; background: transparent !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; border-radius: 0 !important; transition: right .2s linear; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar h1, .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar h1 a { margin-left: 0 !important; padding-left: 0 !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar h1 { height: 40px !important; line-height: 40px !important; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
     /* Eén knopmaat (30px) in de hele kaart: knoppen in de titelrij, tabbladen en werkbalk */
     /* Knoppen rechts in de titelrij: één flexrij (Magister zet ze met float: right, vandaar row-reverse) */
-    ui-view.dt-ld-on > .head-bar .head-bar-links { float: right !important; margin: 0 0 0 16px !important; height: 40px; width: auto !important; display: flex !important; flex-direction: row-reverse; align-items: center; gap: 6px; }
-    ui-view.dt-ld-on > .head-bar .head-bar-links > :not(.ng-hide), ui-view.dt-ld-on > .head-bar .head-bar-links :not(ul, li, .ng-hide) > :is(div, mg-headbar-button):not(.ng-hide) { float: none !important; height: 40px !important; margin: 0 !important; padding: 0 !important; display: flex !important; flex-direction: row-reverse; align-items: center; gap: 6px; }
-    ui-view.dt-ld-on > .head-bar .head-bar-links a.text-menu, ui-view.dt-ld-on > .head-bar .head-bar-links div.sub > a { height: 30px !important; line-height: 30px !important; margin: 0 !important; padding: 0 !important; display: inline-flex !important; align-items: center; }
-    ui-view.dt-ld-on > .head-bar .head-bar-links div.sub > a { padding-right: 16px !important; }
-    ui-view.dt-ld-on > .head-bar .head-bar-links a.text-menu span, ui-view.dt-ld-on > .head-bar .head-bar-links div.sub > a span { line-height: 30px !important; padding: 0 14px !important; font: 500 .8125rem/30px ${t.font} !important; }
-    ui-view.dt-ld-on > .head-bar .head-bar-links a:has(> i.ico) { width: 30px !important; height: 30px !important; margin: 0 !important; padding: 0 !important; display: inline-grid !important; place-items: center; }
-    ui-view.dt-ld-on > .head-bar .head-bar-links a > i.ico { width: 30px !important; height: 30px !important; line-height: 30px !important; font-size: 13px !important; border-radius: 50% !important; padding: 0 !important; margin: 0 !important; text-align: center; }
-    ui-view.dt-ld-on > .head-bar .head-bar-links div.sub:after { line-height: 40px !important; }
-    ui-view.dt-ld-on > section.ld-section { padding-top: 66px !important; }
-    ui-view.dt-ld-on > section.ld-section > .verantwoord-container { margin-left: 16px !important; }
-    ui-view.dt-ld-on > section.ld-section > ld-menu .page-nav { margin: 0 16px 28px !important; }
-    ui-view.dt-ld-on > section.ld-section:has(#leerlinglijst > .dt-att-bar) > ld-menu .page-nav { margin-bottom: 10px !important; }
-    ui-view.dt-ld-on > section.ld-section > ld-menu .page-nav > ul.tabs { height: 30px !important; padding: 2px !important; }
-    ui-view.dt-ld-on > section.ld-section > ld-menu .page-nav > ul.tabs > li > a { height: 26px !important; line-height: 26px !important; padding: 0 14px !important; font-size: .8125rem !important; }
-    ui-view.dt-ld-on > section.ld-section > ld-menu .page-nav > ul.tabs { width: fit-content !important; background: ${t.dark ? "rgba(118,118,128,.24)" : "rgba(118,118,128,.12)"} !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
-    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar { padding: 0 16px !important; margin: 0 0 28px !important; gap: 6px !important; min-height: 30px; align-items: center; }
-    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-btn { height: 30px !important; padding: 0 12px !important; gap: 5px !important; font: 500 .8125rem/1 ${t.font} !important; }
-    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-btn svg { width: 12px; height: 12px; }
-    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-att-shortcut { display: none !important; }
-    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-att-search { height: 30px; align-items: center; }
-    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-att-search .dt-att-input { margin: 0 !important; }
-    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-att-input { width: 180px !important; height: 30px !important; font-size: .8125rem !important; line-height: 30px !important; }
-    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-att-legend { gap: 2px 10px !important; font-size: .6875rem !important; }
-    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-att-legend kbd { min-width: 15px !important; height: 15px !important; line-height: 15px !important; padding: 0 4px !important; font-size: .625rem !important; border-radius: 4px !important; }
-    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-btn:not(.dt-btn-primary) { background: ${t.dark ? "rgba(118,118,128,.24)" : "rgba(118,118,128,.12)"} !important; box-shadow: none !important; }
-    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-btn:not(.dt-btn-primary):hover { background: ${t.dark ? "rgba(118,118,128,.34)" : "rgba(118,118,128,.2)"} !important; }
-    ui-view.dt-ld-on #leerlinglijst > .dt-att-bar .dt-att-input { background: ${t.dark ? "rgba(118,118,128,.24)" : "rgba(118,118,128,.12)"} !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
-    ui-view.dt-ld-on > .sidecolumn aside { top: 28px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar .head-bar-links { float: right !important; margin: 0 0 0 16px !important; height: 40px; width: auto !important; display: flex !important; flex-direction: row-reverse; align-items: center; gap: 6px; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar .head-bar-links > :not(.ng-hide), .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar .head-bar-links :not(ul, li, .ng-hide) > :is(div, mg-headbar-button):not(.ng-hide) { float: none !important; height: 40px !important; margin: 0 !important; padding: 0 !important; display: flex !important; flex-direction: row-reverse; align-items: center; gap: 6px; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar .head-bar-links a.text-menu, .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar .head-bar-links div.sub > a { height: 30px !important; line-height: 30px !important; margin: 0 !important; padding: 0 !important; display: inline-flex !important; align-items: center; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar .head-bar-links div.sub > a { padding-right: 16px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar .head-bar-links a.text-menu span, .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar .head-bar-links div.sub > a span { line-height: 30px !important; padding: 0 14px !important; font: 500 .8125rem/30px ${t.font} !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar .head-bar-links a:has(> i.ico) { width: 30px !important; height: 30px !important; margin: 0 !important; padding: 0 !important; display: inline-grid !important; place-items: center; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar .head-bar-links a > i.ico { width: 30px !important; height: 30px !important; line-height: 30px !important; font-size: 13px !important; border-radius: 50% !important; padding: 0 !important; margin: 0 !important; text-align: center; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar .head-bar-links div.sub:after { line-height: 40px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > section.ld-section { padding-top: 66px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > section.ld-section > .verantwoord-container { margin-left: 16px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > section.ld-section > ld-menu .page-nav { margin: 0 16px 28px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > section.ld-section:has(#leerlinglijst > .dt-att-bar) > ld-menu .page-nav { margin-bottom: 10px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > section.ld-section > ld-menu .page-nav > ul.tabs { height: 30px !important; padding: 2px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > section.ld-section > ld-menu .page-nav > ul.tabs > li > a { height: 26px !important; line-height: 26px !important; padding: 0 14px !important; font-size: .8125rem !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > section.ld-section > ld-menu .page-nav > ul.tabs { width: fit-content !important; background: ${t.dark ? "rgba(118,118,128,.24)" : "rgba(118,118,128,.12)"} !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) #leerlinglijst > .dt-att-bar { padding: 0 16px !important; margin: 0 0 28px !important; gap: 6px !important; min-height: 30px; align-items: center; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) #leerlinglijst > .dt-att-bar .dt-btn { height: 30px !important; padding: 0 12px !important; gap: 5px !important; font: 500 .8125rem/1 ${t.font} !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) #leerlinglijst > .dt-att-bar .dt-btn svg { width: 12px; height: 12px; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) #leerlinglijst > .dt-att-bar .dt-att-shortcut { display: none !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) #leerlinglijst > .dt-att-bar .dt-att-search { height: 30px; align-items: center; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) #leerlinglijst > .dt-att-bar .dt-att-search .dt-att-input { margin: 0 !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) #leerlinglijst > .dt-att-bar .dt-att-input { width: 180px !important; height: 30px !important; font-size: .8125rem !important; line-height: 30px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) #leerlinglijst > .dt-att-bar .dt-att-legend { gap: 2px 10px !important; font-size: .6875rem !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) #leerlinglijst > .dt-att-bar .dt-att-legend kbd { min-width: 15px !important; height: 15px !important; line-height: 15px !important; padding: 0 4px !important; font-size: .625rem !important; border-radius: 4px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) #leerlinglijst > .dt-att-bar .dt-btn:not(.dt-btn-primary) { background: ${t.dark ? "rgba(118,118,128,.24)" : "rgba(118,118,128,.12)"} !important; box-shadow: none !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) #leerlinglijst > .dt-att-bar .dt-btn:not(.dt-btn-primary):hover { background: ${t.dark ? "rgba(118,118,128,.34)" : "rgba(118,118,128,.2)"} !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) #leerlinglijst > .dt-att-bar .dt-att-input { background: ${t.dark ? "rgba(118,118,128,.24)" : "rgba(118,118,128,.12)"} !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside { top: 28px !important; }
     /* Zijpaneel naast de kaart: zelfde kaartstijl, 16px binnenmarge, 12px tussen kaarten, knoppen van 30px */
-    ui-view.dt-ld-on > .sidecolumn:not(.collapse-sidebar) aside .head-bar { height: 46px !important; line-height: normal !important; padding: 0 8px !important; margin: 0 !important; gap: 8px !important; box-sizing: border-box; border-radius: ${t.glass ? "22px" : "16px"} !important; background: ${ldCard} !important; box-shadow: ${ldShadow} !important; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} }
-    ui-view.dt-ld-on > .sidecolumn:not(.collapse-sidebar) aside .head-bar .tabs { flex: 1; width: auto !important; min-width: 0; height: 30px !important; padding: 2px !important; background: ${t.dark ? "rgba(118,118,128,.24)" : "rgba(118,118,128,.12)"} !important; }
-    ui-view.dt-ld-on > .sidecolumn aside .head-bar .tabs li { height: 26px !important; }
-    ui-view.dt-ld-on > .sidecolumn aside .head-bar .tabs li a { height: 26px !important; line-height: 26px !important; font-size: .8125rem !important; }
-    ui-view.dt-ld-on > .sidecolumn:not(.collapse-sidebar) aside .head-bar .toggle-button { width: 30px !important; height: 30px !important; }
-    ui-view.dt-ld-on > .sidecolumn aside .head-bar .toggle-button { position: static !important; inset: auto !important; margin: 0 !important; flex: none; }
-    ui-view.dt-ld-on > .sidecolumn aside .head-bar mg-aside-toggle:empty { display: none !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn:not(.collapse-sidebar) aside .head-bar { height: 46px !important; line-height: normal !important; padding: 0 8px !important; margin: 0 !important; gap: 8px !important; box-sizing: border-box; border-radius: ${t.glass ? "22px" : "16px"} !important; background: ${ldCard} !important; box-shadow: ${ldShadow} !important; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn:not(.collapse-sidebar) aside .head-bar .tabs { flex: 1; width: auto !important; min-width: 0; height: 30px !important; padding: 2px !important; background: ${t.dark ? "rgba(118,118,128,.24)" : "rgba(118,118,128,.12)"} !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .head-bar .tabs li { height: 26px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .head-bar .tabs li a { height: 26px !important; line-height: 26px !important; font-size: .8125rem !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn:not(.collapse-sidebar) aside .head-bar .toggle-button { width: 30px !important; height: 30px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .head-bar .toggle-button { position: static !important; inset: auto !important; margin: 0 !important; flex: none; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .head-bar mg-aside-toggle:empty { display: none !important; }
     aside .head-bar .toggle-button:focus { outline: 0 !important; }
     aside .head-bar .toggle-button:focus-visible { outline: 2px solid ${t.accent} !important; outline-offset: 2px; }
-    ui-view.dt-ld-on > .sidecolumn:not(.collapse-sidebar) aside { overflow: visible !important; }
-    ui-view.dt-ld-on > .sidecolumn:not(.collapse-sidebar) aside .content-container { margin: 58px -16px 0 !important; padding: 0 16px 24px !important; width: calc(100% + 32px) !important; height: calc(100% - 58px) !important; box-sizing: border-box; scrollbar-width: none; }
-    ui-view.dt-ld-on > .sidecolumn:not(.collapse-sidebar) aside .content-container::-webkit-scrollbar { display: none; }
-    ui-view.dt-ld-on > .sidecolumn aside .widget { padding: 0 0 12px !important; margin: 0 !important; }
-    ui-view.dt-ld-on > .sidecolumn aside .widget > .content-pane { border-radius: ${t.glass ? "22px" : "16px"} !important; background: ${ldCard} !important; box-shadow: ${ldShadow} !important; overflow: hidden; }
-    ui-view.dt-ld-on > .sidecolumn aside .widget > .content-pane > h3, ui-view.dt-ld-on > .sidecolumn aside .widget h3 { height: 44px !important; line-height: 44px !important; padding: 0 44px 0 16px !important; margin: 0 !important; font: 600 .9375rem/44px ${t.font} !important; color: ${t.fg} !important; letter-spacing: -.01em; }
-    ui-view.dt-ld-on > .sidecolumn aside .widget h3 b, ui-view.dt-ld-on > .sidecolumn aside .widget h3 span { font: inherit !important; line-height: inherit !important; }
-    ui-view.dt-ld-on > .sidecolumn aside .widget h3 .fold-toggle, ui-view.dt-ld-on > .sidecolumn aside .widget .fold-toggle { top: 0 !important; right: 4px !important; width: 40px !important; height: 44px !important; line-height: 44px !important; display: grid !important; place-items: center; }
-    ui-view.dt-ld-on > .sidecolumn aside .widget .fold-toggle i { font-size: 12px !important; line-height: 1 !important; width: auto !important; height: auto !important; color: ${t.muted} !important; }
-    ui-view.dt-ld-on > .sidecolumn aside .widget .content { padding: 0 16px 16px !important; }
-    ui-view.dt-ld-on > .sidecolumn aside .widget footer.endlink { padding: 0 16px 16px !important; }
-    ui-view.dt-ld-on > .sidecolumn aside .widget .list li > a > span.value, ui-view.dt-ld-on > .sidecolumn aside .widget .list li .single-line > span.value:first-child { padding-left: 0 !important; }
-    ui-view.dt-ld-on > .sidecolumn aside .widget .list li.no-data { padding-left: 8px !important; padding-right: 8px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn:not(.collapse-sidebar) aside { overflow: visible !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn:not(.collapse-sidebar) aside .content-container { margin: 58px -16px 0 !important; padding: 0 16px 24px !important; width: calc(100% + 32px) !important; height: calc(100% - 58px) !important; box-sizing: border-box; scrollbar-width: none; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn:not(.collapse-sidebar) aside .content-container::-webkit-scrollbar { display: none; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget { padding: 0 0 12px !important; margin: 0 !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget > .content-pane { border-radius: ${t.glass ? "22px" : "16px"} !important; background: ${ldCard} !important; box-shadow: ${ldShadow} !important; overflow: hidden; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget > .content-pane > h3, .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget h3 { height: 44px !important; line-height: 44px !important; padding: 0 44px 0 16px !important; margin: 0 !important; font: 600 .9375rem/44px ${t.font} !important; color: ${t.fg} !important; letter-spacing: -.01em; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget h3 b, .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget h3 span { font: inherit !important; line-height: inherit !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget h3 .fold-toggle, .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget .fold-toggle { top: 0 !important; right: 4px !important; width: 40px !important; height: 44px !important; line-height: 44px !important; display: grid !important; place-items: center; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget .fold-toggle i { font-size: 12px !important; line-height: 1 !important; width: auto !important; height: auto !important; color: ${t.muted} !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget .content { padding: 0 16px 16px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget footer.endlink { padding: 0 16px 16px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget .list li > a > span.value, .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget .list li .single-line > span.value:first-child { padding-left: 0 !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget .list li.no-data { padding-left: 8px !important; padding-right: 8px !important; }
     /* Frame van het leerlingenoverzicht tot de onderrand van het venster (Magister laat 24px marge plus 9px
      * onder het inline-frame vrij); de marge van 24px zit daarna binnen het frame, zodat schaduwen zichtbaar blijven */
     ui-view[name="main"]:has(#guest-app-frame[src*="/op-leerlingen/"]) { padding-top: 16px !important; padding-bottom: 0 !important; }

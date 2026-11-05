@@ -19,6 +19,7 @@ globalThis.DT_DEFAULTS = {
   periodes: { enabled: true, lijst: [] },
   aanwezigexport: { enabled: true },
   leaderboard: { enabled: true },
+  lestools: { enabled: true },
   melding: { enabled: true, coaches: [], to: "", cc: "", name: "", extra: true, afzender: "" },
   links: [
     { label: "Magister Web", url: "https://accounts.magister.net" },

@@ -55,6 +55,7 @@
         "content/modules/periodes.js",
         "content/modules/aanwezigexport.js",
         "content/modules/leaderboard.js",
+        "content/modules/lestools.js",
         "content/boot.js"
       ],
       "css": [
