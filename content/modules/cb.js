@@ -761,10 +761,8 @@ DT.register({
         DT.el("td", { text: K.AANLEIDING[m.aanleiding] || m.aanleiding }),
         DT.el("td", {}, [DT.el("span", { class: `dt-cb-niveau n${n}`, text: n ? `trede ${n}` : "—" }), DT.el("small", { text: ` ${aantal}` })]),
         DT.el("td", { text: `${K.langDatum(m.datum)} ${m.tijd || ""}` }),
-        DT.el("td", { text: m.gemaild ? "gemaild" : st.email ? "nog niet gemaild" : "geen e-mailadres" }),
+        DT.el("td", {}, this.meldActies(DT, m)),
         DT.el("td", { class: "dt-cb-acties" }, [
-          this.knop(DT, "In Magister", () => this.afspraakMaken(m.stamnr, { onderwerp: `Meldafspraak bij de CB'er: ${K.naamVan(st)}`, datum: m.datum, tijd: m.tijd,
-            tekst: `Meldafspraak (${(K.AANLEIDING[m.aanleiding] || m.aanleiding).toLowerCase()}): ${aantal}.${m.aanleidingTekst ? `\n${m.aanleidingTekst}` : ""}\n\nAangemaakt vanuit de Te laat-balie (Tardy).` }), false, "klein"),
           this.knop(DT, "Verschenen", () => { this.rondAf(m, "verschenen"); this.bewaar(); this.teken(); }, false, "klein"),
           this.knop(DT, "Niet", () => this.nietModal(DT, m), false, "klein"),
           this.knop(DT, "Vervalt", () => { this.rondAf(m, "vervallen"); this.bewaar(); this.teken(); }, false, "klein stil")]),
@@ -777,7 +775,7 @@ DT.register({
       DT.el("div", { class: "dt-cb-rij" }, [this.mafSchakel(DT), DT.el("span", { class: "dt-cb-zacht", text: `${lijst.length} ${lijst.length === 1 ? "afspraak" : "afspraken"}` }), this.knop(DT, "Student toevoegen", () => this.handmatigeAfspraak(DT))]),
       balk,
       lijst.length ? DT.el("table", { class: "dt-cb-tabel" }, [
-        DT.el("thead", {}, DT.el("tr", {}, [DT.el("th", {}, alles), ...["Student", "Aanleiding", "Ladder", "Wanneer", "Mail", ""].map((t) => DT.el("th", { text: t }))])),
+        DT.el("thead", {}, DT.el("tr", {}, [DT.el("th", {}, alles), ...["Student", "Aanleiding", "Ladder", "Wanneer", "Notitie · mail · agenda", ""].map((t) => DT.el("th", { text: t }))])),
         ...groepen.map(([titel, r]) => DT.el("tbody", {}, [DT.el("tr", { class: "dt-cb-groepkop" }, DT.el("td", { colspan: "7", text: `${titel} (${r.length})` })), ...r.map(rij)])),
       ]) : DT.el("div", { class: "dt-cb-leeg" }, DT.el("p", { text: "Niemand hoeft zich te melden. Registraties op Melden vullen deze lijst vanzelf." })),
     );
@@ -854,19 +852,12 @@ DT.register({
       hoogst && s && hoogst.key !== s.key && hoogst.niveau > s.niveau
         ? DT.el("p", { class: "dt-cb-waarschuw", text: `Let op: op een andere ladder staat ${K.naamVan(st)} al op ${hoogst.consequentie} (${hoogst.titel}). Die zwaardere stap gaat voor; zie Signalen.` }) : null,
     ].filter(Boolean);
-    const knoppen = [["Sluiten", () => this.sluitModal()]];
-    if (n) {
-      knoppen.unshift(["Afspraak in Magister", () => this.afspraakMaken(m.stamnr, { onderwerp: `Meldafspraak bij de CB'er: ${K.naamVan(st)}`, datum: n.datum, tijd: n.tijd,
-        tekst: `Nieuwe meldafspraak: niet verschenen op ${K.langDatum(m.datum)}.\n\nAangemaakt vanuit de Te laat-balie (Tardy).` })]);
-      knoppen.unshift([n.gemaild ? "✓ Student gemaild" : "Mail student over nieuwe afspraak", () => {
-        const t = this.mailVan("student-meldafspraak", m.stamnr, pid, { datum: n.datum, tijd: n.tijd, melding: n });
-        const a = document.createElement("a");
-        a.href = `mailto:${this.adressen(t.aan)}?subject=${encodeURIComponent(t.onderwerp)}&body=${encodeURIComponent(t.body)}`; a.click();
-        n.gemaild = true; K.S.mails.push({ id: K.uid(), stamnr: m.stamnr, type: t.type, aan: t.aan, onderwerp: t.onderwerp, op: K.vandaag() });
-        this.bewaar(); opnieuw();
-      }]);
-    }
-    this.modal(`Volgende stap voor ${K.naamVan(st)}`, inhoud, knoppen);
+    if (n) inhoud.push(DT.el("div", { class: "dt-cb-stapblok" }, [
+      DT.el("div", { class: "dt-cb-kaartkop" }, [DT.el("b", { text: `Nieuwe meldafspraak: ${K.langDatum(n.datum)} om ${n.tijd}` })]),
+      DT.el("p", { class: "dt-cb-zacht", text: "Leg de nieuwe afspraak vast in het dossier, mail de student (en wie het protocol noemt) en zet hem in de agenda." }),
+      this.meldActies(DT, n, opnieuw, false),
+    ]));
+    this.modal(`Volgende stap voor ${K.naamVan(st)}`, inhoud, [["Sluiten", () => this.sluitModal()]]);
   },
 
   nieuweAfspraakModal(DT, m) {
@@ -1119,6 +1110,7 @@ DT.register({
         this.melding(mee ? `Afgehandeld, met ${mee} lichtere ${mee === 1 ? "stap" : "stappen"} die hierin ${mee === 1 ? "opgaat" : "opgaan"}.` : "Afgehandeld.");
       };
       const heropen = () => { K.zetAfh(s.key, null); this.teken(); };
+      const meldMaken = () => { const m = this.maakMeld(s); this.teken(); this.melding(`Meldafspraak op ${K.langDatum(m.datum)} om ${m.tijd} staat bij Meldafspraken. Daar maak je ook de notitie en de mail.`, "info", 7000); };
       const pct = K.S.lesreg[s.stamnr]?.perioden?.[pid]?.pct;
       const wat = DT.el("div", { class: "dt-cb-sigwat" }, [
         DT.el("div", { class: "dt-cb-sigregel" }, [
@@ -1126,6 +1118,7 @@ DT.register({
           DT.el("span", { class: "dt-cb-sigtitel", text: s.titel }),
           s.ook.length ? DT.el("span", { class: "dt-cb-ookchip", title: s.ook.map((x) => `${ladderNaam(x.soort)}: ${x.consequentie} (${x.titel})`).join("\n"), text: `+${s.ook.length} ${s.ook.length === 1 ? "ladder" : "ladders"}` }) : null,
           pct != null ? DT.el("span", { class: "dt-cb-pct", title: "Aanwezig volgens Magister, deze periode", text: `${pct}%` }) : null,
+          (() => { const m = this.openMeld(s.stamnr); return m ? DT.el("span", { class: "dt-cb-meldchip", title: "Meldafspraak gepland (zie Meldafspraken)", text: `meldt zich ${K.kortDatum(m.datum)} ${m.tijd || ""}` }) : null; })(),
           this.oudersMet18(st) ? DT.el("span", { class: "dt-cb-pct", title: "18+, maar de student gaf in Magister toestemming voor contact met ouders/verzorgers: de mails aan ouders gaan mee", text: "18+ · ouders ✓" }) : null,
         ].filter(Boolean)),
         DT.el("div", { class: "dt-cb-sigmaat", title: s.maatregel, text: s.maatregel }),
@@ -1136,12 +1129,19 @@ DT.register({
         DT.el("div", { class: "dt-cb-sigwie" }, [this.naamKnop(DT, st), DT.el("small", { text: st.klas || "" })]),
         wat,
         isOpen ? null : DT.el("div", { class: "dt-cb-sigknoppen" }, [
+          !s.afgehandeld && this.meldNodig(s) && !this.openMeld(s.stamnr) ? this.ikoonKnop(DT, "meld", "Meldafspraak maken (volgens het protocol): komt in de lijst Meldafspraken", () => meldMaken()) : null,
           this.actieKnoppen(DT, s, st, pid, undefined, true),
           s.afgehandeld ? this.ikoonKnop(DT, "heropen", "Heropen", heropen) : this.ikoonKnop(DT, "af", "Afgehandeld", afhandelen, { hoofd: true }),
         ]),
       ].filter(Boolean));
       const detail = isOpen ? DT.el("div", { class: "dt-cb-sigdetail" }, [
         DT.el("p", { text: s.maatregel }),
+        this.meldNodig(s) || this.openMeld(s.stamnr) ? DT.el("div", { class: "dt-cb-meldregel" }, (() => {
+          const m = this.openMeld(s.stamnr);
+          if (!m) return [DT.el("span", { text: "Volgens het protocol meldt de student zich bij de CB'er. " }), this.knop(DT, "Meldafspraak maken", () => meldMaken(), true, "klein")];
+          return [DT.el("span", { text: `Meldafspraak: ${K.langDatum(m.datum)} om ${m.tijd || ""}. ` }), this.meldActies(DT, m, undefined, false),
+            this.knop(DT, "Naar Meldafspraken", () => this._scherm.bar.querySelector('[data-view="meldafspraken"]')?.click(), false, "klein stil")];
+        })()) : null,
         DT.el("div", { class: "dt-cb-rij dt-cb-detailknoppen" }, [
           this.actieKnoppen(DT, s, st, pid),
           s.afgehandeld ? this.knop(DT, "Heropen", heropen, false, "klein") : this.knop(DT, "Afgehandeld", afhandelen, true, "klein"),
@@ -1381,6 +1381,7 @@ DT.register({
     afspraak: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
     af: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
     heropen: '<path d="M4 12a8 8 0 1 0 2.3-5.6"/><path d="M4 4v4.5h4.5"/>',
+    meld: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/>',
   },
   ikoonKnop(DT, soort, label, fn, { gedaan = false, uit = false, hoofd = false } = {}) {
     const b = DT.el("button", { type: "button", class: `dt-cb-ikoon${gedaan ? " is-gedaan" : ""}${hoofd ? " is-hoofd" : ""}`, title: label, "aria-label": label });
@@ -1544,13 +1545,72 @@ DT.register({
     } catch { this.melding("Ophalen van het adres van ouders/verzorgers lukte niet.", "err"); }
   },
 
+  /* ---------- meldafspraken vanuit het protocol ---------- */
+  /* De periode van een meldafspraak: waarin hij gemaakt is (de afspraak zelf kan al in de volgende periode vallen). */
+  meldPid(m) { const K = TardyKern; return (K.periodeVanDatum(m.gemaaktOp || m.datum) || K.periodeVanDatum(m.datum))?.id || K.UI.periodeId; },
+  openMeld(sn) { return TardyKern.S.meldafspraken.filter((m) => m.stamnr === sn && m.status === "open").sort((a, b) => a.datum.localeCompare(b.datum))[0] || null; },
+  /* Vraagt deze stap (of een lichtere stap van dezelfde ladder die erin opgaat) om een meldafspraak? */
+  meldNodig(s) {
+    const K = TardyKern, l = K.protocolLadder(s.soort);
+    return !!(l?.treden || []).some((tr) => tr.meldafspraak && tr.vanaf <= s.drempel && K.tredeTeller(l, tr) === K.tredeTeller(l, this.tredeVan(s) || tr)) || s.soort === "nietgemeld";
+  },
+  maakMeld(s, { datum, tijd } = {}) {
+    const K = TardyKern;
+    const m = { id: K.uid(), stamnr: s.stamnr, datum: datum || K.volgendeSchooldag(K.vandaag()), tijd: tijd || K.S.instellingen.meldTijd || "08:30",
+      aanleiding: ["telaat", "ongeoorloofd", "nietgemeld"].includes(s.soort) ? s.soort : "handmatig", status: "open", gemaaktOp: K.vandaag(), gemaild: false, signaalKey: s.key };
+    if (m.aanleiding === "handmatig") m.aanleidingTekst = s.titel;
+    K.S.meldafspraken.push(m); this.bewaar();
+    return m;
+  },
+  meldVars(m) {
+    const K = TardyKern, st = K.S.studenten[m.stamnr] || {}, pid = this.meldPid(m), t = K.tellingen(m.stamnr, pid);
+    const vorige = m.vorigeId && K.S.meldafspraken.find((x) => x.id === m.vorigeId);
+    const aanleiding = m.aanleidingTekst || ({ telaat: `${t.teLaat}× te laat`, ongeoorloofd: `${t.ongeoorloofd}× ongeoorloofd`, nietgemeld: `niet verschenen bij de vorige meldafspraak${vorige ? ` (${K.langDatum(vorige.datum)})` : ""}` })[m.aanleiding] || "afspraak met de CB'er";
+    const top = this.perStudent(this.met18(K.hoogsteTreden(K.signalenVoor(m.stamnr, pid))).filter((x) => !x.afgehandeld))[0];
+    return { naam: K.naamVan(st), roepnaam: st.roepnaam || K.naamVan(st), klas: st.klas || "", datum: K.langDatum(m.datum), tijd: m.tijd || "", lokaal: K.S.instellingen.lokaal || "",
+      aanleiding, stap: top ? `${top.consequentie} (${top.titel})` : "", vorige: vorige ? `${K.langDatum(vorige.datum)} om ${vorige.tijd || ""}` : "",
+      stand: this.statsRegel(DT, m.stamnr)?.textContent || "", cb: K.S.instellingen.cbNaam || "de CB'er" };
+  },
+  /* De mails bij een meldafspraak: de uitnodiging aan de student, plus de mails van de protocolstap waar de afspraak uit voortkomt. */
+  meldMails(m) {
+    const K = TardyKern, pid = this.meldPid(m);
+    const sigs = this.met18(K.hoogsteTreden(K.signalenVoor(m.stamnr, pid))).filter((x) => !x.afgehandeld);
+    const s = sigs.find((x) => x.key === m.signaalKey) || sigs.find((x) => x.soort === m.aanleiding);
+    return [...new Set(["student-meldafspraak", ...(s ? this.sigMails(s) : [])])];
+  },
+  /* Notitie, mail en afspraak bij een meldafspraak, met vinkjes (m.acties) zoals bij de signalen. */
+  meldActies(DT, m, naKlik = () => this.teken(), kort = true) {
+    const K = TardyKern, st = K.S.studenten[m.stamnr] || {}, pid = this.meldPid(m), gedaan = m.acties || {};
+    const klaar = (soort) => { (m.acties ||= {})[soort] = new Date().toISOString(); this.bewaar(); naKlik(); };
+    const terug = (soort) => { delete (m.acties || {})[soort]; this.bewaar(); naKlik(); };
+    const mails = this.meldMails(m), vars = this.meldVars(m);
+    const acties = [
+      ["notitie", "Notitie in dossier", () => { const t = this.eigenTekst("meldafspraak", vars); this.notitieMaken(m.stamnr, { omschrijving: t.onderwerp, tekst: t.body, type: DT.settings.cb?.logboekType || "Notitie" }); }],
+      ["mail", `Mail ${[...new Set(mails.map((x) => ({ student: "student", ouders: "ouders", mentor: "mentor", bureau: "verzuimbureau" })[(K.MAILSOORT[x] || {}).aan]))].join(", ")}`,
+        async () => { await this.stuurMails(m.stamnr, mails, pid, { datum: m.datum, tijd: m.tijd, melding: m }); m.gemaild = true; }],
+      ["afspraak", "Afspraak in Magister", () => { const t = this.eigenTekst("meldafspraakAgenda", vars); this.afspraakMaken(m.stamnr, { onderwerp: t.onderwerp, tekst: t.body, datum: m.datum, tijd: m.tijd }); }],
+    ];
+    return DT.el("div", { class: kort ? "dt-cb-acties-in" : "dt-cb-acties3" }, acties.map(([soort, label, fn]) => {
+      const wanneer = gedaan[soort] ? new Date(gedaan[soort]) : null;
+      const titel = wanneer ? `${label}: gedaan op ${wanneer.toLocaleDateString("nl-NL", { day: "numeric", month: "long" })} om ${wanneer.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}. Klik om het opnieuw te doen.` : label;
+      const b = kort ? this.ikoonKnop(DT, soort, titel, async () => { await fn(); klaar(soort); }, { gedaan: !!wanneer })
+        : this.knop(DT, wanneer ? `✓ ${label}` : label, async () => { await fn(); klaar(soort); }, false, `klein${wanneer ? " stil" : ""}`);
+      if (!wanneer) return b;
+      const r = DT.el("button", { type: "button", class: "dt-cb-terug", text: "↺", title: "Terugzetten naar open", "aria-label": `${label} terugzetten` });
+      r.addEventListener("click", (e) => { e.stopPropagation(); terug(soort); });
+      return DT.el("span", { class: "dt-cb-actiegroep" }, [b, r]);
+    }));
+  },
+
   /* Alle mails van deze trede als concept in het eigen mailprogramma (Outlook), en vastleggen in het dossier. */
-  async mailsDirect(s, pid) {
-    const K = TardyKern, st = K.S.studenten[s.stamnr];
-    const soorten = this.sigMails(s);
+  async mailsDirect(s, pid) { return this.stuurMails(s.stamnr, this.sigMails(s), pid); },
+  /* Mails van de gegeven soorten voor één student: als concept in het mailprogramma, of (instelling) als
+   * Magister-bericht voor student, ouders en mentor. extra gaat mee naar de mailtekst (datum/tijd van een meldafspraak). */
+  async stuurMails(sn, soorten, pid, extra) {
+    const K = TardyKern, st = K.S.studenten[sn], s = { stamnr: sn };
     if (soorten.some((t) => (K.MAILSOORT[t] || {}).aan === "ouders")) await this.zorgOuders(st);
     if (soorten.some((t) => (K.MAILSOORT[t] || {}).aan === "mentor") && !K.mentorVan(st).email) await this.mentorUitMagister(st).catch(() => {});
-    const mails = soorten.map((type) => this.mailVan(type, s.stamnr, pid));
+    const mails = soorten.map((type) => this.mailVan(type, s.stamnr, pid, extra));
     /* Via Magister-berichten (instelling): student, ouders en mentor als Magister-bericht; overige (verzuimbureau)
      * blijven een concept in het mailprogramma. */
     if (DT.settings.cb?.berichtenVia === "magister") {
@@ -1866,8 +1926,11 @@ DT.register({
   CB_TEKST: {
     notitie: { onderwerp: "{stap}: {titel}", body: "{titel} in {periode}.\n{stand}\n\nMaatregel volgens het verzuimprotocol: {maatregel}\n\nVastgelegd vanuit de Te laat-balie (Tardy) door {cb}." },
     afspraak: { onderwerp: "{stap}: {naam}", body: "{titel} in {periode}.\n\n{maatregel}\n\nAangemaakt vanuit de Te laat-balie (Tardy)." },
+    meldafspraak: { onderwerp: "Meldafspraak {datum}: {naam}", body: "{naam} ({klas}) meldt zich op {datum} om {tijd} uur bij de CB'er (lokaal {lokaal}).\nAanleiding: {aanleiding}.\n{stap}\n{stand}\n\nVastgelegd vanuit de Te laat-balie (Tardy) door {cb}." },
+    meldafspraakAgenda: { onderwerp: "Meldafspraak bij de CB'er: {naam}", body: "Meldafspraak: {aanleiding}.\n{stap}\n\nAangemaakt vanuit de Te laat-balie (Tardy)." },
   },
-  CB_TEKSTNAAM: { notitie: "Notitie in dossier", afspraak: "Afspraak in Magister" },
+  CB_TEKSTNAAM: { notitie: "Notitie in dossier (signaal)", afspraak: "Afspraak in Magister (signaal)", meldafspraak: "Notitie bij een meldafspraak", meldafspraakAgenda: "Afspraak in Magister (meldafspraak)" },
+  VUL_MELD: ["naam", "roepnaam", "klas", "datum", "tijd", "lokaal", "aanleiding", "stap", "vorige", "stand", "cb"],
   VUL_SIGNAAL: ["naam", "roepnaam", "klas", "stap", "niveau", "titel", "aantal", "maatregel", "periode", "stand", "cb", "datum"],
   VUL_MAIL: ["naam", "roepnaam", "klas", "mentor", "periode", "telaat", "ongeoorloofd", "nietgemeld", "calamiteit", "ziek", "medisch", "datum", "tijd", "lokaal", "school", "cb", "ondertekening"],
   VUL_MAIL_EXTRA: ["klokuren", "medischdatums", "ziek8w"],   // alleen in de extensie; Tardy laat ze staan
@@ -1940,7 +2003,9 @@ DT.register({
       const sig = this.met18(K.hoogsteTreden(K.alleSignalen(K.UI.periodeId)))[0], sn = sig?.stamnr || Object.keys(K.S.studenten)[0];
       if (!sn) { voorbeeld.textContent = "Nog geen studenten voor een voorbeeld."; return; }
       let t;
-      if (isEigen) t = sig ? this.eigenTekst(keuze, this.signaalVars(DT, sig, K.S.studenten[sig.stamnr], K.UI.periodeId)) : { onderwerp: "", body: "Nog geen signaal voor een voorbeeld." };
+      const meld = K.S.meldafspraken.slice(-1)[0];
+      if (isEigen && /^meld/.test(keuze)) t = meld ? this.eigenTekst(keuze, this.meldVars(meld)) : { onderwerp: "", body: "Nog geen meldafspraak voor een voorbeeld." };
+      else if (isEigen) t = sig ? this.eigenTekst(keuze, this.signaalVars(DT, sig, K.S.studenten[sig.stamnr], K.UI.periodeId)) : { onderwerp: "", body: "Nog geen signaal voor een voorbeeld." };
       else t = this.mailVan(keuze, sn, K.UI.periodeId);
       voorbeeld.textContent = `${t.onderwerp}\n\n${t.body}`;
     };
@@ -1955,7 +2020,7 @@ DT.register({
     };
     let laatste = body;
     for (const v of [onderwerp, body]) { v.addEventListener("input", opslaan); v.addEventListener("focus", () => { laatste = v; }); }
-    const lijst = isEigen ? this.VUL_SIGNAAL : [...this.VUL_MAIL, ...this.VUL_MAIL_EXTRA];
+    const lijst = isEigen ? (/^meld/.test(keuze) ? this.VUL_MELD : this.VUL_SIGNAAL) : [...this.VUL_MAIL, ...this.VUL_MAIL_EXTRA];
     const chips = DT.el("div", { class: "dt-cb-chips" }, lijst.map((k) => {
       const b = DT.el("button", { type: "button", class: "dt-cb-chip", text: `%${k}%`, title: this.VUL_MAIL_EXTRA.includes(k) ? "Werkt alleen in de extensie; de Tardy-app laat deze plaatshouder staan" : `Invoegen op de plek van de cursor` });
       if (!isEigen && this.VUL_MAIL_EXTRA.includes(k)) b.classList.add("is-extra");
@@ -2216,7 +2281,10 @@ DT.register({
       .dt-cb-vink { position: absolute; right: -5px; top: -6px; width: 15px; height: 15px; border-radius: 50%; background: var(--cb-groen); color: #fff; font-size: 10px; line-height: 15px; text-align: center; font-weight: 700; }
       .dt-cb-sigknoppen .dt-cb-acties-in { gap: 6px; }
       .dt-cb-sig.is-open .dt-cb-sigmaat { display: none; }
-      .dt-cb-detailknoppen { margin: 0 0 10px; } .dt-cb-detailknoppen .dt-cb-acties3 { margin: 0; }
+      .dt-cb-detailknoppen { margin: 0 0 10px; }
+      .dt-cb-meldchip { flex: none; font-size: 12px !important; line-height: 18px; padding: 0 6px; border-radius: 999px; background: #ddeffe; color: #0b4f8a; }
+      .dt-cb-meldregel { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0 0 10px; padding: 8px 10px; border-radius: var(--cb-r); background: color-mix(in srgb, var(--cb-acc) 8%, var(--cb-kaart)); font-size: 14px; }
+      .dt-cb-meldregel .dt-cb-acties3 { margin: 0; padding: 0; border: 0; } .dt-cb-detailknoppen .dt-cb-acties3 { margin: 0; }
       .dt-cb-voorbeeld { margin: 0; padding: 12px; border-radius: var(--cb-r); background: var(--cb-vlak); border: 1px solid var(--cb-lijnzacht); white-space: pre-wrap; font: 13px/19px var(--sl-text-typeset-font-family-body, open-sans), sans-serif; max-height: 320px; overflow: auto; }
       .dt-cb-chip.is-extra { border-style: dashed; }
       .dt-cb-acties3 { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; padding: 8px; border-radius: var(--cb-r); border: 1px dashed var(--cb-lijnzacht); }
