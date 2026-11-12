@@ -18,6 +18,8 @@ globalThis.DT_DEFAULTS = {
   /* Eigen periodes (bijv. onderwijsperiodes): { id, naam, begin: "JJJJ-MM-DD", einde: "JJJJ-MM-DD" } */
   periodes: { enabled: true, lijst: [] },
   aanwezigexport: { enabled: true },
+  /* Lesregistraties: aanwezigheid van klassen per vak/docent over een periode (zijpaneel › Acties). */
+  lesreg: { enabled: true },
   leaderboard: { enabled: true },
   lestools: { enabled: true },
   /* Plan van aanpak bij Begeleiding › Logboek van een student (SLB). Concepten blijven in deze browser. */
@@ -53,6 +55,7 @@ globalThis.DT_MODULES_LIST = [
   ["verzuiminzicht", "Inzicht verzuim", "Tabblad op Verzuim", "#AF52DE"],
   ["periodes", "Periodes", "Eigen periodes in verzuimoverzichten", "#5856D6"],
   ["aanwezigexport", "Aanwezigheid naar Excel", "Per leerling en per klas", "#34C759"],
+  ["lesreg", "Lesregistraties", "Klassen per vak of docent", "#30B0C7"],
   ["pva", "Plan van aanpak", "Bij Begeleiding van een student", "#FF9500"],
   ["melding", "Mail bij melding", "Concept naar de coach", "#FF3B30"],
   ["ai", "AI-hulp", "Prompt uit tabel of selectie", "#A2845E"],
