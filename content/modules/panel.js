@@ -147,7 +147,7 @@ DT.register({
           ["export", "Excel", "Alt+E", () => DT.module("tables")?.exportAll(DT)],
           ["mail", "Mail coach", "Alt+M", () => DT.module("melding")?.trigger(DT)],
           ...(DT.settings.aanwezigexport?.enabled !== false ? [["aanwezigexport", "Klas → Excel", "", () => { this.toggle(false); DT.module("aanwezigexport")?.klas(DT); }]] : []),
-          ...(DT.settings.lesreg?.enabled !== false ? [["aanwezigexport", "Lesregistraties", "", () => { this.toggle(false); DT.module("lesreg")?.open(DT); }]] : []),
+          ...(DT.settings.lesreg?.enabled !== false ? [["aanwezigexport", "Lesregistraties", "", () => { this.toggle(false); DT.module("lesreg")?.open(DT, null); }]] : []),
           ...(DT.settings.aanwezigexport?.enabled !== false ? [["aanwezigexport", "Bespreeklijst", "", () => { this.toggle(false); DT.module("aanwezigexport")?.bespreeklijst(DT); }]] : []),
           ...(DT.settings.cb?.enabled ? [["cb", "Te laat-balie", "", () => { this.toggle(false); DT.module("cb")?.open(DT); }]] : []),
           DT.settings.developer?.enabled ? ["inspector", "Inspector", "Alt+I", () => { this.toggle(false); DT.module("inspector")?.start(DT); }] : ["options", "Instellingen", "", () => chrome.runtime.sendMessage({ type: "openOptions" })]

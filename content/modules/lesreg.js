@@ -1,6 +1,6 @@
 /* Lesregistraties: aanwezigheid van één of meer klassen, per vak of docent, over een instelbare periode.
  *
- * Zijpaneel › Acties › Lesregistraties. Kies klassen (uit Magister) en een periode; per student worden het
+ * Aanwezigheid › tegel Lesregistraties (een subpagina zoals het leaderboard), of zijpaneel › Acties › Lesregistraties. Kies klassen (uit Magister) en een periode; per student worden het
  * rooster en de registraties opgehaald (dezelfde bron en berekening als Inzicht: vzStats in verzuiminzicht.js).
  * Daarna filter je direct op vak en/of docent en bekijk je:
  *  - Per student: lessen, aanwezig, te laat, gemist, ziek, ongeoorloofd, uitgestuurd en aanwezig %;
@@ -10,8 +10,44 @@
  * Magister gewijzigd; alles via je eigen Magister-sessie. */
 DT.register({
   id: "lesreg",
-  init() {},
-  destroy() { this._dlg?.remove(); this._dlg = null; },
+  init(DT) {
+    if (!DT.isTop) return;
+    this._stop = DT.observe(() => this.mount(DT), { debounce: 300, poll: 1500 });
+    this._hash = () => { if (this._dlg?.classList.contains("is-pagina") && !/^#\/aanwezigheid\/?$/.test(location.hash)) this.sluit(); };
+    window.addEventListener("hashchange", this._hash);
+  },
+  destroy() {
+    this._stop && this._stop(); window.removeEventListener("hashchange", this._hash);
+    this.sluit(); DT.deepQueryAll("#dt-lr-tegel").forEach((el) => el.remove());
+  },
+  sluit() { this._dlg?.remove(); this._dlg = null; document.querySelectorAll(".dt-lr-open").forEach((el) => el.classList.remove("dt-lr-open")); },
+
+  /* ---------- tegel op Aanwezigheid ---------- */
+  mount(DT) {
+    const wrap = DT.deepQuery("att-attendance-dashboard")?.shadowRoot?.querySelector(".wrapper");
+    if (this._dlg?.classList.contains("is-pagina") && (!this._dlg.isConnected || !document.querySelector("mg-att-tiles"))) this.sluit();
+    let wil = false; try { wil = sessionStorage.getItem("dt-lr-open") === "1"; } catch {}
+    if (wil && document.querySelector("mg-att-tiles") && !this._dlg) { try { sessionStorage.removeItem("dt-lr-open"); } catch {} this.open(DT, true); }
+    const oud = wrap?.querySelector("#dt-lr-tegel");
+    if (oud && oud.shadowRoot?.querySelector("h1")?.textContent.trim() !== "Lesregistraties") window.postMessage({ type: "dt:attr:opnieuw", selector: "#dt-lr-tegel", attr: "heading" }, "*");
+    if (!wrap || oud) return;
+    const c = document.createElement("dna-link-card");
+    c.id = "dt-lr-tegel"; c.setAttribute("heading", "Lesregistraties"); c.setAttribute("tabindex", "0"); c.setAttribute("role", "link"); c.style.cursor = "pointer";
+    const oms = document.createElement("div"); oms.slot = "description"; oms.textContent = "Aanwezigheid van klassen per vak of docent, met export";
+    const ic = document.createElement("dna-icon"); ic.slot = "icon"; ic.setAttribute("name", "fad-traffic-light");
+    c.append(oms, ic);
+    const open = (e) => { e.preventDefault(); e.stopPropagation(); this.open(DT, true); };
+    c.addEventListener("click", open);
+    c.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") open(e); });
+    wrap.append(c);
+    this.icoon(ic);
+  },
+  icoon(ic, poging = 0) {   // tabel met vinkjes, in Magisters duotone-stijl
+    const svg = ic.shadowRoot?.querySelector("svg");
+    if (!svg) { if (poging < 20) setTimeout(() => this.icoon(ic, poging + 1), 150); return; }
+    svg.setAttribute("viewBox", "0 0 512 512");
+    svg.innerHTML = `<path opacity=".4" d="M64 96h384v320H64z"></path><path d="M48 64h416a32 32 0 0 1 32 32v320a32 32 0 0 1-32 32H48a32 32 0 0 1-32-32V96a32 32 0 0 1 32-32zm16 64v64h96v-64H64zm144 0v64h240v-64H208zM64 240v64h96v-64H64zm144 0v64h240v-64H208zM64 352v64h96v-64H64zm144 0v64h240v-64H208z"></path>`;
+  },
 
   ymd(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; },
   sj(nu = new Date()) { return new Date(nu.getFullYear() - (nu.getMonth() < 7 ? 1 : 0), 7, 1); },
@@ -34,8 +70,16 @@ DT.register({
   },
 
   /* ---------- venster ---------- */
-  async open(DT) {
+  async open(DT, pagina = null) {
     if (this._dlg) return;
+    /* Vanuit het zijpaneel: naar Aanwezigheid en daar de subpagina openen. */
+    if (pagina === null) {
+      if (!/^#\/aanwezigheid\/?$/.test(location.hash) || !document.querySelector("mg-att-tiles")) {
+        try { sessionStorage.setItem("dt-lr-open", "1"); } catch {}
+        location.hash = "#/aanwezigheid"; return;
+      }
+      pagina = true;
+    }
     this.css();
     const peil = this.ymd(new Date());
     let r = await DT.api(`/api/leerlingen/zoeken/filters?q=**&peildatum=${peil}`, { full: true, timeout: 12000 });
@@ -64,8 +108,8 @@ DT.register({
     const start = DT.el("button", { type: "button", class: "dt-lr-btn is-hoofd", text: "Ophalen" });
     const sluit = DT.el("button", { type: "button", class: "dt-lr-btn", text: "Sluiten" });
     let afbreken = false, bezig = false;
-    const weg = () => { afbreken = true; dlg.remove(); this._dlg = null; document.removeEventListener("keydown", esc, true); };
-    const esc = (e) => { if (e.key === "Escape") { e.stopPropagation(); weg(); } };
+    const weg = () => { afbreken = true; document.removeEventListener("keydown", esc, true); this.sluit(); };
+    const esc = (e) => { if (e.key === "Escape" && !pagina) { e.stopPropagation(); weg(); } };
     sluit.addEventListener("click", weg);
     document.addEventListener("keydown", esc, true);
     start.addEventListener("click", async () => {
@@ -86,17 +130,28 @@ DT.register({
       } catch (e) { if (String(e.message) !== "afgebroken") status.textContent = `Er ging iets mis: ${e.message || e}`; }
       bezig = false; start.disabled = false;
     });
-    const dlg = DT.el("div", { class: "dt-lr", role: "dialog", "aria-modal": "true", "aria-label": "Lesregistraties" }, DT.el("div", { class: "dt-lr-paneel" }, [
-      DT.el("div", { class: "dt-lr-kop" }, [DT.el("h2", { text: "Lesregistraties" }), DT.el("span", { class: "dt-lr-zacht", text: "aanwezigheid per klas, vak en docent" })]),
+    const terug = DT.el("a", { href: "#/aanwezigheid", class: "dt-lr-crumb", text: "Aanwezigheid" });
+    terug.addEventListener("click", (e) => { e.preventDefault(); weg(); });
+    const kop = pagina
+      ? DT.el("div", { class: "dt-lr-kop is-pagina" }, [DT.el("nav", { class: "dt-lr-crumbs", "aria-label": "Kruimelpad" }, [terug, DT.el("span", { "aria-hidden": "true", text: "›" }), DT.el("span", { text: "Lesregistraties" })]),
+          DT.el("h1", { html: `Lesregistraties<span class="dt-lr-punt">.</span>` }), DT.el("span", { class: "dt-lr-zacht", text: "Aanwezigheid van één of meer klassen per vak of docent, over een periode die je kiest." })])
+      : DT.el("div", { class: "dt-lr-kop" }, [DT.el("h2", { text: "Lesregistraties" }), DT.el("span", { class: "dt-lr-zacht", text: "aanwezigheid per klas, vak en docent" })]);
+    const dlg = DT.el(pagina ? "section" : "div", { class: `dt-lr${pagina ? " is-pagina" : ""}`, ...(pagina ? { "aria-label": "Lesregistraties" } : { role: "dialog", "aria-modal": "true", "aria-label": "Lesregistraties" }) }, DT.el("div", { class: "dt-lr-paneel" }, [
+      kop,
       DT.el("div", { class: "dt-lr-keuzes" }, [
         DT.el("div", { class: "dt-lr-label" }, [DT.el("span", { text: "Klassen" }), chips]),
         DT.el("div", { class: "dt-lr-rij" }, [DT.el("label", { class: "dt-lr-label" }, [DT.el("span", { text: "Periode" }), per]), eigen, start]),
         balk, status,
       ]),
       resultaat,
-      DT.el("div", { class: "dt-lr-voet" }, [sluit]),
-    ]));
-    document.body.append(dlg); this._dlg = dlg;
+      pagina ? null : DT.el("div", { class: "dt-lr-voet" }, [sluit]),
+    ].filter(Boolean)));
+    if (pagina) {
+      const tiles = document.querySelector("mg-att-tiles"), uv = tiles?.parentElement;
+      if (!uv) return;
+      uv.classList.add("dt-lr-open"); tiles.after(dlg);
+    } else document.body.append(dlg);
+    this._dlg = dlg;
   },
 
   /* ---------- ophalen ---------- */
@@ -249,34 +304,41 @@ DT.register({
     if (document.getElementById("dt-lr-style")) return;
     const st = document.createElement("style"); st.id = "dt-lr-style";
     st.textContent = `
-      .dt-lr { position: fixed; inset: 0; z-index: 2000; display: grid; place-items: center; background: rgba(34,34,34,.55); font: 14px/20px open-sans, sans-serif; color: #25292f; }
-      .dt-lr-paneel { width: min(1240px, calc(100vw - 32px)); height: calc(100vh - 32px); display: flex; flex-direction: column; background: #fff; border-radius: 8px; box-shadow: 0 12px 32px rgba(0,0,0,.25); overflow: hidden; }
-      .dt-lr-kop { display: flex; align-items: baseline; gap: 12px; padding: 14px 20px; border-bottom: 1px solid #e0e6ea; } .dt-lr-kop h2 { margin: 0; font-size: 18px; color: #0b385c; }
-      .dt-lr-keuzes { padding: 12px 20px; border-bottom: 1px solid #e0e6ea; background: #f6f8fa; display: flex; flex-direction: column; gap: 8px; }
+      ui-view.dt-lr-open > mg-att-tiles { display: none !important; }
+      .dt-lr.is-pagina { position: static; inset: auto; display: block; background: none; padding: 24px 24px 32px; }
+      .dt-lr.is-pagina .dt-lr-paneel { width: auto; max-width: 1200px; height: auto; min-height: 0; margin: 0 auto; box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 8px 24px rgba(0,0,0,.06); border: 1px solid var(--sl-color-card-border, var(--dt-line, #e0e6ea)); }
+      .dt-lr.is-pagina .dt-lr-resultaat { min-height: 0; } .dt-lr.is-pagina .dt-lr-scroll { flex: none; max-height: 62vh; }
+      .dt-lr-kop.is-pagina { flex-direction: column; align-items: flex-start; gap: 4px; }
+      .dt-lr-kop h1 { margin: 0; font-size: 1.75rem; line-height: 2.125rem; font-weight: 700; color: var(--dt-fg, #0b385c); } .dt-lr-punt { color: #ff8a00; }
+      .dt-lr-crumbs { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--dt-muted, #59636e); } .dt-lr-crumbs a { color: var(--dt-accent, #056dc2); text-decoration: none; }
+      .dt-lr { position: fixed; inset: 0; z-index: 2000; display: grid; place-items: center; background: rgba(34,34,34,.55); font: 14px/20px var(--dt-font, open-sans), sans-serif; color: var(--dt-fg, #25292f); }
+      .dt-lr-paneel { width: min(1240px, calc(100vw - 32px)); height: calc(100vh - 32px); display: flex; flex-direction: column; background: var(--dt-bg, #fff); border-radius: 8px; box-shadow: 0 12px 32px rgba(0,0,0,.25); overflow: hidden; }
+      .dt-lr-kop { display: flex; align-items: baseline; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--dt-line, #e0e6ea); } .dt-lr-kop h2 { margin: 0; font-size: 18px; color: var(--dt-fg, #0b385c); }
+      .dt-lr-keuzes { padding: 12px 20px; border-bottom: 1px solid var(--dt-line, #e0e6ea); background: color-mix(in srgb, var(--dt-fg, #25292f) 4%, var(--dt-bg, #fff)); display: flex; flex-direction: column; gap: 8px; }
       .dt-lr-resultaat { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 12px 20px; }
-      .dt-lr-voet { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 20px; border-top: 1px solid #e0e6ea; background: #f6f8fa; }
+      .dt-lr-voet { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 20px; border-top: 1px solid var(--dt-line, #e0e6ea); background: color-mix(in srgb, var(--dt-fg, #25292f) 4%, var(--dt-bg, #fff)); }
       .dt-lr-rij { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; }
       .dt-lr-label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; }
-      .dt-lr-veld { min-height: 32px; padding: 4px 8px; border: 1px solid #818b98; border-radius: 4px; background: #fff; font: 400 14px/20px open-sans, sans-serif; color: #25292f; }
+      .dt-lr-veld { min-height: 32px; padding: 4px 8px; border: 1px solid var(--dt-line, #818b98); border-radius: 4px; background: var(--dt-bg, #fff); font: 400 14px/20px open-sans, sans-serif; color: var(--dt-fg, #25292f); }
       select[multiple].dt-lr-veld { min-width: 260px; }
       .dt-lr-eigen { display: inline-flex; align-items: center; gap: 6px; }
       .dt-lr-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-      .dt-lr-chip { height: 30px; padding: 0 12px; border: 1px solid #c8d1da; border-radius: 999px; background: #fff; font: 13px open-sans, sans-serif; cursor: pointer; }
-      .dt-lr-chip[aria-pressed="true"] { background: #b7defd; border-color: #056dc2; font-weight: 700; }
-      .dt-lr-btn { height: 34px; padding: 0 14px; border: 1px solid #056dc2; border-radius: 4px; background: #fff; color: #056dc2; font: 600 14px/32px open-sans, sans-serif; cursor: pointer; }
-      .dt-lr-btn.is-hoofd { background: #056dc2; color: #fff; } .dt-lr-btn:disabled { opacity: .5; cursor: default; }
-      .dt-lr-link { border: 0; background: none; padding: 0; color: #056dc2; font: 600 12px open-sans, sans-serif; cursor: pointer; }
-      .dt-lr-balk { height: 4px; border-radius: 2px; background: #e0e6ea; overflow: hidden; } .dt-lr-balk i { display: block; height: 100%; width: 0; background: #056dc2; transition: width .2s; }
-      .dt-lr-status, .dt-lr-zacht { color: #59636e; font-size: 13px; margin: 0; }
+      .dt-lr-chip { height: 30px; padding: 0 12px; border: 1px solid var(--dt-line, #c8d1da); border-radius: 999px; background: var(--dt-bg, #fff); font: 13px open-sans, sans-serif; cursor: pointer; }
+      .dt-lr-chip[aria-pressed="true"] { background: color-mix(in srgb, var(--dt-accent, var(--dt-accent, #056dc2)) 22%, var(--dt-bg, #fff)); border-color: var(--dt-accent, #056dc2); font-weight: 700; }
+      .dt-lr-btn { height: 34px; padding: 0 14px; border: 1px solid var(--dt-accent, #056dc2); border-radius: 4px; background: var(--dt-bg, #fff); color: var(--dt-accent, #056dc2); font: 600 14px/32px open-sans, sans-serif; cursor: pointer; }
+      .dt-lr-btn.is-hoofd { background: var(--dt-accent, #056dc2); color: #fff; } .dt-lr-btn:disabled { opacity: .5; cursor: default; }
+      .dt-lr-link { border: 0; background: none; padding: 0; color: var(--dt-accent, #056dc2); font: 600 12px open-sans, sans-serif; cursor: pointer; }
+      .dt-lr-balk { height: 4px; border-radius: 2px; background: var(--dt-line, #e0e6ea); overflow: hidden; } .dt-lr-balk i { display: block; height: 100%; width: 0; background: var(--dt-accent, #056dc2); transition: width .2s; }
+      .dt-lr-status, .dt-lr-zacht { color: var(--dt-muted, #59636e); font-size: 13px; margin: 0; }
       .dt-lr-filters { display: flex; flex-wrap: wrap; gap: 16px; }
-      .dt-lr-tabs { display: inline-flex; border: 1px solid #c8d1da; border-radius: 4px; overflow: hidden; }
-      .dt-lr-tab { border: 0; border-right: 1px solid #c8d1da; background: #fff; padding: 6px 14px; font: 13px open-sans, sans-serif; cursor: pointer; } .dt-lr-tab:last-child { border-right: 0; }
-      .dt-lr-tab[aria-pressed="true"] { background: #056dc2; color: #fff; font-weight: 700; }
-      .dt-lr-scroll { flex: 1; min-height: 0; overflow: auto; border: 1px solid #e0e6ea; border-radius: 4px; }
+      .dt-lr-tabs { display: inline-flex; border: 1px solid var(--dt-line, #c8d1da); border-radius: 4px; overflow: hidden; }
+      .dt-lr-tab { border: 0; border-right: 1px solid var(--dt-line, #c8d1da); background: var(--dt-bg, #fff); padding: 6px 14px; font: 13px open-sans, sans-serif; cursor: pointer; } .dt-lr-tab:last-child { border-right: 0; }
+      .dt-lr-tab[aria-pressed="true"] { background: var(--dt-accent, #056dc2); color: #fff; font-weight: 700; }
+      .dt-lr-scroll { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--dt-line, #e0e6ea); border-radius: 4px; }
       .dt-lr-tabel { width: 100%; border-collapse: collapse; font-size: 13px; }
-      .dt-lr-tabel th { position: sticky; top: 0; background: #f6f8fa; text-align: left; font-size: 12px; color: #59636e; padding: 6px 8px; border-bottom: 1px solid #c8d1da; white-space: nowrap; }
-      .dt-lr-tabel td { padding: 5px 8px; border-bottom: 1px solid #f0f2f5; vertical-align: top; } .dt-lr-tabel td.getal { text-align: right; font-variant-numeric: tabular-nums; }
-      .dt-lr-tabel td.is-laag { color: #c70e13; font-weight: 700; } .dt-lr-tabel td.lijst { font-size: 12px; color: #393f46; max-width: 360px; }
+      .dt-lr-tabel th { position: sticky; top: 0; background: color-mix(in srgb, var(--dt-fg, #25292f) 4%, var(--dt-bg, #fff)); text-align: left; font-size: 12px; color: var(--dt-muted, #59636e); padding: 6px 8px; border-bottom: 1px solid var(--dt-line, #c8d1da); white-space: nowrap; }
+      .dt-lr-tabel td { padding: 5px 8px; border-bottom: 1px solid var(--dt-line, #f0f2f5); vertical-align: top; } .dt-lr-tabel td.getal { text-align: right; font-variant-numeric: tabular-nums; }
+      .dt-lr-tabel td.is-laag { color: #c70e13; font-weight: 700; } .dt-lr-tabel td.lijst { font-size: 12px; color: var(--dt-fg, #393f46); max-width: 360px; }
     `;
     document.head.append(st);
   },
