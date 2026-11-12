@@ -38,17 +38,28 @@ DT.register({
     const id = this.leerlingId();
     const host = id && DT.deepQuery("att-dk-attendance");
     const root = host && host.shadowRoot;
-    const tabs = root && root.querySelector("dna-tabs");
-    const bar = tabs && tabs.querySelector("dna-tab-bar");
+    /* Magister gebruikt hier sinds kort sl-tab-group (sl-tab/sl-tab-panel); de oude dna-tabs blijven ondersteund. */
+    const tabs = root && (root.querySelector("sl-tab-group") || root.querySelector("dna-tabs"));
+    const sl = tabs?.localName === "sl-tab-group";
+    const bar = sl ? tabs : tabs && tabs.querySelector("dna-tab-bar");
     if (!bar) { if (this._btn) { this.deactivate(); this._btn.remove(); this._btn2?.remove(); this._panel?.remove(); this._btn = this._btn2 = this._panel = null; } return; }
     if (this._root !== root || !this._btn || !this._btn.isConnected) {
       this.deactivate();
       this._root = root;
       this.css(root);
+      this._sl = sl;
       const knop = (tekst, view) => {
-        const b = document.createElement("button");
-        b.type = "button"; b.className = "dt-vz-tabbtn"; b.textContent = tekst; b.dataset.view = view;
-        b.setAttribute("role", "tab");
+        let b;
+        if (sl) {
+          /* Een echt sl-tab, aangemaakt via de shadow root zodat Magisters eigen (scoped) registry het opbouwt:
+           * zelfde uiterlijk als Lesregistraties en Meldingen. De klik gaat niet door naar de tab-group. */
+          b = typeof root.createElement === "function" ? root.createElement("sl-tab") : document.createElement("sl-tab");
+          b.slot = "tabs"; b.classList.add("dt-vz-sltab");
+        } else {
+          b = document.createElement("button");
+          b.type = "button"; b.className = "dt-vz-tabbtn"; b.setAttribute("role", "tab");
+        }
+        b.textContent = tekst; b.dataset.view = view;
         b.addEventListener("click", (e) => { e.stopPropagation(); this.activate(DT, view); });
         return b;
       };
@@ -56,7 +67,7 @@ DT.register({
       this._btn = knop("Inzicht", "inzicht");
       this._btn2 = knop("Vergelijken", "vergelijk");
       bar.append(this._btn, this._btn2);
-      bar.addEventListener("click", (e) => { if (e.target.closest("dna-tab-button")) this.deactivate(); });
+      bar.addEventListener("click", (e) => { const t = e.target.closest(sl ? "sl-tab" : "dna-tab-button"); if (t && !t.dataset.view) this.deactivate(); });
       this._panel?.remove();
       this._panel = document.createElement("div"); this._panel.id = "dt-vz"; this._panel.hidden = true;
       tabs.after(this._panel);
@@ -72,9 +83,16 @@ DT.register({
     this._active = true; this._view = view; sessionStorage.setItem("dt-vz-active", view);
     this._btn.classList.toggle("is-active", view === "inzicht");
     this._btn2?.classList.toggle("is-active", view === "vergelijk");
-    const tabs = this._root.querySelector("dna-tabs");
-    tabs?.querySelector("dna-tab-bar")?.classList.add("dt-vz-on");
-    for (const t of tabs?.querySelectorAll(":scope > dna-tab, :scope > [slot='tab']") || []) { t.dataset.dtVzHidden = "1"; t.style.display = "none"; }
+    if (this._sl) {
+      const g = this._root.querySelector("sl-tab-group");
+      for (const t of g?.querySelectorAll(":scope > sl-tab[selected]") || []) if (!t.dataset.view) { t.dataset.dtVzSel = "1"; t.removeAttribute("selected"); }
+      this._btn.toggleAttribute("selected", view === "inzicht"); this._btn2?.toggleAttribute("selected", view === "vergelijk");
+      for (const t of g?.querySelectorAll(":scope > sl-tab-panel") || []) { t.dataset.dtVzHidden = "1"; t.style.display = "none"; }
+    } else {
+      const tabs = this._root.querySelector("dna-tabs");
+      tabs?.querySelector("dna-tab-bar")?.classList.add("dt-vz-on");
+      for (const t of tabs?.querySelectorAll(":scope > dna-tab, :scope > [slot='tab']") || []) { t.dataset.dtVzHidden = "1"; t.style.display = "none"; }
+    }
     this._panel.hidden = false;
     this.load(DT);
   },
@@ -83,9 +101,21 @@ DT.register({
     if (!this._active) return;
     this._active = false; sessionStorage.removeItem("dt-vz-active");
     this._btn?.classList.remove("is-active"); this._btn2?.classList.remove("is-active");
-    const tabs = this._root?.querySelector("dna-tabs");
-    tabs?.querySelector("dna-tab-bar")?.classList.remove("dt-vz-on");
-    for (const t of tabs?.querySelectorAll("[data-dt-vz-hidden]") || []) { t.style.display = ""; delete t.dataset.dtVzHidden; }
+    if (this._sl) {
+      const g = this._root?.querySelector("sl-tab-group");
+      this._btn?.removeAttribute("selected"); this._btn2?.removeAttribute("selected");
+      for (const t of g?.querySelectorAll("[data-dt-vz-hidden]") || []) { t.style.display = ""; delete t.dataset.dtVzHidden; }
+      /* Klikte je een Magister-tab aan, dan zet Magister die zelf; anders het oude tabblad terugzetten. */
+      setTimeout(() => {
+        const terug = [...(g?.querySelectorAll(":scope > sl-tab[data-dt-vz-sel]") || [])];
+        if (!g?.querySelector(":scope > sl-tab[selected]:not([data-view])")) terug.forEach((t) => t.setAttribute("selected", ""));
+        terug.forEach((t) => delete t.dataset.dtVzSel);
+      }, 0);
+    } else {
+      const tabs = this._root?.querySelector("dna-tabs");
+      tabs?.querySelector("dna-tab-bar")?.classList.remove("dt-vz-on");
+      for (const t of tabs?.querySelectorAll("[data-dt-vz-hidden]") || []) { t.style.display = ""; delete t.dataset.dtVzHidden; }
+    }
     if (this._panel) this._panel.hidden = true;
   },
 
