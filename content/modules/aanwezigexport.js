@@ -113,11 +113,16 @@ DT.register({
     if (filter && rows.length > 1) ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length - 1, c: rows[0].length - 1 } }) };
     return ws;
   },
-  schrijf(DT, naam, bladen) {
+  schrijf(DT, naam, bladen, visueel = null) {
     if (typeof XLSX === "undefined") return DT.toast("Excel-bibliotheek niet geladen", "err");
     const wb = XLSX.utils.book_new();
     for (const [titel, ws] of bladen) XLSX.utils.book_append_sheet(wb, ws, titel.slice(0, 31));
-    XLSX.writeFile(wb, `${this.bestandsnaam(naam)}.xlsx`);
+    /* Kleurschaal, databalken en grafieken (xlsx-visueel.js); lukt dat niet, dan de gewone export. */
+    let klaar = false;
+    if (visueel && typeof XlsxVisueel !== "undefined") {
+      try { XlsxVisueel.download(XlsxVisueel.maak(wb, visueel), `${this.bestandsnaam(naam)}.xlsx`); klaar = true; } catch (e) { console.warn("[Docent Tools] Excel-opmaak mislukt", e); }
+    }
+    if (!klaar) XLSX.writeFile(wb, `${this.bestandsnaam(naam)}.xlsx`);
     DT.toast("Excel-bestand gedownload", "ok");
   },
   toelichting(extra = []) {
@@ -308,7 +313,8 @@ DT.register({
         uitkomst.replaceChildren(DT.el("table", { class: "dt-bl-tabel" }, [
           DT.el("thead", {}, DT.el("tr", {}, ["Student", "Aanwezig", "Lessen", "Gemist", "Ziek", "Ongeoorl.", "Te laat", "Plan van aanpak"].map((t) => DT.el("th", { text: t })))),
           DT.el("tbody", {}, rijen.map(({ l, T, open, plannen }) => DT.el("tr", { class: T?.telt && T.pct < n ? (T.pct < n - 10 ? "is-rood" : "is-oranje") : "" }, [
-            td(l.naam), td(T?.telt ? `${T.pct}%` : "—", "getal"), td(T?.telt ?? "", "getal"), td(T?.afwezig ?? "", "getal"), td(T?.ziek ?? "", "getal"), td(T?.ongeoorloofd ?? "", "getal"), td(T?.teLaat ?? "", "getal"),
+            td(l.naam), (() => { const c = DT.el("td", { class: "getal dt-bl-pct" }); if (!T?.telt) { c.textContent = "—"; return c; } const k = T.pct < 70 ? "#e5484d" : T.pct < 80 ? "#f5a524" : T.pct < 90 ? "#9bc53d" : "#2fa36b";
+              c.append(DT.el("span", { class: "dt-bl-balk" }, DT.el("i", { style: `width:${T.pct}%;background:${k}` })), DT.el("b", { text: `${T.pct}%` })); return c; })(), td(T?.telt ?? "", "getal"), td(T?.afwezig ?? "", "getal"), td(T?.ziek ?? "", "getal"), td(T?.ongeoorloofd ?? "", "getal"), td(T?.teLaat ?? "", "getal"),
             td(open ? `evaluatie ${open.e.datum < peil ? "verlopen" : ""} ${open.e.datum.split("-").reverse().join("-")}`.replace("  ", " ") : plannen ? `${plannen} plan${plannen === 1 ? "" : "nen"}, afgerond` : "", open && open.e.datum < peil ? "is-laat" : ""),
           ]))),
         ]), DT.el("p", { class: "dt-xk-hint", text: `Oranje: onder ${n}%. Rood: meer dan 10 procentpunt onder de norm. Plannen van aanpak komen uit deze browser.` }));
@@ -321,7 +327,10 @@ DT.register({
       const kop = ["Student", "Stamnummer", "Aanwezig %", "Lessen (tellen mee)", "Gemist", "Ziek", "Ongeoorloofd", "Te laat", "Onder norm", "Plannen van aanpak", "Eerstvolgende evaluatie"];
       const rijen = data.rijen.map(({ l, T, open, plannen }) => [l.naam, l.stam, T?.telt ? this.pct(T.pct) : "", T?.telt ?? "", T?.afwezig ?? "", T?.ziek ?? "", T?.ongeoorloofd ?? "", T?.teLaat ?? "",
         T?.telt && T.pct < data.n ? "ja" : "", plannen || "", open ? open.e.datum.split("-").reverse().join("-") : ""]);
-      this.schrijf(DT, `Bespreeklijst ${data.klas} ${data.per.kort || data.per.naam}`, [["Bespreeklijst", this.blad([kop, ...rijen], [28, 11, 11, 12, 9, 8, 12, 8, 11, 12, 16])]]);
+      const n = rijen.length + 1;
+      this.schrijf(DT, `Bespreeklijst ${data.klas} ${data.per.kort || data.per.naam}`, [["Bespreeklijst", this.blad([kop, ...rijen], [28, 11, 11, 12, 9, 8, 12, 8, 11, 12, 16])]],
+        { Bespreeklijst: { kleurschaal: [`C2:C${n}`], balken: [`E2:E${n}`, `G2:G${n}`], balkenBlauw: [`H2:H${n}`],
+          grafieken: [{ type: "bar", titel: `Aanwezig % · ${data.klas}`, cat: `A2:A${n}`, reeksen: [{ naam: "Aanwezig %", val: `C2:C${n}` }], pct: true, van: [12, 0], tot: [21, Math.max(18, Math.min(60, n + 4))] }] } });
     });
     dlg.append(DT.el("div", { class: "dt-xk-card dt-bl-card" }, [
       DT.el("h2", { text: "Bespreeklijst voor het teamoverleg" }),
@@ -345,6 +354,7 @@ DT.register({
       .dt-bl-tabel th { text-align: left; font-size: 12px; color: #59636e; padding: 6px 8px; border-bottom: 1px solid #c8d1da; position: sticky; top: 0; background: inherit; }
       .dt-bl-tabel td { padding: 5px 8px; border-bottom: 1px solid rgba(128,128,128,.15); } .dt-bl-tabel td.getal { text-align: right; font-variant-numeric: tabular-nums; }
       .dt-bl-tabel tr.is-oranje td:nth-child(2) { color: #ac5000; font-weight: 700; } .dt-bl-tabel tr.is-rood td:nth-child(2) { color: #c70e13; font-weight: 700; }
+      .dt-bl-pct { white-space: nowrap; } .dt-bl-pct b { display: inline-block; min-width: 36px; } .dt-bl-balk { display: inline-block; width: 70px; height: 8px; margin-right: 6px; border-radius: 4px; background: rgba(128,128,128,.2); overflow: hidden; vertical-align: middle; } .dt-bl-balk i { display: block; height: 100%; }
       .dt-bl-tabel td.is-laat { color: #c70e13; font-weight: 600; }`;
     document.head.append(st);
   },
@@ -426,11 +436,13 @@ DT.register({
 
     const per = periode.kort || periode.naam.replace(/[()]/g, "");
     const naamBestand = titel && /^Selectie/.test(titel) ? `Aanwezigheid ${lln.length} leerlingen ${per}` : `Aanwezigheid klas ${titel ? titel.replace(/^\S+\s+\S+\s+\S+\s+/, "") + " " : ""}${per}`;
+    const n1 = rijen.length + 1;
     this.schrijf(DT, naamBestand, [
       ["Per leerling", blad1],
       ["Aanwezig per vak", blad2],
       ["Gemist en ziek per vak", blad3],
       ["Toelichting", this.blad(this.toelichting([["Klas", titel || ""], ["Periode", periode.naam], ["Van", periode.van.toLocaleDateString("nl-NL")], ["Tot en met", periode.tot.toLocaleDateString("nl-NL")], ["Gemiddelde per leerling", "Gemiddelde van de percentages; 'Klas totaal' telt alle lessen bij elkaar op."], ...(vergelijk ? [["Verschil", "Dit schooljaar tot vandaag min vorig schooljaar tot dezelfde datum, in procentpunten."]] : [])]), [24, 80], { filter: false })],
-    ]);
+    ], { "Per leerling": { kleurschaal: [`N2:N${n1}`], balken: [`H2:H${n1}`, `K2:K${n1}`], balkenBlauw: [`G2:G${n1}`],
+      grafieken: [{ type: "bar", titel: "Aanwezig % per leerling", cat: `A2:A${n1}`, reeksen: [{ naam: "Aanwezig %", val: `N2:N${n1}` }], pct: true, van: [kop.length + 1, 0], tot: [kop.length + 10, Math.max(18, Math.min(60, n1 + 4))] }] } });
   },
 });

@@ -222,6 +222,19 @@ DT.register({
     return [...per.entries()].map(([k, ls]) => ({ naam: k, ...this.telling(ls) })).sort((a, b) => (a.pct ?? 101) - (b.pct ?? 101));
   },
 
+  weken(studenten) {
+    const per = new Map();
+    for (const s of studenten) for (const l of s.lessen) {
+      if (!this.past(l)) continue;
+      const w = isoWeek(l.begin), k = `${w.y}-${String(w.w).padStart(2, "0")}`;
+      if (!per.has(k)) { const ma = new Date(l.begin); ma.setDate(ma.getDate() - ((ma.getDay() + 6) % 7)); per.set(k, { k, week: w.w, jaar: w.y, ma, lessen: [] }); }
+      per.get(k).lessen.push(l);
+    }
+    return [...per.values()].sort((a, b) => a.k.localeCompare(b.k)).map((w) => ({ ...w, ...this.telling(w.lessen) }));
+  },
+  /* Kleur bij een percentage: zelfde grenzen als de kleurschaal in Excel. */
+  kleur(p) { return p == null ? "var(--dt-line, #c8d1da)" : p < 70 ? "#e5484d" : p < 80 ? "#f5a524" : p < 90 ? "#9bc53d" : "#2fa36b"; },
+
   /* ---------- tonen ---------- */
   teken(DT, doel, status) {
     const d = this._data, f = this._filter;
@@ -234,7 +247,7 @@ DT.register({
       const wis = DT.el("button", { type: "button", class: "dt-lr-link", text: "alle" }); wis.addEventListener("click", () => { set.clear(); this.teken(DT, doel, status); });
       return DT.el("label", { class: "dt-lr-label" }, [DT.el("span", {}, [`${titel} `, DT.el("small", { class: "dt-lr-zacht", text: set.size ? `${set.size} gekozen · ` : "alle · " }), wis]), sel]);
     };
-    const tabs = DT.el("div", { class: "dt-lr-tabs" }, [["student", "Per student"], ["les", "Per les"], ["vak", "Per vak"], ["docent", "Per docent"]].map(([k, t]) => {
+    const tabs = DT.el("div", { class: "dt-lr-tabs" }, [["student", "Per student"], ["les", "Per les"], ["week", "Per week"], ["vak", "Per vak"], ["docent", "Per docent"]].map(([k, t]) => {
       const b = DT.el("button", { type: "button", class: "dt-lr-tab", "aria-pressed": String(f.weergave === k), text: t });
       b.addEventListener("click", () => { f.weergave = k; this.teken(DT, doel, status); }); return b;
     }));
@@ -242,34 +255,78 @@ DT.register({
     const kop = (namen) => DT.el("thead", {}, DT.el("tr", {}, namen.map((n) => DT.el("th", { text: n }))));
     const td = (t, c = "") => DT.el("td", { class: c, text: t == null ? "" : String(t) });
     const pct = (p) => td(p == null ? "—" : `${p}%`, `getal${p != null && p < 80 ? " is-laag" : ""}`);
+    /* Balk met percentage (per vak, docent, les) en verdeling per student (aanwezig, te laat, ziek, absent, uitgestuurd). */
+    const pctBalk = (p) => { const c = DT.el("td", { class: "dt-lr-balkcel" }); if (p != null) c.append(DT.el("span", { class: "dt-lr-pbalk" }, DT.el("i", { style: `width:${p}%;background:${this.kleur(p)}` })), DT.el("b", { text: `${p}%`, style: p < 80 ? "color:#c70e13" : "" })); else c.textContent = "—"; return c; };
+    const SEG = [["aanwezig", "#2fa36b", "aanwezig"], ["teLaat", "#f5a524", "te laat"], ["ziek", "#7b8ea6", "ziek"], ["abOk", "#8fb8e8", "absent geoorloofd"], ["abNo", "#e5484d", "absent ongeoorloofd"], ["ui", "#7b33ff", "uitgestuurd"]];
+    const verdeling = (g) => {
+      const c = DT.el("td", { class: "dt-lr-verdcel" });
+      if (!g.telt) return c;
+      const bar = DT.el("span", { class: "dt-lr-verd", title: SEG.map(([k, , n]) => `${n}: ${k === "aanwezig" ? g.aanwezig - g.teLaat : g[k]}`).join("\n") });
+      for (const [k, kl] of SEG) { const n = k === "aanwezig" ? g.aanwezig - g.teLaat : g[k]; if (n > 0) bar.append(DT.el("i", { style: `width:${(100 * n) / g.telt}%;background:${kl}` })); }
+      c.append(bar); return c;
+    };
+    const legenda = DT.el("div", { class: "dt-lr-legenda" }, SEG.map(([, kl, n]) => DT.el("span", {}, [DT.el("i", { style: `background:${kl}` }), n])));
     const studenten = d.studenten.map((s) => ({ s, g: this.telling(s.lessen.filter((l) => this.past(l))) }));
     const totaal = this.telling(alleLessen.filter((l) => this.past(l)));
     let inhoud;
     if (f.weergave === "student") {
-      inhoud = DT.el("table", { class: "dt-lr-tabel" }, [kop(["Student", "Klas", "Lessen", "Aanwezig", "Te laat", "Gemist", "Ziek", "Absent geoorl.", "Absent ongeoorl.", "Uitgestuurd", "Aanwezig %"]),
+      inhoud = DT.el("table", { class: "dt-lr-tabel" }, [kop(["Student", "Klas", "Lessen", "Aanwezig", "Te laat", "Gemist", "Ziek", "Absent geoorl.", "Absent ongeoorl.", "Uitgestuurd", "Aanwezig %", "Verdeling"]),
         DT.el("tbody", {}, studenten.filter((x) => x.g.lessen || x.s.fout).map(({ s, g }) => DT.el("tr", {}, [td(s.l.naam), td(s.l.klas), ...(s.fout ? [td(`niet op te halen (${s.fout})`)] :
-          [td(g.telt, "getal"), td(g.aanwezig, "getal"), td(g.teLaat, "getal"), td(g.afwezig, "getal"), td(g.ziek, "getal"), td(g.abOk, "getal"), td(g.abNo, "getal"), td(g.ui, "getal"), pct(g.pct)])])))]);
+          [td(g.telt, "getal"), td(g.aanwezig, "getal"), td(g.teLaat, "getal"), td(g.afwezig, "getal"), td(g.ziek, "getal"), td(g.abOk, "getal"), td(g.abNo, "getal"), td(g.ui, "getal"), pctBalk(g.pct), verdeling(g)])])))]);
     } else if (f.weergave === "les") {
       const ms = this.momenten(d.studenten);
       inhoud = DT.el("table", { class: "dt-lr-tabel" }, [kop(["Datum", "Tijd", "Vak", "Docent", "Klas", "Studenten", "Aanwezig", "Te laat", "Afwezig"]),
         DT.el("tbody", {}, ms.map((m) => {
           const g = this.telling(m.rijen.map((r) => r.l));
           const wie = (cats) => m.rijen.filter((r) => cats.includes(r.l.cat)).map((r) => `${r.s.naam}${r.l.cat === "TL" ? "" : ` (${this.CAT[r.l.cat]})`}`).join(", ");
-          return DT.el("tr", {}, [td(this.datum(m.begin)), td(`${this.tijd(m.begin)}–${this.tijd(m.einde)}`), td(m.vak), td(m.docent), td([...m.klassen].join(", ")), td(g.telt, "getal"), pct(g.pct),
+          return DT.el("tr", {}, [td(this.datum(m.begin)), td(`${this.tijd(m.begin)}–${this.tijd(m.einde)}`), td(m.vak), td(m.docent), td([...m.klassen].join(", ")), td(g.telt, "getal"), pctBalk(g.pct),
             td(wie(["TL"]), "lijst"), td(wie(["AB_OK", "AB_NO", "ZK", "UI"]), "lijst")]);
         }))]);
+    } else if (f.weergave === "week") {
+      const ws = this.weken(d.studenten);
+      inhoud = DT.el("table", { class: "dt-lr-tabel" }, [kop(["Week", "Vanaf", "Lessen", "Aanwezig", "Te laat", "Gemist", "Ziek", "Absent ongeoorl.", "Aanwezig %", "Verdeling"]),
+        DT.el("tbody", {}, ws.map((w) => DT.el("tr", {}, [td(`week ${w.week}`), td(this.datum(w.ma)), td(w.telt, "getal"), td(w.aanwezig, "getal"), td(w.teLaat, "getal"), td(w.afwezig, "getal"), td(w.ziek, "getal"), td(w.abNo, "getal"), pctBalk(w.pct), verdeling(w)])))]);
     } else {
       const gs = this.groepen(d.studenten, f.weergave);
-      inhoud = DT.el("table", { class: "dt-lr-tabel" }, [kop([f.weergave === "vak" ? "Vak" : "Docent", "Lessen (student × les)", "Aanwezig", "Te laat", "Gemist", "Ziek", "Absent ongeoorl.", "Aanwezig %"]),
-        DT.el("tbody", {}, gs.map((g) => DT.el("tr", {}, [td(g.naam), td(g.telt, "getal"), td(g.aanwezig, "getal"), td(g.teLaat, "getal"), td(g.afwezig, "getal"), td(g.ziek, "getal"), td(g.abNo, "getal"), pct(g.pct)])))]);
+      inhoud = DT.el("table", { class: "dt-lr-tabel" }, [kop([f.weergave === "vak" ? "Vak" : "Docent", "Lessen (student × les)", "Aanwezig", "Te laat", "Gemist", "Ziek", "Absent ongeoorl.", "Aanwezig %", "Verdeling"]),
+        DT.el("tbody", {}, gs.map((g) => DT.el("tr", {}, [td(g.naam), td(g.telt, "getal"), td(g.aanwezig, "getal"), td(g.teLaat, "getal"), td(g.afwezig, "getal"), td(g.ziek, "getal"), td(g.abNo, "getal"), pctBalk(g.pct), verdeling(g)])))]);
     }
     status.textContent = `${d.studenten.length} studenten · ${d.klassen.join(", ")} · ${d.per.naam} · ${totaal.telt} lessen in selectie · ${totaal.pct ?? "—"}% aanwezig`;
+    const kpi = (label, waarde, sub = "", kl = "") => DT.el("div", { class: "dt-lr-kpi" }, [DT.el("small", { text: label }), DT.el("b", { text: waarde, style: kl ? `color:${kl}` : "" }), sub ? DT.el("span", { text: sub }) : null].filter(Boolean));
+    const onder = studenten.filter((x) => x.g.telt && x.g.pct < 80).length;
+    const kpis = DT.el("div", { class: "dt-lr-kpis" }, [
+      kpi("Aanwezig", totaal.pct == null ? "—" : `${totaal.pct}%`, `${totaal.aanwezig} van ${totaal.telt} lessen`, this.kleur(totaal.pct)),
+      kpi("Te laat", String(totaal.teLaat), totaal.telt ? `${Math.round(100 * totaal.teLaat / totaal.telt)}% van de lessen` : ""),
+      kpi("Gemist", String(totaal.afwezig), `waarvan ${totaal.ziek} ziek`),
+      kpi("Ongeoorloofd", String(totaal.abNo), "absent zonder geldige reden", totaal.abNo ? "#c70e13" : ""),
+      kpi("Onder 80%", `${onder} van ${studenten.filter((x) => x.g.telt).length}`, "studenten", onder ? "#c70e13" : ""),
+    ]);
     doel.replaceChildren(
       DT.el("div", { class: "dt-lr-filters" }, [filterLijst("Vak", vakken, f.vakken), filterLijst("Docent", docenten, f.docenten)]),
+      kpis, this.weekGrafiek(DT), legenda,
       DT.el("div", { class: "dt-lr-rij" }, [tabs, DT.el("span", { style: "flex:1" }), excel]),
       DT.el("div", { class: "dt-lr-scroll" }, inhoud),
       DT.el("p", { class: "dt-lr-zacht", text: "Aanwezig % = (lessen − gemist) / lessen; te laat telt als aanwezig, vrijstelling telt niet mee (zoals Inzicht). Ctrl/Cmd-klik om meerdere vakken of docenten te kiezen." }),
     );
+  },
+
+  /* Staafjes per week (aanwezig %), met de 80%-lijn; klik op een staaf voor de details in Per week. */
+  weekGrafiek(DT) {
+    const ws = this.weken(this._data.studenten);
+    if (ws.length < 2) return DT.el("span");
+    const B = 760, H = 150, l = 34, r = 8, t = 14, o = 28, bw = (B - l - r) / ws.length, y = (p) => t + (H - t - o) * (1 - p / 100);
+    const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", `0 0 ${B} ${H}`); svg.setAttribute("class", "dt-lr-week"); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", "Aanwezig per week");
+    const el = (tag, a, tekst) => { const e = document.createElementNS(ns, tag); for (const [k, v] of Object.entries(a)) e.setAttribute(k, v); if (tekst != null) e.textContent = tekst; svg.append(e); return e; };
+    for (const p of [0, 50, 80, 100]) { el("line", { x1: l, x2: B - r, y1: y(p), y2: y(p), class: p === 80 ? "norm" : "lijn" }); el("text", { x: l - 6, y: y(p) + 4, "text-anchor": "end", class: "as" }, `${p}%`); }
+    ws.forEach((w, i) => {
+      const x = l + i * bw + bw * 0.18, br = bw * 0.64, p = w.pct ?? 0;
+      const rect = el("rect", { x, y: y(p), width: br, height: Math.max(0, y(0) - y(p)), rx: 3, fill: this.kleur(w.pct) });
+      const titel = document.createElementNS(ns, "title"); titel.textContent = `Week ${w.week} (vanaf ${this.datum(w.ma)}): ${w.pct ?? "—"}% aanwezig, ${w.teLaat}× te laat, ${w.afwezig} gemist, ${w.telt} lessen`; rect.append(titel);
+      if (bw > 26) el("text", { x: x + br / 2, y: y(p) - 4, "text-anchor": "middle", class: "waarde" }, w.pct == null ? "" : `${w.pct}`);
+      if (bw > 18 || i % 2 === 0) el("text", { x: x + br / 2, y: H - 10, "text-anchor": "middle", class: "as" }, `wk ${w.week}`);
+    });
+    return DT.el("div", { class: "dt-lr-grafiek" }, [DT.el("small", { class: "dt-lr-zacht", text: "Aanwezig % per week (stippellijn = 80%)" }), svg]);
   },
 
   /* ---------- Excel ---------- */
@@ -295,8 +352,25 @@ DT.register({
       XLSX.utils.book_append_sheet(wb, blad([[k === "vak" ? "Vak" : "Docent", "Lessen (student × les)", "Aanwezig", "Te laat", "Gemist", "Ziek", "Absent ongeoorloofd", "Aanwezig %"],
         ...this.groepen(d.studenten, k).map((g) => [g.naam, g.telt, g.aanwezig, g.teLaat, g.afwezig, g.ziek, g.abNo, pct(g.pct)])], [28, 12, 10, 9, 9, 8, 12, 11]), naam);
     }
-    const naam = `Lesregistraties ${d.klassen.join(" ")} ${d.per.naam}`.replace(/[\\/:*?"<>|]+/g, "-").slice(0, 120);
-    XLSX.writeFile(wb, `${naam}.xlsx`);
+    const ws = this.weken(d.studenten);
+    XLSX.utils.book_append_sheet(wb, blad([["Week", "Vanaf", "Lessen", "Aanwezig", "Te laat", "Gemist", "Ziek", "Absent ongeoorloofd", "Aanwezig %"],
+      ...ws.map((w) => [`week ${w.week}`, this.datum(w.ma), w.telt, w.aanwezig, w.teLaat, w.afwezig, w.ziek, w.abNo, pct(w.pct)])], [10, 11, 9, 10, 9, 9, 8, 12, 11]), "Per week");
+    /* Grafieken en kleuren (echte Excel-opmaak, zie xlsx-visueel.js). */
+    const n = d.studenten.length + 1, nm = this.momenten(d.studenten).length + 1, nv = this.groepen(d.studenten, "vak").length + 1, nd = this.groepen(d.studenten, "docent").length + 1, nw = ws.length + 1;
+    const hoog = (k) => Math.max(18, Math.min(60, k + 4));
+    const specs = {
+      "Per student": { kleurschaal: [`M2:M${n}`], balken: [`G2:G${n}`, `J2:J${n}`], balkenBlauw: [`F2:F${n}`],
+        grafieken: [{ type: "bar", titel: "Aanwezig % per student", cat: `A2:A${n}`, reeksen: [{ naam: "Aanwezig %", val: `M2:M${n}` }], pct: true, van: [14, 0], tot: [23, hoog(n)] }] },
+      "Per les": { kleurschaal: [`K2:K${nm}`], balken: [`J2:J${nm}`], balkenBlauw: [`I2:I${nm}`] },
+      "Per week": { kleurschaal: [`I2:I${nw}`], balken: [`F2:F${nw}`], balkenBlauw: [`E2:E${nw}`],
+        grafieken: [{ type: "line", titel: "Aanwezig % per week", cat: `A2:A${nw}`, reeksen: [{ naam: "Aanwezig %", val: `I2:I${nw}` }], pct: true, van: [10, 0], tot: [19, 17] },
+          { type: "col", gestapeld: true, titel: "Lessen per week", cat: `A2:A${nw}`, reeksen: [{ naam: "Aanwezig", val: `D2:D${nw}`, kleur: "2FA36B" }, { naam: "Gemist", val: `F2:F${nw}`, kleur: "E5484D" }], van: [10, 18], tot: [19, 35] }] },
+      "Per vak": { kleurschaal: [`H2:H${nv}`], balken: [`E2:E${nv}`], grafieken: [{ type: "bar", titel: "Aanwezig % per vak", cat: `A2:A${nv}`, reeksen: [{ naam: "Aanwezig %", val: `H2:H${nv}` }], pct: true, van: [9, 0], tot: [18, hoog(nv)] }] },
+      "Per docent": { kleurschaal: [`H2:H${nd}`], balken: [`E2:E${nd}`], grafieken: [{ type: "bar", titel: "Aanwezig % per docent", cat: `A2:A${nd}`, reeksen: [{ naam: "Aanwezig %", val: `H2:H${nd}` }], pct: true, van: [9, 0], tot: [18, hoog(nd)] }] },
+    };
+    const naam = `Lesregistraties ${d.klassen.join(" ")} ${d.per.naam}${f.vakken.size === 1 ? ` ${[...f.vakken][0]}` : ""}`.replace(/[\\/:*?"<>|]+/g, "-").slice(0, 120);
+    try { XlsxVisueel.download(XlsxVisueel.maak(wb, specs), `${naam}.xlsx`); }
+    catch (e) { console.warn("[Docent Tools] Excel-opmaak mislukt, gewone export", e); XLSX.writeFile(wb, `${naam}.xlsx`); }
     DT.toast("Excel-bestand gedownload", "ok");
   },
 
@@ -338,6 +412,17 @@ DT.register({
       .dt-lr-tabel { width: 100%; border-collapse: collapse; font-size: 13px; }
       .dt-lr-tabel th { position: sticky; top: 0; background: color-mix(in srgb, var(--dt-fg, #25292f) 4%, var(--dt-bg, #fff)); text-align: left; font-size: 12px; color: var(--dt-muted, #59636e); padding: 6px 8px; border-bottom: 1px solid var(--dt-line, #c8d1da); white-space: nowrap; }
       .dt-lr-tabel td { padding: 5px 8px; border-bottom: 1px solid var(--dt-line, #f0f2f5); vertical-align: top; } .dt-lr-tabel td.getal { text-align: right; font-variant-numeric: tabular-nums; }
+      .dt-lr-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+      .dt-lr-kpi { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--dt-line, #e0e6ea); border-radius: 8px; }
+      .dt-lr-kpi small { font-size: 12px; color: var(--dt-muted, #59636e); } .dt-lr-kpi b { font-size: 22px; line-height: 28px; } .dt-lr-kpi span { font-size: 12px; color: var(--dt-muted, #59636e); }
+      .dt-lr-grafiek { border: 1px solid var(--dt-line, #e0e6ea); border-radius: 8px; padding: 8px 12px 4px; }
+      .dt-lr-week { width: 100%; height: auto; max-height: 170px; display: block; }
+      .dt-lr-week .lijn { stroke: var(--dt-line, #e0e6ea); stroke-width: 1; } .dt-lr-week .norm { stroke: #c70e13; stroke-width: 1; stroke-dasharray: 4 3; opacity: .7; }
+      .dt-lr-week .as { font-size: 10px; fill: var(--dt-muted, #59636e); } .dt-lr-week .waarde { font-size: 10px; font-weight: 700; fill: var(--dt-fg, #25292f); }
+      .dt-lr-legenda { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--dt-muted, #59636e); } .dt-lr-legenda i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+      .dt-lr-balkcel { min-width: 120px; white-space: nowrap; } .dt-lr-balkcel b { font-size: 12px; margin-left: 6px; font-variant-numeric: tabular-nums; }
+      .dt-lr-pbalk { display: inline-block; width: 70px; height: 8px; border-radius: 4px; background: var(--dt-line, #e0e6ea); overflow: hidden; vertical-align: middle; } .dt-lr-pbalk i { display: block; height: 100%; }
+      .dt-lr-verdcel { min-width: 140px; } .dt-lr-verd { display: flex; width: 140px; height: 10px; border-radius: 5px; overflow: hidden; background: var(--dt-line, #e0e6ea); } .dt-lr-verd i { display: block; height: 100%; }
       .dt-lr-tabel td.is-laag { color: #c70e13; font-weight: 700; } .dt-lr-tabel td.lijst { font-size: 12px; color: var(--dt-fg, #393f46); max-width: 360px; }
     `;
     document.head.append(st);
