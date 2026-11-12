@@ -133,6 +133,24 @@
       }
     }
   });
+  /* Onderdelen die Magister in een eigen (scoped) registry heeft, zoals sl-tab, kan de extensie niet zelf opbouwen.
+   * Elementen met data-dt-upgrade worden hier opnieuw gemaakt via hun eigen shadow root (createElement), met
+   * dezelfde attributen en inhoud. */
+  window.addEventListener("message", (e) => {
+    if (!(e.data && e.data.type === "dt:upgrade" && trusted(e))) return;
+    const zoek = (r, uit = []) => { uit.push(...r.querySelectorAll("[data-dt-upgrade]")); r.querySelectorAll("*").forEach((x) => x.shadowRoot && zoek(x.shadowRoot, uit)); return uit; };
+    for (const el of zoek(document)) {
+      const root = el.getRootNode();
+      el.removeAttribute("data-dt-upgrade");
+      if (el.shadowRoot || typeof root.createElement !== "function") continue;
+      try {
+        const nieuw = root.createElement(el.localName);
+        for (const a of [...el.attributes]) nieuw.setAttribute(a.name, a.value);
+        nieuw.append(...el.childNodes);
+        el.replaceWith(nieuw);
+      } catch {}
+    }
+  });
   window.addEventListener("message", (e) => {
     if (!(e.data && e.data.type === "dt:state:go" && trusted(e))) return;
     let ok = false, error = "";

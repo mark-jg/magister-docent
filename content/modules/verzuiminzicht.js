@@ -43,6 +43,11 @@ DT.register({
     const sl = tabs?.localName === "sl-tab-group";
     const bar = sl ? tabs : tabs && tabs.querySelector("dna-tab-bar");
     if (!bar) { if (this._btn) { this.deactivate(); this._btn.remove(); this._btn2?.remove(); this._panel?.remove(); this._btn = this._btn2 = this._panel = null; } return; }
+    /* Het paginascript vervangt onze sl-tabs door echte (zie netlog.js, dt:upgrade): dan de nieuwe overnemen. */
+    if (sl && this._root === root && this._btn && !this._btn.isConnected) {
+      const ins = bar.querySelector(':scope > sl-tab[data-view="inzicht"]'), verg = bar.querySelector(':scope > sl-tab[data-view="vergelijk"]');
+      if (ins) { this._btn = ins; this._btn2 = verg; }
+    }
     if (this._root !== root || !this._btn || !this._btn.isConnected) {
       this.deactivate();
       this._root = root;
@@ -51,22 +56,30 @@ DT.register({
       const knop = (tekst, view) => {
         let b;
         if (sl) {
-          /* Een echt sl-tab, aangemaakt via de shadow root zodat Magisters eigen (scoped) registry het opbouwt:
-           * zelfde uiterlijk als Lesregistraties en Meldingen. De klik gaat niet door naar de tab-group. */
-          b = typeof root.createElement === "function" ? root.createElement("sl-tab") : document.createElement("sl-tab");
-          b.slot = "tabs"; b.classList.add("dt-vz-sltab");
+          /* sl-tab staat in Magisters eigen (scoped) registry, die de extensie niet kan gebruiken. Het paginascript
+           * maakt er een echt sl-tab van (data-dt-upgrade), met hetzelfde uiterlijk als Lesregistraties en Meldingen. */
+          b = document.createElement("sl-tab");
+          b.slot = "tabs"; b.classList.add("dt-vz-sltab"); b.setAttribute("data-dt-upgrade", "");
         } else {
           b = document.createElement("button");
           b.type = "button"; b.className = "dt-vz-tabbtn"; b.setAttribute("role", "tab");
         }
         b.textContent = tekst; b.dataset.view = view;
-        b.addEventListener("click", (e) => { e.stopPropagation(); this.activate(DT, view); });
+        if (!sl) b.addEventListener("click", (e) => { e.stopPropagation(); this.activate(DT, view); });
         return b;
       };
       this._btn2?.remove();
       this._btn = knop("Inzicht", "inzicht");
       this._btn2 = knop("Vergelijken", "vergelijk");
       bar.append(this._btn, this._btn2);
+      if (sl) {
+        /* Klik op onze tabs via de groep (capture), zodat het ook werkt nadat ze vervangen zijn; de groep zelf krijgt die klik niet. */
+        if (!bar.dataset.dtVzLuistert) {
+          bar.dataset.dtVzLuistert = "1";
+          bar.addEventListener("click", (e) => { const t = e.target.closest?.("sl-tab[data-view]"); if (t) { e.stopPropagation(); this.activate(DT, t.dataset.view); } }, true);
+        }
+        window.postMessage({ type: "dt:upgrade" }, "*");
+      }
       bar.addEventListener("click", (e) => { const t = e.target.closest(sl ? "sl-tab" : "dna-tab-button"); if (t && !t.dataset.view) this.deactivate(); });
       this._panel?.remove();
       this._panel = document.createElement("div"); this._panel.id = "dt-vz"; this._panel.hidden = true;
@@ -80,6 +93,7 @@ DT.register({
 
   activate(DT, view = "inzicht") {
     if (!this._root) return;
+    if (this._sl) { const g = this._root.querySelector("sl-tab-group"); this._btn = g?.querySelector(':scope > sl-tab[data-view="inzicht"]') || this._btn; this._btn2 = g?.querySelector(':scope > sl-tab[data-view="vergelijk"]') || this._btn2; }
     this._active = true; this._view = view; sessionStorage.setItem("dt-vz-active", view);
     this._btn.classList.toggle("is-active", view === "inzicht");
     this._btn2?.classList.toggle("is-active", view === "vergelijk");
