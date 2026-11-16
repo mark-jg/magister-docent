@@ -473,17 +473,26 @@ DT.register({
     const K = TardyKern, h = this._scherm.hoofd;
     const zoek = DT.el("input", { type: "search", class: "dt-cb-zoek", placeholder: "Naam of stamnummer, of scan de pas…", autocomplete: "off", "aria-label": "Student zoeken" });
     const tijd = DT.el("input", { type: "time", class: "dt-cb-tijd", title: "Tijd van de melding; leeg = nu", "aria-label": "Tijd" });
+    /* Datum van de melding: standaard vandaag; een eerdere dag kiezen kan (bijv. meldingen van een dag dat je er niet was
+     * achteraf invoeren). De keuze blijft staan tot je hem terugzet, zodat je een hele dag achter elkaar kunt invoeren. */
+    const vandaag = K.vandaag(), dag = this.meldDatum();
+    const datum = DT.el("input", { type: "date", class: `dt-cb-tijd dt-cb-datum${dag !== vandaag ? " is-anders" : ""}`, value: dag, max: vandaag, min: (K.periodes()[0] || {}).start || "", title: "Datum van de melding", "aria-label": "Datum" });
+    datum.addEventListener("change", () => { this._datum = datum.value && datum.value < vandaag ? datum.value : null; this.teken(); });
+    if (dag !== vandaag) tijd.title = "Tijd van de melding (verplicht bij een andere datum)";
     const scan = this.knop(DT, "Scan pas", () => {});
     scan.title = "Studentenpas scannen met de camera";
     const lijst = DT.el("div", { class: "dt-cb-hits", role: "listbox" });
     const paneel = DT.el("div", { class: "dt-cb-paneel" });
     const log = DT.el("div", { class: "dt-cb-log" });
     h.replaceChildren(
-      DT.el("div", { class: "dt-cb-zoekrij" }, [zoek, tijd, scan]),
+      DT.el("div", { class: "dt-cb-zoekrij" }, [zoek, datum, tijd, scan]),
+      dag !== vandaag ? DT.el("div", { class: "dt-cb-anderedag" }, [
+        DT.el("span", { html: `Je meldt nu op <b>${K.esc(K.langDatum(dag))}</b>. Vul bij elke melding ook de tijd in.` }),
+        this.knop(DT, "Terug naar vandaag", () => { this._datum = null; this.teken(); }, false, "klein")]) : null,
       lijst, paneel,
-      DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("div", { class: "dt-cb-kaartkop" }, [DT.el("h2", { text: "Vandaag" }),
-        this.knop(DT, "Controleren in Magister", () => { const sns = [...new Set(K.S.registraties.filter((r) => r.datum === K.vandaag()).map((r) => r.stamnr))]; if (!sns.length) return this.melding("Nog niemand gemeld vandaag."); this.controleer(DT, sns, true); }, false, "stil"),
-        this.knop(DT, "Briefjes van vandaag printen", () => this.print(K.S.registraties.filter((r) => r.datum === K.vandaag() && ["telaat", "calamiteit"].includes((K.SOORT[r.soort] || {}).g)), true))]), log]),
+      DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("div", { class: "dt-cb-kaartkop" }, [DT.el("h2", { text: dag === vandaag ? "Vandaag" : `Meldingen op ${K.langDatum(dag)}` }),
+        this.knop(DT, "Controleren in Magister", () => { const sns = [...new Set(K.S.registraties.filter((r) => r.datum === dag).map((r) => r.stamnr))]; if (!sns.length) return this.melding(dag === vandaag ? "Nog niemand gemeld vandaag." : "Nog niemand gemeld op deze dag."); this.controleer(DT, sns, true); }, false, "stil"),
+        this.knop(DT, dag === vandaag ? "Briefjes van vandaag printen" : "Briefjes van deze dag printen", () => this.print(K.S.registraties.filter((r) => r.datum === dag && ["telaat", "calamiteit"].includes((K.SOORT[r.soort] || {}).g)), true))]), log]),
     );
     let hits = [], sel = 0, mzoek = 0;
     const tekenHits = (lokaal, magister = []) => {
@@ -553,12 +562,12 @@ DT.register({
       const soortKnop = (c) => {
         const so = K.SOORT[c], n = tel(c);
         const b = DT.el("button", { type: "button", class: `dt-cb-soort ${so.ok ? "ok" : "nok"}` }, [DT.el("b", { text: so.n }), DT.el("small", { text: n ? `${n}× deze periode` : "nog niet" })]);
-        b.addEventListener("click", () => { this.registreer(st.stamnr, c, tijdVeld.value); tijdVeld.value = ""; this.teken(); });
+        b.addEventListener("click", () => { if (this.registreer(st.stamnr, c, tijdVeld.value, this.meldDatum()) === false) return; tijdVeld.value = ""; this.teken(); });
         return b;
       };
       const meer = DT.el("select", { class: "dt-cb-meer", "aria-label": "Meer soorten" }, [DT.el("option", { value: "", text: "Meer soorten…" }),
         ...K.SOORTEN.filter((s) => ![...this.SNEL.ongeoorloofd, ...this.SNEL.geoorloofd].includes(s.c)).map((s) => DT.el("option", { value: s.c, text: s.n }))]);
-      meer.addEventListener("change", () => { if (meer.value) { this.registreer(st.stamnr, meer.value, tijdVeld.value); tijdVeld.value = ""; this.teken(); } });
+      meer.addEventListener("change", () => { if (meer.value) { if (this.registreer(st.stamnr, meer.value, tijdVeld.value, this.meldDatum()) === false) { meer.value = ""; return; } tijdVeld.value = ""; this.teken(); } });
       delen.push(DT.el("dna-card", { class: "dt-cb-kaart dt-cb-student" }, [
         DT.el("div", { class: "dt-cb-kaartkop" }, [
           DT.el("div", { class: "dt-cb-wie" }, [
@@ -580,10 +589,13 @@ DT.register({
   },
 
   /* Zoals meldNu in Tardy: registratie, telling, gevolg volgens het protocol en zo nodig een meldafspraak. */
-  registreer(stamnr, soort, tijd) {
+  meldDatum() { const v = TardyKern.vandaag(); return this._datum && this._datum < v ? this._datum : v; },
+  registreer(stamnr, soort, tijd, datum = null) {
     const K = TardyKern, S = K.S;
     if (this._kijkt) return this.melding(`${this._ander?.naam || "Je collega"} werkt nu in Tardy. Je kijkt mee, dus er wordt niets geregistreerd.`, "err");
-    const groep = (K.SOORT[soort] || {}).g, d = K.vandaag();
+    const vandaag = K.vandaag(), groep = (K.SOORT[soort] || {}).g, d = datum && datum < vandaag ? datum : vandaag, eerder = d !== vandaag;
+    /* Een melding op een andere dag heeft een echte tijd nodig (anders zou de tijd van nu erin komen). */
+    if (eerder && !tijd) { this.melding("Vul bij een melding op een andere dag ook de tijd in.", "err"); return false; }
     /* Per ongeluk twee keer geklikt? Zelfde student en soort binnen 5 minuten: eerst vragen. */
     const nu = tijd || K.nuTijd(), min = (t) => { const [u, m] = String(t || "0:0").split(":").map(Number); return u * 60 + m; };
     const dubbel = S.registraties.find((r) => r.stamnr === stamnr && r.soort === soort && r.datum === d && Math.abs(min(r.tijd) - min(nu)) <= 5);
@@ -596,7 +608,7 @@ DT.register({
     const g = K.gevolgVan(groep, aantal, this.oudersMet18(S.studenten[stamnr]) ? true : t.achttienMin);   // 18+ met toestemming: de tekst met ouders
     let meldDatum = null;
     if (g.meld && !S.meldafspraken.some((m) => m.stamnr === stamnr && m.status === "open")) {
-      meldDatum = K.volgendeSchooldag(d);
+      meldDatum = K.volgendeSchooldag(vandaag);   // ook bij een melding achteraf: de eerstvolgende schooldag vanaf vandaag
       S.meldafspraken.push({ id: K.uid(), stamnr, datum: meldDatum, tijd: S.instellingen.meldTijd, aanleiding: groep, aanleidingTekst: "", status: "open", gemaaktOp: d, gemaild: false });
     }
     const per = (K.periodeById(pid) || { naam: "deze periode" }).naam.toLowerCase();
@@ -606,7 +618,7 @@ DT.register({
     this._gekozen = null;
     if (groep === "calamiteit" && aantal >= 4) this.melding(`${S.studenten[stamnr].roepnaam} staat op ${aantal}× calamiteit: gesprek voeren en mentor informeren.`, "info", 7000);
     this.bewaar();
-    if (S.instellingen.bonAuto && (groep === "telaat" || groep === "calamiteit")) this.print([reg]);
+    if (!eerder && S.instellingen.bonAuto && (groep === "telaat" || groep === "calamiteit")) this.print([reg]);
     return reg;
   },
 
@@ -620,10 +632,10 @@ DT.register({
     }));
     const eigen = DT.el("input", { type: "text", class: "dt-cb-veld", placeholder: "Eigen reden of notitie", value: K.REDENEN.concat(K.REDENEN_CAL).includes(reg.reden) ? "" : reg.reden || "" });
     eigen.addEventListener("change", () => { reg.reden = eigen.value.trim(); this.bewaar(); this.teken(); });
-    const opmerking = `${K.soortNaam(reg.soort)} ${reg.tijd}${reg.reden ? ` – ${reg.reden}` : ""}${reg.paraaf ? ` (${reg.paraaf})` : ""}`;
+    const opmerking = `${K.soortNaam(reg.soort)} ${reg.datum !== K.vandaag() ? `${K.dmy(reg.datum)} ` : ""}${reg.tijd}${reg.reden ? ` – ${reg.reden}` : ""}${reg.paraaf ? ` (${reg.paraaf})` : ""}`;
     return DT.el("dna-card", { class: `dt-cb-kaart dt-cb-uitslag n${l.niveau || 0}` }, [
       DT.el("div", { class: "dt-cb-kaartkop" }, [
-        DT.el("div", { class: "dt-cb-wie" }, [DT.el("h2", { text: `${K.naamVan(st)} · ${K.soortNaam(reg.soort)} ${reg.tijd}` }), DT.el("small", { text: l.telzin || "" })]),
+        DT.el("div", { class: "dt-cb-wie" }, [DT.el("h2", { text: `${K.naamVan(st)} · ${K.soortNaam(reg.soort)} ${reg.datum !== K.vandaag() ? `${K.kortDatum(reg.datum)} ` : ""}${reg.tijd}` }), DT.el("small", { text: l.telzin || "" })]),
         this.knop(DT, "Briefje printen", () => this.print([reg])),
         this.knop(DT, "Ongedaan maken", () => { K.S.registraties = K.S.registraties.filter((r) => r.id !== reg.id); if (l.meldDatum) K.S.meldafspraken = K.S.meldafspraken.filter((m) => !(m.stamnr === reg.stamnr && m.datum === l.meldDatum && m.gemaaktOp === reg.datum && m.status === "open")); this._laatste = null; this.bewaar(); this.teken(); }, false, "stil"),
       ]),
@@ -642,10 +654,11 @@ DT.register({
 
   tekenLog(DT, log) {
     const K = TardyKern;
-    const regs = K.S.registraties.filter((r) => r.datum === K.vandaag()).sort((a, b) => (b.tijd || "").localeCompare(a.tijd || ""));
+    const dag = this.meldDatum();
+    const regs = K.S.registraties.filter((r) => r.datum === dag).sort((a, b) => (b.tijd || "").localeCompare(a.tijd || ""));
     const open = regs.filter((r) => r.terug === false).length;
     const nogMag = regs.filter((r) => this.nogInMagister(r)).length;
-    if (!regs.length) return log.replaceChildren(DT.el("p", { class: "dt-cb-zacht", text: "Nog niemand gemeld vandaag." }));
+    if (!regs.length) return log.replaceChildren(DT.el("p", { class: "dt-cb-zacht", text: dag === K.vandaag() ? "Nog niemand gemeld vandaag." : `Nog niemand gemeld op ${K.langDatum(dag)}.` }));
     log.replaceChildren(
       DT.el("p", { class: "dt-cb-zacht", text: `${regs.length} ${regs.length === 1 ? "melding" : "meldingen"}${open ? ` · ${open} ${open === 1 ? "briefje" : "briefjes"} niet terug` : ""}${nogMag ? ` · ${nogMag} nog niet aangepast in Magister` : ""}` }),
       DT.el("table", { class: "dt-cb-tabel" }, [
@@ -2493,6 +2506,8 @@ Signalen krijgen de status afgehandeld, meldafspraken vervallen. Je kunt ze late
       .dt-cb-sig.is-open .dt-cb-sigmaat { display: none; }
       .dt-cb-detailknoppen { margin: 0 0 10px; }
       dna-card.dt-cb-periodeaf { border-left: 4px solid var(--cb-acc); }
+      .dt-cb-datum { width: 150px; } .dt-cb-datum.is-anders { border-color: var(--cb-acc); background: var(--cb-hover); font-weight: 700; }
+      .dt-cb-anderedag { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 12px; border-radius: var(--cb-r); background: var(--cb-hover); border-left: 4px solid var(--cb-acc); font-size: 14px; }
       .dt-cb-magchip { flex: none; font-size: 12px !important; line-height: 18px; padding: 0 6px; border-radius: 999px; background: color-mix(in srgb, var(--cb-rood) 12%, var(--cb-kaart)); color: var(--cb-rood); font-weight: 600; }
       .dt-cb-magvink { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; }
       .dt-cb-magvink small { font-size: 12px !important; color: var(--cb-zacht); }
