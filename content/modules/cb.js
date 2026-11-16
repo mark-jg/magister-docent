@@ -484,7 +484,7 @@ DT.register({
     const lijst = DT.el("div", { class: "dt-cb-hits", role: "listbox" });
     const paneel = DT.el("div", { class: "dt-cb-paneel" });
     const log = DT.el("div", { class: "dt-cb-log" });
-    h.replaceChildren(
+    h.replaceChildren(...[
       DT.el("div", { class: "dt-cb-zoekrij" }, [zoek, datum, tijd, scan]),
       dag !== vandaag ? DT.el("div", { class: "dt-cb-anderedag" }, [
         DT.el("span", { html: `Je meldt nu op <b>${K.esc(K.langDatum(dag))}</b>. Vul bij elke melding ook de tijd in.` }),
@@ -493,7 +493,7 @@ DT.register({
       DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("div", { class: "dt-cb-kaartkop" }, [DT.el("h2", { text: dag === vandaag ? "Vandaag" : `Meldingen op ${K.langDatum(dag)}` }),
         this.knop(DT, "Controleren in Magister", () => { const sns = [...new Set(K.S.registraties.filter((r) => r.datum === dag).map((r) => r.stamnr))]; if (!sns.length) return this.melding(dag === vandaag ? "Nog niemand gemeld vandaag." : "Nog niemand gemeld op deze dag."); this.controleer(DT, sns, true); }, false, "stil"),
         this.knop(DT, dag === vandaag ? "Briefjes van vandaag printen" : "Briefjes van deze dag printen", () => this.print(K.S.registraties.filter((r) => r.datum === dag && ["telaat", "calamiteit"].includes((K.SOORT[r.soort] || {}).g)), true))]), log]),
-    );
+    ].filter(Boolean));
     let hits = [], sel = 0, mzoek = 0;
     const tekenHits = (lokaal, magister = []) => {
       hits = [...lokaal.map((st) => ({ st })), ...magister.filter((m) => !K.S.studenten[m.stamnr]).map((m) => ({ m }))];
@@ -1187,7 +1187,7 @@ DT.register({
       return DT.el("div", { class: `dt-cb-sig n${s.niveau}${s.afgehandeld ? " is-af" : ""}${isOpen ? " is-open" : ""}` }, [regel, detail].filter(Boolean));
     };
     const perNiveau = [4, 3, 2, 1].map((n) => [n, zicht.filter((s) => s.niveau === n)]).filter(([, l]) => l.length);
-    h.replaceChildren(
+    h.replaceChildren(...[
       this.magisterKaart(DT),
       this.periodeAfKaart(DT, pid),
       DT.el("div", { class: "dt-cb-rij" }, [DT.el("span", { class: "dt-cb-zacht", text: `${open.length} ${open.length === 1 ? "student" : "studenten"} met een open stap in ${(K.periodeById(pid) || {}).naam || ""}` }), toggle,
@@ -1196,7 +1196,7 @@ DT.register({
         DT.el("h2", {}, [DT.el("span", { class: `dt-cb-niveau n${n}`, text: `${n}` }), DT.el("span", { text: ` ${K.NIVEAUNAAM[n]} (${l.length})` })]),
         DT.el("div", { class: "dt-cb-siglijst" }, l.map(rij))]))
         : [DT.el("div", { class: "dt-cb-leeg" }, DT.el("p", { text: "Geen signalen in deze periode." }))]),
-    );
+    ].filter(Boolean));
   },
 
   /* Een afgelopen periode in één keer afsluiten: alle open signalen (ook de lichtere stappen) afgehandeld en
@@ -1383,6 +1383,39 @@ Signalen krijgen de status afgehandeld, meldafspraken vervallen. Je kunt ze late
   haken() {
     const K = TardyKern;
     K.H.tellingenPlus = (t, sn, pid) => this.tellingenPlus(t, sn, pid);
+    /* "16 klokuren in 4 weken" en "ziek in 8 weken" keken altijd naar de laatste weken vanaf vandaag, ook bij een
+     * andere periode. Nu: de weken tot het einde van de gekozen periode (of tot vandaag), en niets voor een periode
+     * die nog moet beginnen. */
+    const venster = (pid, dagen) => {
+      const p = K.periodeById(pid), v = K.vandaag();
+      if (!p || p.start > v) return null;
+      const eind = p.eind < v ? p.eind : v;
+      return { van: K.plusDagen(eind, -dagen), tot: eind };
+    };
+    const k4 = K.TELLERS.klokuren4w;
+    if (k4 && !k4._dt) {
+      k4._dt = true;
+      k4.waarde = (sn, pid) => {
+        const w = venster(pid, 28), ls = K.S.lesreg[sn]; if (!w || !ls) return null;
+        const binnen = (d) => d >= w.van && d <= w.tot;
+        if (Array.isArray(ls.lessen)) {
+          const laat = this.laatDagen(sn, binnen);
+          return ls.lessen.filter((l) => l.c === "AB_NO" && binnen(l.d) && !(laat.has(l.d) && l.b < laat.get(l.d))).reduce((a, l) => a + (l.u || 1), 0);
+        }
+        return (ls.onUren || []).filter((u) => binnen(u.datum)).reduce((a, u) => a + u.uren, 0);
+      };
+    }
+    const z8 = K.TELLERS.ziek8w;
+    if (z8 && !z8._dt) {
+      z8._dt = true;
+      z8.waarde = (sn, pid) => {
+        const w = venster(pid, 56); if (!w) return null;
+        const binnen = (d) => d >= w.van && d <= w.tot, set = new Set();
+        K.S.registraties.filter((r) => r.stamnr === sn && (K.SOORT[r.soort] || {}).g === "ziek" && binnen(r.datum)).forEach((r) => set.add(r.datum));
+        (K.S.lesreg[sn]?.ziekDatums || []).filter(binnen).forEach((d) => set.add(d));
+        return set.size;
+      };
+    }
     const tl = K.TELLERS.telaat;
     if (tl && !tl._dt) {
       tl._dt = true;
