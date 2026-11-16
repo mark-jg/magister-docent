@@ -1189,6 +1189,7 @@ DT.register({
     const perNiveau = [4, 3, 2, 1].map((n) => [n, zicht.filter((s) => s.niveau === n)]).filter(([, l]) => l.length);
     h.replaceChildren(...[
       this.magisterKaart(DT),
+      this.anderePeriode(DT, pid),
       this.periodeAfKaart(DT, pid),
       DT.el("div", { class: "dt-cb-rij" }, [DT.el("span", { class: "dt-cb-zacht", text: `${open.length} ${open.length === 1 ? "student" : "studenten"} met een open stap in ${(K.periodeById(pid) || {}).naam || ""}` }), toggle,
         this.knop(DT, "Overzicht per mentor…", () => this.mentorOverzicht(DT)), this.knop(DT, "Weekrapport mentoren…", () => this.weekrapport(DT)), this.knop(DT, "Protocol bekijken", () => this._scherm.bar.querySelector('[data-view="protocol"]')?.click(), false, "stil")]),
@@ -1199,6 +1200,15 @@ DT.register({
     ].filter(Boolean));
   },
 
+  /* Kijk je naar een andere periode dan de huidige, dan staan nieuwe meldingen hier niet: zeg dat, met een knop terug. */
+  anderePeriode(DT, pid) {
+    const K = TardyKern, nu = K.huidigePeriode();
+    if (!nu || nu.id === pid) return null;
+    const p = K.periodeById(pid) || {};
+    return DT.el("div", { class: "dt-cb-anderedag" }, [
+      DT.el("span", { html: `Je bekijkt <b>${K.esc(p.naam || pid)}</b>. Meldingen van nu staan in ${K.esc(nu.naam)}.` }),
+      this.knop(DT, `Naar ${nu.naam}`, () => { K.UI.periodeId = nu.id; this._periode.value = nu.id; this.teken(); }, false, "klein")]);
+  },
   /* Een afgelopen periode in één keer afsluiten: alle open signalen (ook de lichtere stappen) afgehandeld en
    * open meldafspraken uit die periode vervallen. De geschiedenis blijft bewaard; heropenen kan per signaal. */
   periodeAfKaart(DT, pid) {
