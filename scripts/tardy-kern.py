@@ -34,6 +34,13 @@ oud = "const st=S.studenten[stamnr], t=tellingen(stamnr,pid), p=periodeById(pid)
 assert oud in code, "mailTekst-begin niet gevonden"
 code = code.replace(oud, oud.replace("t=tellingen(stamnr,pid)", "t=(H.tellingen||tellingen)(stamnr,pid)"), 1)
 
+# De extensie vult Tardy's telling aan met Magister (te laat dat alleen in Magister staat, en ongeoorloofd
+# vóór de melding bij de balie niet dubbel): tellingen() roept daarvoor de haak H.tellingenPlus aan. Alles in
+# de kern (signalen, gevolg, meldlijst, mailteksten) rekent zo met dezelfde, gecombineerde telling.
+oud = "function tellingen(stamnr, pid){"
+assert oud in code, "tellingen niet gevonden"
+code = code.replace(oud, "function tellingen(stamnr, pid){ const t=_tellingenTardy(stamnr,pid); return H.tellingenPlus ? H.tellingenPlus(t,stamnr,pid) : t; }\nfunction _tellingenTardy(stamnr, pid){", 1)
+
 EXPORT = """S:{get:()=>S,set:v=>{S=v;}}"""
 uit = f"""/* GEGENEREERD door scripts/tardy-kern.py uit Tardy (web/index.html). Niet met de hand wijzigen:
  * pas Tardy aan en genereer opnieuw. Bevat de telling, het verzuimprotocol, de mailteksten en het
@@ -46,7 +53,7 @@ function toon(t, lang) {{ H.toon(t, lang); }}
 function render() {{}}
 {code}
 const kern = {{ H, UI, leegeState, normaliseer, SOORTEN, SOORT, soortNaam, REDENEN, REDENEN_CAL, redenLijst,
-  periodes, periodeById, huidigePeriode, periodeVanDatum, inPeriode, tellingen, signalenVoor, alleSignalen, hoogsteTreden,
+  periodes, periodeById, huidigePeriode, periodeVanDatum, inPeriode, tellingen, _tellingenTardy, regVan, signalenVoor, alleSignalen, hoogsteTreden,
   handelAf, zetAfh, afh, hoogsteNiveau, protocol, protocolLadder, gevolgVan, mailTekst, MAILSOORT, mentorVan, mentorSleutel,
   naamVan, minderjarig, volgendeSchooldag, langDatum, kortDatum, dmy, plusDagen, vandaag, nuTijd, uid, esc, meldLijst,
   AANLEIDING, NIVEAUNAAM, briefjesHtml, bonBeeld, bonOpdracht, bonOntwerp, bonInfo, BON, langsteReeks, ondertekening, TELLERS,

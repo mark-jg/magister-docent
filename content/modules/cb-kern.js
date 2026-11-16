@@ -115,7 +115,8 @@ function regVan(stamnr, pid, groep){
   return S.registraties.filter(r=>r.stamnr===stamnr && inPeriode(r.datum,p) && (!groep || (SOORT[r.soort]||{}).g===groep));
 }
 function dagenUniek(lijst){ return Array.from(new Set(lijst.map(r=>r.datum))).sort(); }
-function tellingen(stamnr, pid){
+function tellingen(stamnr, pid){ const t=_tellingenTardy(stamnr,pid); return H.tellingenPlus ? H.tellingenPlus(t,stamnr,pid) : t; }
+function _tellingenTardy(stamnr, pid){
   const p=periodeById(pid), st=S.studenten[stamnr]||{};
   const teLaat = regVan(stamnr,pid,"telaat");
   const ongeoorloofdApp = dagenUniek(regVan(stamnr,pid,"ongeoorloofd")).length;
@@ -821,7 +822,7 @@ function normaliseer(){
 }
 
 const kern = { H, UI, leegeState, normaliseer, SOORTEN, SOORT, soortNaam, REDENEN, REDENEN_CAL, redenLijst,
-  periodes, periodeById, huidigePeriode, periodeVanDatum, inPeriode, tellingen, signalenVoor, alleSignalen, hoogsteTreden,
+  periodes, periodeById, huidigePeriode, periodeVanDatum, inPeriode, tellingen, _tellingenTardy, regVan, signalenVoor, alleSignalen, hoogsteTreden,
   handelAf, zetAfh, afh, hoogsteNiveau, protocol, protocolLadder, gevolgVan, mailTekst, MAILSOORT, mentorVan, mentorSleutel,
   naamVan, minderjarig, volgendeSchooldag, langDatum, kortDatum, dmy, plusDagen, vandaag, nuTijd, uid, esc, meldLijst,
   AANLEIDING, NIVEAUNAAM, briefjesHtml, bonBeeld, bonOpdracht, bonOntwerp, bonInfo, BON, langsteReeks, ondertekening, TELLERS,

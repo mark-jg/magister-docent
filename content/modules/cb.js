@@ -224,6 +224,7 @@ DT.register({
     const K = TardyKern;
     K.H.bewaar = () => this.bewaar();
     K.H.toon = (t) => this.melding(t);
+    this.haken();
     const pagina = DT.el("section", { id: "dt-cbp", class: "dt-cb", "aria-label": "Te laat-balie" });
     const kop = DT.el("dna-page-header", { heading: "Te laat-balie" });
     const echt = DT.deepQuery("att-attendance-dashboard")?.shadowRoot?.querySelector("dna-page-header");
@@ -480,7 +481,9 @@ DT.register({
     h.replaceChildren(
       DT.el("div", { class: "dt-cb-zoekrij" }, [zoek, tijd, scan]),
       lijst, paneel,
-      DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("div", { class: "dt-cb-kaartkop" }, [DT.el("h2", { text: "Vandaag" }), this.knop(DT, "Briefjes van vandaag printen", () => this.print(K.S.registraties.filter((r) => r.datum === K.vandaag() && ["telaat", "calamiteit"].includes((K.SOORT[r.soort] || {}).g)), true))]), log]),
+      DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("div", { class: "dt-cb-kaartkop" }, [DT.el("h2", { text: "Vandaag" }),
+        this.knop(DT, "Controleren in Magister", () => { const sns = [...new Set(K.S.registraties.filter((r) => r.datum === K.vandaag()).map((r) => r.stamnr))]; if (!sns.length) return this.melding("Nog niemand gemeld vandaag."); this.controleer(DT, sns, true); }, false, "stil"),
+        this.knop(DT, "Briefjes van vandaag printen", () => this.print(K.S.registraties.filter((r) => r.datum === K.vandaag() && ["telaat", "calamiteit"].includes((K.SOORT[r.soort] || {}).g)), true))]), log]),
     );
     let hits = [], sel = 0, mzoek = 0;
     const tekenHits = (lokaal, magister = []) => {
@@ -628,6 +631,7 @@ DT.register({
         DT.el("code", { text: opmerking }),
         this.knop(DT, "Kopieer opmerking", () => navigator.clipboard.writeText(opmerking).then(() => this.melding("Opmerking gekopieerd.")).catch(() => this.melding("Kopiëren lukte niet.", "err"))),
         this.knop(DT, "Open verzuim", () => this.openInMagister(st)),
+        this.magisterVink(DT, reg, "Aangepast in Magister"),
       ]),
     ]);
   },
@@ -636,11 +640,12 @@ DT.register({
     const K = TardyKern;
     const regs = K.S.registraties.filter((r) => r.datum === K.vandaag()).sort((a, b) => (b.tijd || "").localeCompare(a.tijd || ""));
     const open = regs.filter((r) => r.terug === false).length;
+    const nogMag = regs.filter((r) => this.nogInMagister(r)).length;
     if (!regs.length) return log.replaceChildren(DT.el("p", { class: "dt-cb-zacht", text: "Nog niemand gemeld vandaag." }));
     log.replaceChildren(
-      DT.el("p", { class: "dt-cb-zacht", text: `${regs.length} ${regs.length === 1 ? "melding" : "meldingen"}${open ? ` · ${open} ${open === 1 ? "briefje" : "briefjes"} niet terug` : ""}` }),
+      DT.el("p", { class: "dt-cb-zacht", text: `${regs.length} ${regs.length === 1 ? "melding" : "meldingen"}${open ? ` · ${open} ${open === 1 ? "briefje" : "briefjes"} niet terug` : ""}${nogMag ? ` · ${nogMag} nog niet aangepast in Magister` : ""}` }),
       DT.el("table", { class: "dt-cb-tabel" }, [
-        DT.el("thead", {}, DT.el("tr", {}, ["Tijd", "Student", "Soort", "Reden", "Briefje terug", ""].map((t) => DT.el("th", { text: t })))),
+        DT.el("thead", {}, DT.el("tr", {}, ["Tijd", "Student", "Soort", "Reden", "Briefje terug", "In Magister", ""].map((t) => DT.el("th", { text: t })))),
         DT.el("tbody", {}, regs.map((r) => {
           const st = K.S.studenten[r.stamnr] || {};
           const terug = r.terug === undefined ? DT.el("span", { class: "dt-cb-zacht", text: "—" }) : DT.el("input", { type: "checkbox", "aria-label": `Briefje van ${K.naamVan(st)} terug` });
@@ -648,7 +653,7 @@ DT.register({
           const reden = DT.el("input", { type: "text", class: "dt-cb-veld klein", value: r.reden || "", "aria-label": "Reden" });
           reden.addEventListener("change", () => { r.reden = reden.value.trim(); this.bewaar(); });
           return DT.el("tr", {}, [DT.el("td", { text: r.tijd }), DT.el("td", {}, [DT.el("b", { text: K.naamVan(st) }), DT.el("small", { text: ` ${st.klas || ""}` })]),
-            DT.el("td", { text: K.soortNaam(r.soort) }), DT.el("td", {}, reden), DT.el("td", {}, terug),
+            DT.el("td", { text: K.soortNaam(r.soort) }), DT.el("td", {}, reden), DT.el("td", {}, terug), DT.el("td", {}, this.magisterVink(DT, r)),
             DT.el("td", { class: "dt-cb-acties" }, [this.knop(DT, "Print", () => this.print([r]), false, "klein"),
               this.knop(DT, "Wis", () => { if (confirm(`Registratie van ${K.naamVan(st)} (${r.tijd}) verwijderen?`)) { K.S.registraties = K.S.registraties.filter((x) => x.id !== r.id); this.bewaar(); this.teken(); } }, false, "klein stil")])]);
         })),
@@ -759,7 +764,7 @@ DT.register({
         DT.el("td", {}, [this.naamKnop(DT, st), DT.el("small", { text: ` ${st.klas || ""}${K.minderjarig(st) === true ? " · 18−" : ""}` }),
           m.vorigeId ? DT.el("small", { class: "dt-cb-vervolg", text: ` · ${this.vervolgTekst(m)}` }) : null].filter(Boolean)),
         DT.el("td", { text: K.AANLEIDING[m.aanleiding] || m.aanleiding }),
-        DT.el("td", {}, [DT.el("span", { class: `dt-cb-niveau n${n}`, text: n ? `trede ${n}` : "—" }), DT.el("small", { text: ` ${aantal}` })]),
+        DT.el("td", {}, [DT.el("span", { class: `dt-cb-niveau n${n}`, text: n ? `trede ${n}` : "—" }), DT.el("small", { text: ` ${aantal}` }), ...this.bronChips(DT, m.stamnr, K.UI.periodeId)]),
         DT.el("td", { text: `${K.langDatum(m.datum)} ${m.tijd || ""}` }),
         DT.el("td", {}, this.meldActies(DT, m)),
         DT.el("td", { class: "dt-cb-acties" }, [
@@ -1120,6 +1125,7 @@ DT.register({
           pct != null ? DT.el("span", { class: "dt-cb-pct", title: "Aanwezig volgens Magister, deze periode", text: `${pct}%` }) : null,
           (() => { const m = this.openMeld(s.stamnr); return m ? DT.el("span", { class: "dt-cb-meldchip", title: "Meldafspraak gepland (zie Meldafspraken)", text: `meldt zich ${K.kortDatum(m.datum)} ${m.tijd || ""}` }) : null; })(),
           this.oudersMet18(st) ? DT.el("span", { class: "dt-cb-pct", title: "18+, maar de student gaf in Magister toestemming voor contact met ouders/verzorgers: de mails aan ouders gaan mee", text: "18+ · ouders ✓" }) : null,
+          ...this.bronChips(DT, s.stamnr, pid),
         ].filter(Boolean)),
         DT.el("div", { class: "dt-cb-sigmaat", title: s.maatregel, text: s.maatregel }),
       ]);
@@ -1152,6 +1158,7 @@ DT.register({
           DT.el("div", {}, [DT.el("b", { text: `${ladderNaam(x.soort)}: ${x.titel}` }), DT.el("small", { text: x.maatregel })]),
         ])),
         this.statsRegel(DT, s.stamnr),
+        this.bronLijst(DT, s.stamnr, pid),
         DT.el("div", { class: "dt-cb-rij" }, [
           this.knop(DT, "Verzuim in Magister", () => this.openInMagister(st), false, "klein stil"),
           this.knop(DT, "Plan van aanpak", () => this.pvaOpenen(s, st), false, "klein stil"),
@@ -1199,9 +1206,9 @@ DT.register({
     return r;
   },
 
-  async haalMagister(DT, stamnrs) {
+  async haalMagister(DT, stamnrs, { stil = false } = {}) {
     const K = TardyKern;
-    if (this._haal) return this.melding("Er wordt al opgehaald.");
+    if (this._haal) return stil ? false : this.melding("Er wordt al opgehaald.");
     if (this._kijkt) return this.melding("Je kijkt mee; ophalen kan pas als jij in Tardy werkt.", "err");
     const per = K.periodes().slice().sort((a, b) => a.start.localeCompare(b.start));
     const van = new Date(per[0].start + "T00:00:00"), nu = new Date(), vandaag = this.ymd(nu);
@@ -1244,9 +1251,13 @@ DT.register({
             perioden[p.id] = { pct: t.telt ? t.pct : null, telt: t.telt, afwezig: t.afwezig };
             (rijen[p.id] ||= {})[sn] = { TL: c.TL || 0, ON: (c.AB_NO || 0) + (c.TL || 0), GE: c.AB_OK || 0, ZK: c.ZK || 0, AB: (c.AB_OK || 0) + (c.AB_NO || 0), UI: c.UI || 0, VR: c.VR || 0 };
           }
-          K.S.lesreg[sn] = { op: vandaag, bron: "magister", ziekDatums: [...ziek].sort(), medischDatums: [...med].sort(), onUren, perioden };
-          await this.ouderMails(st, id).catch(() => {});
-          await this.mentorUitMagister(st, id).catch(() => {});
+          /* Elke les met een registratie (niet "aanwezig"), kort: datum, begintijd, categorie en bij ongeoorloofd de
+           * uren. Daarmee combineren we de eigen meldingen met Magister (zie tellingenPlus en magisterStand). */
+          const tijd = (d) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+          const lessen = jaar.lessen.filter((l) => l.cat && l.cat !== "OK").map((l) => Object.assign({ d: datum(l.begin), b: tijd(l.begin), c: l.cat },
+            l.cat === "AB_NO" ? { u: Math.round(100 * Math.max(0.25, (l.einde - l.begin) / 3.6e6 || 1)) / 100 } : {}));
+          K.S.lesreg[sn] = { op: vandaag, opUur: tijd(new Date()), bron: "magister", ziekDatums: [...ziek].sort(), medischDatums: [...med].sort(), onUren, perioden, lessen };
+          if (!stil) { await this.ouderMails(st, id).catch(() => {}); await this.mentorUitMagister(st, id).catch(() => {}); }
         } catch { H.fout++; }
         H.klaar++;
         if (this._view === "signalen" && this._scherm) this.tekenHaal();
@@ -1265,8 +1276,131 @@ DT.register({
     }
     this._haal = null;
     this.bewaar();
-    this.melding(`Verzuim van ${H.klaar - H.fout} ${H.klaar - H.fout === 1 ? "student" : "studenten"} uit Magister bijgewerkt${H.fout ? `, ${H.fout} niet gelukt` : ""}.`, H.fout ? "err" : "info", 7000);
+    if (!stil) this.melding(`Verzuim van ${H.klaar - H.fout} ${H.klaar - H.fout === 1 ? "student" : "studenten"} uit Magister bijgewerkt${H.fout ? `, ${H.fout} niet gelukt` : ""}.`, H.fout ? "err" : "info", 7000);
     if (this._scherm) this.teken();
+    return H.klaar - H.fout;
+  },
+
+  /* ===================================================================================== */
+  /* Eigen invoer gecombineerd met Magister                                                 */
+  /* ===================================================================================== */
+  /* De telling van Tardy telt alleen de eigen meldingen. Hier vullen we aan met wat er in Magister staat:
+   *  - te laat dat alleen in Magister staat (door een docent geregistreerd), per dag; een dag met een eigen
+   *    melding (te laat of calamiteit) telt één keer;
+   *  - ongeoorloofd in Magister zonder de lessen vóór een melding bij de balie: dat is dezelfde keer te laat,
+   *    die nog niet is omgezet in Magister.
+   * Via de haak in de kern rekenen de signalen, het gevolg bij een nieuwe melding, de meldafspraken en de
+   * mailteksten allemaal met deze telling. */
+  haken() {
+    const K = TardyKern;
+    K.H.tellingenPlus = (t, sn, pid) => this.tellingenPlus(t, sn, pid);
+    const tl = K.TELLERS.telaat;
+    if (tl && !tl._dt) {
+      tl._dt = true;
+      tl.titel = (w, t) => `${w}× te laat${t?.teLaatAlleenMagister?.length ? ` (waarvan ${t.teLaatAlleenMagister.length} alleen in Magister)` : ""}`;
+    }
+  },
+  laatDagen(sn, inP) {
+    const K = TardyKern, uit = new Map();   // datum -> laatste meldtijd bij de balie
+    for (const r of K.S.registraties) {
+      if (r.stamnr !== sn || !inP(r.datum)) continue;
+      const g = (K.SOORT[r.soort] || {}).g;
+      if (g !== "telaat" && g !== "calamiteit") continue;
+      const tijd = r.tijd || "23:59", o = uit.get(r.datum);
+      if (!o || tijd > o) uit.set(r.datum, tijd);
+    }
+    return uit;
+  },
+  tellingenPlus(t, sn, pid) {
+    const K = TardyKern, ls = K.S?.lesreg?.[sn], p = K.periodeById(pid);
+    if (!ls || ls.bron !== "magister" || !Array.isArray(ls.lessen) || !p) return t;
+    const inP = (d) => d >= p.start && d <= p.eind;
+    const laat = this.laatDagen(sn, inP), les = ls.lessen.filter((l) => inP(l.d));
+    const alleenMag = [...new Set(les.filter((l) => l.c === "TL").map((l) => l.d))].filter((d) => !laat.has(d)).sort();
+    const ab = les.filter((l) => l.c === "AB_NO");
+    const on = ab.filter((l) => !(laat.has(l.d) && l.b < laat.get(l.d)));
+    return Object.assign({}, t, {
+      teLaat: t.teLaat + alleenMag.length, teLaatBalie: t.teLaat, teLaatAlleenMagister: alleenMag,
+      onMagister: on.length, ongeoorloofd: Math.max(on.length, t.ongeoorloofdApp), ongeoorloofdVoorMelding: ab.length - on.length,
+      klokuren: on.reduce((a, l) => a + (l.u || 1), 0), klokurenExact: true,
+    });
+  },
+  /* Wat Magister bij een eigen melding laat zien. bekend = er is opgehaald ná de melding. */
+  magisterStand(r) {
+    const K = TardyKern, ls = K.S.lesreg[r.stamnr], g = (K.SOORT[r.soort] || {}).g;
+    if (!ls || ls.bron !== "magister" || !Array.isArray(ls.lessen) || `${ls.op} ${ls.opUur || "00:00"}` < `${r.datum} ${r.tijd || "00:00"}`) return { bekend: false };
+    const dag = ls.lessen.filter((l) => l.d === r.datum), heeft = (...c) => dag.some((l) => c.includes(l.c));
+    const st = { bekend: true, op: `${K.kortDatum(ls.op)} ${ls.opUur || ""}`.trim(), gezien: false, nogOngeoorloofd: false };
+    if (g === "telaat" || g === "calamiteit") {
+      st.gezien = g === "telaat" ? heeft("TL") : heeft("TL", "AB_OK");
+      st.nogOngeoorloofd = !st.gezien && dag.some((l) => l.c === "AB_NO" && (!r.tijd || l.b < r.tijd));
+    } else if (g === "ongeoorloofd") st.gezien = heeft("AB_NO");
+    else if (g === "ziek") st.gezien = heeft("ZK");
+    else if (g === "medisch" || g === "geoorloofd") st.gezien = heeft("AB_OK", "VR");
+    else if (g === "incident") st.gezien = heeft("UI");
+    return st;
+  },
+  telt(r) { const g = (TardyKern.SOORT[r.soort] || {}).g; return !!g && g !== "aanwezig" && g !== "overig"; },
+  nogInMagister(r) { if (!this.telt(r)) return false; const m = this.magisterStand(r); return !m.gezien && (!r.magister || !!m.nogOngeoorloofd); },
+  /* Vinkje "In Magister": zelf aanvinken als je het hebt aangepast; staat het (na ophalen) in Magister, dan staat
+   * het vanzelf aan. Bij aanvinken wordt deze student meteen opnieuw opgehaald om het te controleren. */
+  magisterVink(DT, r, tekst = "") {
+    if (!this.telt(r)) return DT.el("span", { class: "dt-cb-zacht", text: "—" });
+    const K = TardyKern, st = K.S.studenten[r.stamnr] || {}, m = this.magisterStand(r);
+    const vink = DT.el("input", { type: "checkbox", "aria-label": `${K.soortNaam(r.soort)} van ${K.naamVan(st)} aangepast in Magister` });
+    vink.checked = !!r.magister || m.gezien;
+    if (m.gezien) vink.disabled = true;
+    vink.addEventListener("change", () => { r.magister = vink.checked; this.bewaar(); this.teken(); if (vink.checked) this.controleer(DT, [r.stamnr]); });
+    const sub = m.gezien ? "staat in Magister" : m.nogOngeoorloofd ? "Magister: nog ongeoorloofd" : r.magister && !m.bekend ? "nog niet gecontroleerd" : "";
+    const titel = m.gezien ? `Staat in Magister (opgehaald ${m.op}).`
+      : m.nogOngeoorloofd ? `Volgens Magister (opgehaald ${m.op}) staat ${st.roepnaam || "de student"} vóór ${r.tijd} nog op ongeoorloofd afwezig. Zet het om naar ${K.soortNaam(r.soort).toLowerCase()}.`
+      : r.magister ? "Zelf aangevinkt. Bij de volgende keer ophalen wordt het in Magister gecontroleerd." : "Vink aan zodra je dit in Magister hebt aangepast.";
+    return DT.el("label", { class: `dt-cb-magvink${m.gezien ? " is-ok" : m.nogOngeoorloofd ? " is-nok" : ""}`, title: titel },
+      [vink, tekst ? DT.el("span", { text: tekst }) : null, sub ? DT.el("small", { text: sub }) : null].filter(Boolean));
+  },
+  async controleer(DT, sns, luid = false) {
+    const K = TardyKern;
+    if (this._kijkt) return luid && this.melding("Je kijkt mee; ophalen kan pas als jij in Tardy werkt.", "err");
+    if (this._haal) return luid && this.melding("Er wordt al opgehaald; probeer het zo nog eens.");
+    if (luid) this.melding(`${sns.length} ${sns.length === 1 ? "student" : "studenten"} controleren in Magister…`, "info", 4000);
+    const n = await this.haalMagister(DT, sns, { stil: true });
+    if (!luid) return;
+    const nog = K.S.registraties.filter((r) => r.datum === K.vandaag() && sns.includes(r.stamnr) && this.nogInMagister(r)).length;
+    this.melding(n === false ? "Ophalen lukte niet." : nog ? `Gecontroleerd: ${nog} ${nog === 1 ? "melding staat" : "meldingen staan"} nog niet goed in Magister.` : "Gecontroleerd: alles staat in Magister.", nog ? "err" : "info", 7000);
+  },
+  /* Bronnen van de telling deze periode: eigen meldingen (met briefje en Magister-stand) en te laat dat alleen in Magister staat. */
+  bronnen(sn, pid) {
+    const K = TardyKern, p = K.periodeById(pid); if (!p) return [];
+    const inP = (d) => d >= p.start && d <= p.eind;
+    const eigen = K.S.registraties.filter((r) => r.stamnr === sn && inP(r.datum) && this.telt(r)).map((r) => ({ datum: r.datum, tijd: r.tijd, soort: K.soortNaam(r.soort), r, m: this.magisterStand(r) }));
+    const t = K.tellingen(sn, pid);
+    const mag = (t.teLaatAlleenMagister || []).map((d) => ({ datum: d, tijd: (K.S.lesreg[sn].lessen.find((l) => l.d === d && l.c === "TL") || {}).b || "", soort: "Te laat", magister: true }));
+    return eigen.concat(mag).sort((a, b) => `${b.datum} ${b.tijd}`.localeCompare(`${a.datum} ${a.tijd}`));
+  },
+  bronChips(DT, sn, pid) {
+    const K = TardyKern, t = K.tellingen(sn, pid), uit = [];
+    const nog = this.bronnen(sn, pid).filter((b) => b.r && this.nogInMagister(b.r));
+    if (t.teLaatAlleenMagister?.length) uit.push(DT.el("span", { class: "dt-cb-pct", title: `Te laat in Magister zonder melding bij de balie: ${t.teLaatAlleenMagister.map((d) => K.kortDatum(d)).join(", ")}. Telt mee in de ladder.`, text: `${t.teLaatAlleenMagister.length}× te laat uit Magister` }));
+    if (nog.length) uit.push(DT.el("span", { class: "dt-cb-magchip", title: `Nog niet (goed) in Magister:\n${nog.map((b) => `${K.kortDatum(b.datum)} ${b.tijd || ""} ${b.soort}${b.m.nogOngeoorloofd ? " (staat nog op ongeoorloofd)" : ""}`).join("\n")}`, text: `${nog.length} nog niet in Magister` }));
+    return uit;
+  },
+  bronLijst(DT, sn, pid) {
+    const K = TardyKern, lijst = this.bronnen(sn, pid);
+    if (!lijst.length) return null;
+    const t = K.tellingen(sn, pid);
+    return DT.el("div", { class: "dt-cb-bronnen" }, [
+      DT.el("b", { text: "Meldingen deze periode (balie en Magister)" }),
+      t.ongeoorloofdVoorMelding ? DT.el("small", { class: "dt-cb-zacht", text: ` · ${t.ongeoorloofdVoorMelding} ${t.ongeoorloofdVoorMelding === 1 ? "les" : "lessen"} ongeoorloofd vóór een melding bij de balie tellen niet als ongeoorloofd` }) : null,
+      DT.el("table", { class: "dt-cb-tabel" }, [
+        DT.el("thead", {}, DT.el("tr", {}, ["Datum", "Tijd", "Soort", "Bron", "Briefje", "In Magister"].map((x) => DT.el("th", { text: x })))),
+        DT.el("tbody", {}, lijst.map((b) => DT.el("tr", {}, [
+          DT.el("td", { text: K.kortDatum(b.datum) }), DT.el("td", { text: b.tijd || "" }), DT.el("td", { text: b.soort }),
+          DT.el("td", { text: b.magister ? "Magister" : "balie" }),
+          DT.el("td", { text: b.r ? (b.r.terug === undefined ? "—" : b.r.terug ? "terug" : "niet terug") : "—" }),
+          DT.el("td", {}, b.r ? this.magisterVink(DT, b.r) : DT.el("span", { class: "dt-cb-zacht", text: "staat in Magister" })),
+        ]))),
+      ]),
+    ].filter(Boolean));
   },
 
   tekenHaal() {
@@ -1286,7 +1420,7 @@ DT.register({
     return DT.el("dna-card", { class: "dt-cb-kaart" }, [
       DT.el("div", { class: "dt-cb-kaartkop" }, [
         DT.el("div", { class: "dt-cb-wie" }, [DT.el("h2", { text: "Verzuim uit Magister" }),
-          DT.el("small", { text: met.length ? `${met.length} van ${studenten.length} studenten bijgewerkt, laatst ${K.langDatum(laatst)}. Ongeoorloofd, klokuren, ziekte en medische afspraken tellen mee in de signalen.` : "Nog niet opgehaald. Haal de registraties op om ook signalen te krijgen op ongeoorloofd verzuim, klokuren, ziekte en medische afspraken." })]),
+          DT.el("small", { text: met.length ? `${met.length} van ${studenten.length} studenten bijgewerkt, laatst ${K.langDatum(laatst)}. Te laat (ook wat alleen in Magister staat), ongeoorloofd, klokuren, ziekte en medische afspraken tellen mee in de signalen, samen met de meldingen bij de balie.` : "Nog niet opgehaald. Haal de registraties op om ook signalen te krijgen op te laat dat alleen in Magister staat, ongeoorloofd verzuim, klokuren, ziekte en medische afspraken." })]),
       ]),
       DT.el("div", { class: "dt-cb-rij" }, [klasSel,
         this.knop(DT, "Bijwerken uit Magister", () => this.haalMagister(DT, studenten.filter((st) => !klasSel.value || st.klas === klasSel.value).map((st) => st.stamnr)), true),
@@ -2282,6 +2416,12 @@ DT.register({
       .dt-cb-sigknoppen .dt-cb-acties-in { gap: 6px; }
       .dt-cb-sig.is-open .dt-cb-sigmaat { display: none; }
       .dt-cb-detailknoppen { margin: 0 0 10px; }
+      .dt-cb-magchip { flex: none; font-size: 12px !important; line-height: 18px; padding: 0 6px; border-radius: 999px; background: color-mix(in srgb, var(--cb-rood) 12%, var(--cb-kaart)); color: var(--cb-rood); font-weight: 600; }
+      .dt-cb-magvink { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; }
+      .dt-cb-magvink small { font-size: 12px !important; color: var(--cb-zacht); }
+      .dt-cb-magvink.is-ok small { color: #1e8a4c; } .dt-cb-magvink.is-nok small { color: var(--cb-rood); font-weight: 600; }
+      .dt-cb-magvink input:disabled { cursor: default; }
+      .dt-cb-bronnen { margin: 8px 0; } .dt-cb-bronnen .dt-cb-tabel { margin-top: 6px; } .dt-cb-bronnen td, .dt-cb-bronnen th { font-size: 13px !important; }
       .dt-cb-meldchip { flex: none; font-size: 12px !important; line-height: 18px; padding: 0 6px; border-radius: 999px; background: #ddeffe; color: #0b4f8a; }
       .dt-cb-meldregel { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0 0 10px; padding: 8px 10px; border-radius: var(--cb-r); background: color-mix(in srgb, var(--cb-acc) 8%, var(--cb-kaart)); font-size: 14px; }
       .dt-cb-meldregel .dt-cb-acties3 { margin: 0; padding: 0; border: 0; } .dt-cb-detailknoppen .dt-cb-acties3 { margin: 0; }
