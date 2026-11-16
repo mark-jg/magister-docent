@@ -158,8 +158,23 @@ DT.register({
     if (JSON.stringify(nieuw) === JSON.stringify(oud)) return false;
     K.S.instellingen.periodes = nieuw;
     if (!K.periodeById(K.UI.periodeId)) K.UI.periodeId = (K.periodeVanDatum(K.vandaag()) || nieuw[0]).id;
-    if (this._map && !this._kijkt) this.bewaar();
+    if (this._map && !this._kijkt) { this.bewaar(); this.opnieuwOphalen("De periodes zijn gewijzigd"); }
     return true;
+  },
+  /* Magister-cijfers per periode horen bij de periodegrenzen; na een wijziging (of met gegevens van vóór de
+   * telling per les) alles op de achtergrond opnieuw ophalen. */
+  opnieuwOphalen(reden) {
+    const K = TardyKern;
+    clearTimeout(this._herT);
+    this._herT = setTimeout(async () => {
+      if (!this._map || this._kijkt || !K.S) return;
+      if (this._haal) return this.opnieuwOphalen(reden);
+      const sns = Object.values(K.S.studenten).filter((st) => !st.archief && (st.magisterId || K.S.lesreg[st.stamnr])).map((st) => st.stamnr);
+      if (!sns.length) return;
+      this.melding(`${reden}: het verzuim van ${sns.length} studenten wordt opnieuw uit Magister opgehaald…`, "info", 6000);
+      await this.haalMagister(DT, sns, { stil: true });
+      this.melding("Verzuim uit Magister bijgewerkt.");
+    }, 1500);
   },
   async bezetting() { try { return JSON.parse(await this.lees(this.BEZET) || "null"); } catch { return null; } },
   bezetDoorAnder(b) { return !!(b && b.apparaat && b.apparaat !== this.apparaat() && (Date.now() - Date.parse(b.bijgewerkt || 0)) < this.BEZET_VERLOOPT); },
@@ -415,6 +430,8 @@ DT.register({
     const K = TardyKern;
     if (this._autoGedaan || this._kijkt || !this._map || !K.S || DT.settings.cb?.autoBijwerken === false) return;
     this._autoGedaan = true;
+    /* Gegevens van vóór de telling per les (zonder "lessen"): eenmalig opnieuw ophalen, ook als vandaag al is bijgewerkt. */
+    if (Object.values(K.S.lesreg || {}).some((l) => l?.bron === "magister" && !Array.isArray(l.lessen))) return this.opnieuwOphalen("Nieuwe telling per les");
     let laatst = null; try { laatst = localStorage.getItem("dt-cb-auto"); } catch {}
     if (laatst === K.vandaag()) return;
     const sns = Object.values(K.S.studenten).filter((st) => !st.archief && (st.magisterId || K.S.lesreg[st.stamnr])).map((st) => st.stamnr);
@@ -1450,6 +1467,11 @@ Signalen krijgen de status afgehandeld, meldafspraken vervallen. Je kunt ze late
         return set.size;
       };
     }
+    const og = K.TELLERS.ongeoorloofd;
+    if (og && !og._dt) {
+      og._dt = true;
+      og.titel = (w, t) => `${w}× ongeoorloofd verzuim${t?.ongeoorloofdAlleenBalie?.length ? ` (waarvan ${t.ongeoorloofdAlleenBalie.length} alleen bij de balie)` : ""}`;
+    }
     const tl = K.TELLERS.telaat;
     if (tl && !tl._dt) {
       tl._dt = true;
@@ -1475,9 +1497,14 @@ Signalen krijgen de status afgehandeld, meldafspraken vervallen. Je kunt ze late
     const alleenMag = [...new Set(les.filter((l) => l.c === "TL").map((l) => l.d))].filter((d) => !laat.has(d)).sort();
     const ab = les.filter((l) => l.c === "AB_NO");
     const on = ab.filter((l) => !(laat.has(l.d) && l.b < laat.get(l.d)));
+    /* Eigen meldingen ongeoorloofd op een dag waarop Magister (nog) niets ongeoorloofd heeft, tellen erbij op
+     * (één per dag). Staat het ook in Magister, dan telt het één keer: via Magister. */
+    const magDagen = new Set(on.map((l) => l.d));
+    const eigenOn = [...new Set(K.S.registraties.filter((r) => r.stamnr === sn && inP(r.datum) && (K.SOORT[r.soort] || {}).g === "ongeoorloofd").map((r) => r.datum))];
+    const alleenBalie = eigenOn.filter((d) => !magDagen.has(d)).sort();
     return Object.assign({}, t, {
       teLaat: t.teLaat + alleenMag.length, teLaatBalie: t.teLaat, teLaatAlleenMagister: alleenMag,
-      onMagister: on.length, ongeoorloofd: Math.max(on.length, t.ongeoorloofdApp), ongeoorloofdVoorMelding: ab.length - on.length,
+      onMagister: on.length, ongeoorloofd: on.length + alleenBalie.length, ongeoorloofdAlleenBalie: alleenBalie, ongeoorloofdVoorMelding: ab.length - on.length,
       klokuren: on.reduce((a, l) => a + (l.u || 1), 0), klokurenExact: true,
     });
   },
