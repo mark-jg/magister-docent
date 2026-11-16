@@ -584,6 +584,10 @@ DT.register({
     const K = TardyKern, S = K.S;
     if (this._kijkt) return this.melding(`${this._ander?.naam || "Je collega"} werkt nu in Tardy. Je kijkt mee, dus er wordt niets geregistreerd.`, "err");
     const groep = (K.SOORT[soort] || {}).g, d = K.vandaag();
+    /* Per ongeluk twee keer geklikt? Zelfde student en soort binnen 5 minuten: eerst vragen. */
+    const nu = tijd || K.nuTijd(), min = (t) => { const [u, m] = String(t || "0:0").split(":").map(Number); return u * 60 + m; };
+    const dubbel = S.registraties.find((r) => r.stamnr === stamnr && r.soort === soort && r.datum === d && Math.abs(min(r.tijd) - min(nu)) <= 5);
+    if (dubbel && !confirm(`${K.naamVan(S.studenten[stamnr] || {})} is om ${dubbel.tijd} al gemeld als ${K.soortNaam(soort).toLowerCase()}. Nog een keer melden?`)) return null;
     const reg = { id: K.uid(), stamnr, datum: d, tijd: tijd || K.nuTijd(), soort, reden: "", notitie: "", paraaf: S.instellingen.cbParaaf || "",
       terug: (groep === "telaat" || groep === "calamiteit") ? false : undefined };
     S.registraties.push(reg);
@@ -1172,6 +1176,7 @@ DT.register({
     const perNiveau = [4, 3, 2, 1].map((n) => [n, zicht.filter((s) => s.niveau === n)]).filter(([, l]) => l.length);
     h.replaceChildren(
       this.magisterKaart(DT),
+      this.periodeAfKaart(DT, pid),
       DT.el("div", { class: "dt-cb-rij" }, [DT.el("span", { class: "dt-cb-zacht", text: `${open.length} ${open.length === 1 ? "student" : "studenten"} met een open stap in ${(K.periodeById(pid) || {}).naam || ""}` }), toggle,
         this.knop(DT, "Overzicht per mentor…", () => this.mentorOverzicht(DT)), this.knop(DT, "Weekrapport mentoren…", () => this.weekrapport(DT)), this.knop(DT, "Protocol bekijken", () => this._scherm.bar.querySelector('[data-view="protocol"]')?.click(), false, "stil")]),
       ...(perNiveau.length ? perNiveau.map(([n, l]) => DT.el("dna-card", { class: "dt-cb-kaart dt-cb-niveaugroep" }, [
@@ -1179,6 +1184,77 @@ DT.register({
         DT.el("div", { class: "dt-cb-siglijst" }, l.map(rij))]))
         : [DT.el("div", { class: "dt-cb-leeg" }, DT.el("p", { text: "Geen signalen in deze periode." }))]),
     );
+  },
+
+  /* Een afgelopen periode in één keer afsluiten: alle open signalen (ook de lichtere stappen) afgehandeld en
+   * open meldafspraken uit die periode vervallen. De geschiedenis blijft bewaard; heropenen kan per signaal. */
+  periodeAfKaart(DT, pid) {
+    const K = TardyKern, p = K.periodeById(pid);
+    if (!p || p.eind >= K.vandaag()) return null;
+    const sigs = K.alleSignalen(pid).filter((s) => !s.afgehandeld);
+    const mafs = K.S.meldafspraken.filter((m) => m.status === "open" && (m.datum <= p.eind) && ((m.gemaaktOp || m.datum) >= p.start));
+    if (!sigs.length && !mafs.length) return null;
+    const studenten = new Set(sigs.map((s) => s.stamnr)).size;
+    const doe = () => {
+      if (this._kijkt) return this.melding(`${this._ander?.naam || "Je collega"} werkt nu in Tardy. Je kijkt mee, dus er wordt niets afgehandeld.`, "err");
+      const wat = [sigs.length ? `${sigs.length} open ${sigs.length === 1 ? "signaal" : "signalen"} (${studenten} ${studenten === 1 ? "student" : "studenten"})` : "", mafs.length ? `${mafs.length} open ${mafs.length === 1 ? "meldafspraak" : "meldafspraken"}` : ""].filter(Boolean).join(" en ");
+      if (!confirm(`${p.naam} is afgelopen. ${wat} afhandelen?
+
+Signalen krijgen de status afgehandeld, meldafspraken vervallen. Je kunt ze later per stuk heropenen.`)) return;
+      const op = K.vandaag();
+      for (const s of sigs) K.S.afhandelingen[s.key] = { status: "gedaan", op, notitie: `${p.naam} afgesloten` };
+      for (const m of mafs) this.rondAf(m, "vervallen", { notitie: `${p.naam} afgesloten` });
+      this.bewaar(); this.teken();
+      this.melding(`${p.naam} afgesloten: ${wat} afgehandeld.`, "info", 7000);
+    };
+    return DT.el("dna-card", { class: "dt-cb-kaart dt-cb-periodeaf" }, [
+      DT.el("div", { class: "dt-cb-kaartkop" }, [
+        DT.el("div", { class: "dt-cb-wie" }, [DT.el("h2", { text: `${p.naam} is afgelopen` }),
+          DT.el("small", { text: `Nog open: ${sigs.length} ${sigs.length === 1 ? "signaal" : "signalen"} bij ${studenten} ${studenten === 1 ? "student" : "studenten"}${mafs.length ? ` en ${mafs.length} ${mafs.length === 1 ? "meldafspraak" : "meldafspraken"}` : ""}. Na de periode mag alles in één keer worden afgehandeld.` })]),
+        this.knop(DT, "Alles afhandelen", doe, true),
+      ]),
+    ]);
+  },
+
+  /* Meldingen uit een ander Tardy-bestand overnemen (bijv. een oudere tardy-gegevens.json van vóór de gedeelde
+   * map). Alleen wat er nog niet is: zelfde id, of zelfde student, datum, tijd en soort, wordt overgeslagen. */
+  importeer(DT) {
+    const K = TardyKern;
+    if (this._kijkt) return this.melding("Je kijkt mee; overnemen kan pas als jij in Tardy werkt.", "err");
+    const inp = DT.el("input", { type: "file", accept: ".json,application/json" });
+    inp.addEventListener("change", async () => {
+      let g; try { g = JSON.parse(await inp.files[0].text()); } catch { return this.melding("Dit is geen leesbaar Tardy-bestand.", "err"); }
+      if (!g || !Array.isArray(g.registraties)) return this.melding("In dit bestand staan geen meldingen van Tardy.", "err");
+      const S = K.S, sl = (r) => `${r.stamnr}|${r.datum}|${r.tijd}|${r.soort}`;
+      const ids = new Set(S.registraties.map((r) => r.id)), sleutels = new Set(S.registraties.map(sl));
+      const regs = g.registraties.filter((r) => r && r.stamnr && r.datum && r.soort && !ids.has(r.id) && !sleutels.has(sl(r)));
+      const mIds = new Set(S.meldafspraken.map((m) => m.id)), mSl = new Set(S.meldafspraken.map((m) => `${m.stamnr}|${m.datum}|${m.aanleiding}`));
+      const mafs = (Array.isArray(g.meldafspraken) ? g.meldafspraken : []).filter((m) => m && m.stamnr && !mIds.has(m.id) && !mSl.has(`${m.stamnr}|${m.datum}|${m.aanleiding}`));
+      const nodig = new Set([...regs, ...mafs].map((x) => x.stamnr));
+      const nieuweSt = [...nodig].filter((sn) => !S.studenten[sn] && g.studenten?.[sn]);
+      const zonder = [...nodig].filter((sn) => !S.studenten[sn] && !g.studenten?.[sn]);
+      if (!regs.length && !mafs.length) return this.melding("Alles uit dit bestand staat al in de gedeelde map.");
+      const ds = regs.map((r) => r.datum).sort();
+      const per = {}; for (const r of regs) { const n = (K.periodeVanDatum(r.datum) || { naam: "buiten de periodes" }).naam; per[n] = (per[n] || 0) + 1; }
+      this.modal("Meldingen overnemen", [
+        DT.el("p", { text: `Uit "${inp.files[0].name}":` }),
+        DT.el("ul", {}, [
+          regs.length ? DT.el("li", { text: `${regs.length} ${regs.length === 1 ? "melding" : "meldingen"} (${K.kortDatum(ds[0])} t/m ${K.kortDatum(ds[ds.length - 1])}; ${Object.entries(per).map(([n, a]) => `${n}: ${a}`).join(", ")})` }) : null,
+          mafs.length ? DT.el("li", { text: `${mafs.length} ${mafs.length === 1 ? "meldafspraak" : "meldafspraken"}` }) : null,
+          nieuweSt.length ? DT.el("li", { text: `${nieuweSt.length} ${nieuweSt.length === 1 ? "student" : "studenten"} die nog niet in de gedeelde map ${nieuweSt.length === 1 ? "staat" : "staan"} (worden toegevoegd)` }) : null,
+          zonder.length ? DT.el("li", { text: `${zonder.length} stamnummer(s) zonder studentgegevens: die meldingen worden wel overgenomen` }) : null,
+        ].filter(Boolean)),
+        DT.el("p", { class: "dt-cb-zacht", text: "Wat er al is (zelfde melding) wordt overgeslagen. Er verdwijnt niets uit de gedeelde map; signalen en meldafspraken tellen de overgenomen meldingen direct mee." }),
+      ], [["Annuleren", () => this.sluitModal()], ["Overnemen", () => {
+        for (const sn of nieuweSt) S.studenten[sn] = g.studenten[sn];
+        S.registraties.push(...regs.map((r) => Object.assign({}, r, { overgenomen: inp.files[0].name })));
+        S.meldafspraken.push(...mafs);
+        K.normaliseer();
+        this.sluitModal(); this.bewaar(); this.teken();
+        this.melding(`${regs.length} ${regs.length === 1 ? "melding" : "meldingen"}${mafs.length ? ` en ${mafs.length} ${mafs.length === 1 ? "meldafspraak" : "meldafspraken"}` : ""} overgenomen.`, "info", 7000);
+      }, true]]);
+    });
+    inp.click();
   },
 
   /* ===================================================================================== */
@@ -2226,7 +2302,7 @@ DT.register({
       DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("h2", { text: "Gedeelde map" }),
         DT.el("p", { text: this._map ? `In gebruik: "${this._map.name}" · revisie ${this._basis}${this._door ? ` · laatst opgeslagen door ${this._door} ${this.moment(this._op)}` : ""}.` : "Nog geen map gekozen." }),
         DT.el("p", { class: "dt-cb-zacht", text: "Dezelfde map als de Tardy-app: tardy-gegevens.json en tardy-in-gebruik.json. Jullie werken om de beurt. Een kopie van de stand blijft ook in deze browser bewaard (hooguit één per uur, de laatste 40, en bij een conflict)." }),
-        DT.el("div", { class: "dt-cb-rij" }, [this.knop(DT, "Andere map kiezen", () => this.kiesMap(DT)), this.knop(DT, "Map loskoppelen", async () => { if (!confirm("De balie loskoppelen van deze map? De map zelf blijft staan.")) return; await this.bezettingVrij(); await this.kv("map", null); this._map = null; this.koppel(DT); }, false, "stil")])]),
+        DT.el("div", { class: "dt-cb-rij" }, [this.knop(DT, "Andere map kiezen", () => this.kiesMap(DT)), this.knop(DT, "Meldingen overnemen uit ander bestand…", () => this.importeer(DT)), this.knop(DT, "Map loskoppelen", async () => { if (!confirm("De balie loskoppelen van deze map? De map zelf blijft staan.")) return; await this.bezettingVrij(); await this.kv("map", null); this._map = null; this.koppel(DT); }, false, "stil")])]),
       DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("h2", { text: "Jij" }), DT.el("p", { class: "dt-cb-zacht", text: "Alleen in deze browser, niet in de gedeelde map (zoals in Tardy)." }),
         veld("Naam", "naam"), veld("Paraaf", "paraaf"), veld("E-mail", "email", "email"), veld("Lokaal", "lokaal", "text", c.lokaal || i.lokaal || "", "staat in mails en op het briefje"),
         (() => { const r = veld("Logboektype bij Notitie", "logboekType", "text", c.logboekType || "Notitie", "zoals in Magister › Begeleiding › Toevoegen, bijv. Notitie of Gespreksnotitie");
@@ -2416,6 +2492,7 @@ DT.register({
       .dt-cb-sigknoppen .dt-cb-acties-in { gap: 6px; }
       .dt-cb-sig.is-open .dt-cb-sigmaat { display: none; }
       .dt-cb-detailknoppen { margin: 0 0 10px; }
+      dna-card.dt-cb-periodeaf { border-left: 4px solid var(--cb-acc); }
       .dt-cb-magchip { flex: none; font-size: 12px !important; line-height: 18px; padding: 0 6px; border-radius: 999px; background: color-mix(in srgb, var(--cb-rood) 12%, var(--cb-kaart)); color: var(--cb-rood); font-weight: 600; }
       .dt-cb-magvink { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; }
       .dt-cb-magvink small { font-size: 12px !important; color: var(--cb-zacht); }
