@@ -136,7 +136,30 @@ DT.register({
     Object.assign(K.S.instellingen, p);
     if (!p.lokaal && lokaal) K.S.instellingen.lokaal = lokaal;   // oude bestanden met lokaal in de gedeelde stand
     this._basis = g.revisie || 0; this._door = g.gewijzigdDoor || ""; this._op = g.gewijzigdOp || "";
-    if (!K.UI.periodeId || !K.periodeById(K.UI.periodeId)) K.UI.periodeId = K.huidigePeriode().id;
+    this.volgPeriodes();
+    if (!K.UI.periodeId || !K.periodeById(K.UI.periodeId)) K.UI.periodeId = (K.periodeVanDatum(K.vandaag()) || K.huidigePeriode()).id;
+  },
+  /* De periodes van de plugin (zijpaneel › Periodes) zijn leidend, zodra daar periodes staan. Een periode houdt
+   * de code die hij in Tardy al had (zelfde begindatum of naam), zodat afgehandelde signalen, acties en
+   * Magister-cijfers bij die periode blijven horen. Meldingen blijven altijd bewaard; die van een verwijderde
+   * periode vallen alleen buiten de signalen. Geeft true als de periodes zijn gewijzigd. */
+  volgPeriodes() {
+    const K = TardyKern; if (!K.S || typeof DT === "undefined" || !DT.periodes) return false;
+    const pl = DT.periodes(); if (!pl.length) return false;
+    const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const oud = K.S.instellingen.periodes || [], gebruikt = new Set();
+    const nieuw = pl.map((p) => {
+      const start = ymd(p.begin), eind = ymd(p.einde);
+      const zelfde = oud.find((o) => !gebruikt.has(o.id) && o.start === start) || oud.find((o) => !gebruikt.has(o.id) && o.naam === p.naam);
+      const id = zelfde ? zelfde.id : `dt-${p.id}`;
+      gebruikt.add(id);
+      return { id, naam: p.naam, start, eind };
+    });
+    if (JSON.stringify(nieuw) === JSON.stringify(oud)) return false;
+    K.S.instellingen.periodes = nieuw;
+    if (!K.periodeById(K.UI.periodeId)) K.UI.periodeId = (K.periodeVanDatum(K.vandaag()) || nieuw[0]).id;
+    if (this._map && !this._kijkt) this.bewaar();
+    return true;
   },
   async bezetting() { try { return JSON.parse(await this.lees(this.BEZET) || "null"); } catch { return null; } },
   bezetDoorAnder(b) { return !!(b && b.apparaat && b.apparaat !== this.apparaat() && (Date.now() - Date.parse(b.bijgewerkt || 0)) < this.BEZET_VERLOOPT); },
@@ -225,6 +248,7 @@ DT.register({
     K.H.bewaar = () => this.bewaar();
     K.H.toon = (t) => this.melding(t);
     this.haken();
+    if (!this._perUnsub && DT.onSettingsChange) this._perUnsub = DT.onSettingsChange(() => { if (this._scherm && this.volgPeriodes()) { this.teken(); this.melding("Periodes bijgewerkt volgens de plugin."); } });
     const pagina = DT.el("section", { id: "dt-cbp", class: "dt-cb", "aria-label": "Te laat-balie" });
     const kop = DT.el("dna-page-header", { heading: "Te laat-balie" });
     const echt = DT.deepQuery("att-attendance-dashboard")?.shadowRoot?.querySelector("dna-page-header");
@@ -1202,7 +1226,7 @@ DT.register({
 
   /* Kijk je naar een andere periode dan de huidige, dan staan nieuwe meldingen hier niet: zeg dat, met een knop terug. */
   anderePeriode(DT, pid) {
-    const K = TardyKern, nu = K.huidigePeriode();
+    const K = TardyKern, nu = K.periodeVanDatum(K.vandaag());
     if (!nu || nu.id === pid) return null;
     const p = K.periodeById(pid) || {};
     return DT.el("div", { class: "dt-cb-anderedag" }, [
@@ -1399,8 +1423,8 @@ Signalen krijgen de status afgehandeld, meldafspraken vervallen. Je kunt ze late
     const venster = (pid, dagen) => {
       const p = K.periodeById(pid), v = K.vandaag();
       if (!p || p.start > v) return null;
-      const eind = p.eind < v ? p.eind : v;
-      return { van: K.plusDagen(eind, -dagen), tot: eind };
+      const eind = p.eind < v ? p.eind : v, van = K.plusDagen(eind, -dagen);
+      return { van: van < p.start ? p.start : van, tot: eind };   // niet terug over het begin van de periode
     };
     const k4 = K.TELLERS.klokuren4w;
     if (k4 && !k4._dt) {
