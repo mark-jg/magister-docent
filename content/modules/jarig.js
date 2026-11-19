@@ -48,12 +48,12 @@ DT.register({
     if (!column) { if (this._card) { this._card.remove(); this._card = null; } return; }
     this.layout();
     if (this._card && this._card.isConnected && Date.now() - this._fetchedAt < 6 * 3600e3) return;
-    if (this._busy) return;
+    if (this._busy || Date.now() - (this._misluktOp || 0) < 5 * 60000) return;
     this._busy = true;
     try {
       if (!this._data || Date.now() - this._fetchedAt > 6 * 3600e3) {
         const r = await DT.api("/api/leerlingen/jarigen", { full: true, timeout: 12000 });
-        if (r.status !== 200 || !r.json) { this._busy = false; return; }
+        if (r.status !== 200 || !r.json) { this._misluktOp = Date.now(); this._busy = false; return; }
         this._data = Array.isArray(r.json) ? r.json : (r.json.items || r.json.Items || []);
         this._fetchedAt = Date.now();
       }

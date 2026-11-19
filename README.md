@@ -4,7 +4,7 @@ Chrome-extensie voor Magister (docenten/personeel). Alles draait lokaal in je br
 
 ## Installeren (lokaal laden)
 
-1. Download de nieuwste `magister-docent-tools-vX.Y.Z.zip` van de [Releases-pagina](https://github.com/mark-jg/magister-docent/releases/latest). De repo is privé: je moet bij GitHub ingelogd zijn met een account dat toegang heeft.
+1. Download de nieuwste `magister-docent-tools-vX.Y.Z.zip` van de [Releases-pagina](https://github.com/mark-jg/magister-docent/releases/latest).
 2. Pak de zip uit in een map die je laat staan (bijvoorbeeld `Documenten/magister-docent-tools`).
 3. Open Chrome en ga naar `chrome://extensions`.
 4. Zet rechtsboven **Ontwikkelaarsmodus** aan.
@@ -28,6 +28,16 @@ Er worden alleen bestanden geschreven of overschreven, nooit verwijderd. Het man
 De repo is openbaar, dus controleren en bijwerken werkt zonder token. GitHub beperkt anonieme aanroepen wel tot 60 per uur per adres; wie daar tegenaan loopt (bijvoorbeeld op een gedeeld schoolnetwerk) kan een fine-grained token met alleen **Contents: Read-only** invullen bij **Instellingen > Updates > GitHub-token**. Het token staat alleen in de lokale opslag van de extensie op dat apparaat en gaat alleen naar `api.github.com`.
 
 Chrome laat een uitgepakte extensie zijn eigen map alleen beschrijven als de gebruiker die map zelf aanwijst (File System Access API); daarom die eenmalige keuze en de toestemmingsvraag per update. Wie liever met git werkt: `git clone https://github.com/mark-jg/magister-docent`, die map als uitgepakte extensie laden, en bijwerken met `git pull` plus Herladen.
+
+## Ontwikkelen en testen
+
+De extensie zelf heeft geen buildstap. Voor de linter en de tests is Node nodig (eenmalig `npm install`):
+
+- `npm test` draait de tests in `tests/` (rekenfuncties, de brug naar Magister, de Te laat-balie, de updater);
+- `npm run lint` controleert alle scripts op onbekende namen en dubbele sleutels;
+- `npm run check` doet allebei. GitHub Actions draait dit bij elke push, en er komt geen release als het faalt.
+
+Bij elke release staat naast de zip een bestand `.sha256`; de updater vergelijkt de download daarmee voordat er iets wordt overschreven.
 
 ## Wat zit erin
 

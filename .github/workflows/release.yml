@@ -24,14 +24,26 @@ jobs:
             exit 1
           fi
 
+      # Geen release als de linter of een test faalt.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check
+
       - name: Zip bouwen
         run: |
           mkdir -p dist/magister-docent-tools
           rsync -a ./ dist/magister-docent-tools/ \
             --exclude .git --exclude .github --exclude scripts --exclude dist \
-            --exclude .gitignore --exclude '.DS_Store'
+            --exclude .gitignore --exclude '.DS_Store' \
+            --exclude node_modules --exclude tests --exclude package.json \
+            --exclude package-lock.json --exclude eslint.config.js
           cd dist
           zip -qr "magister-docent-tools-${GITHUB_REF_NAME}.zip" magister-docent-tools
+          # Controlegetal: de updater in de extensie vergelijkt de gedownloade zip hiermee.
+          sha256sum "magister-docent-tools-${GITHUB_REF_NAME}.zip" > "magister-docent-tools-${GITHUB_REF_NAME}.zip.sha256"
           ls -l
 
       - name: Release-notities uit README halen
@@ -48,5 +60,7 @@ jobs:
         with:
           name: Versie ${{ github.ref_name }}
           body_path: dist/notes.md
-          files: dist/magister-docent-tools-*.zip
+          files: |
+            dist/magister-docent-tools-*.zip
+            dist/magister-docent-tools-*.zip.sha256
           generate_release_notes: true

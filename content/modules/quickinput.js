@@ -23,17 +23,23 @@ DT.register({
   init(DT) {
     this._handler = (e) => this.onKey(DT, e);
     document.addEventListener("keydown", this._handler, true);
-    chrome.runtime.onMessage.addListener((msg) => {
+    /* Chrome stuurt een sneltoets naar álle frames van het tabblad. Paneel en thema horen bij het tabblad
+     * als geheel: alleen het hoofdvenster reageert (anders wisselt het thema één keer per frame). */
+    this._msg = (msg) => {
       if (msg?.type !== "command") return;
-      if (msg.command === "toggle-panel") DT.module("panel")?.toggle();
-      if (msg.command === "toggle-theme") DT.module("theme")?.toggle(DT);
+      if (msg.command === "toggle-panel") { if (DT.isTop) DT.module("panel")?.toggle(); return; }
+      if (msg.command === "toggle-theme") { if (DT.isTop) DT.module("theme")?.toggle(DT); return; }
       if (msg.command === "export") DT.module("tables")?.exportAll(DT);
       if (msg.command === "inspector") DT.module("inspector")?.start(DT);
       if (msg.command === "mail-coach") DT.module("melding")?.trigger(DT);
-    });
+    };
+    chrome.runtime.onMessage.addListener(this._msg);
   },
 
-  destroy() { document.removeEventListener("keydown", this._handler, true); },
+  destroy() {
+    document.removeEventListener("keydown", this._handler, true);
+    if (this._msg) chrome.runtime.onMessage.removeListener(this._msg);
+  },
 
   onKey(DT, e) {
     if (!DT.settings.quickinput.shortcuts) return;
@@ -46,7 +52,7 @@ DT.register({
       return;
     }
     if (e.altKey && !e.ctrlKey && !e.metaKey) {
-      const k = e.key.toLowerCase();
+      const k = DT.keyOf(e);
       if (k === "d") { e.preventDefault(); DT.module("panel")?.toggle(); }
       if (k === "t") { e.preventDefault(); DT.module("theme")?.toggle(DT); }
       if (k === "i") { e.preventDefault(); DT.module("inspector")?.start(DT); }
@@ -61,7 +67,7 @@ DT.register({
     // Ctrl+Shift+V: kolom uit klembord in opeenvolgende velden plakken.
     if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "v" && typing && t.tagName === "INPUT") {
       e.preventDefault();
-      navigator.clipboard.readText().then((text) => this.pasteColumn(DT, t, text));
+      navigator.clipboard.readText().then((text) => this.pasteColumn(DT, t, text)).catch(() => DT.toast("Plakken lukte niet: sta het lezen van het klembord toe voor Magister", "err", 4500));
     }
   },
 

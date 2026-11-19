@@ -5,6 +5,7 @@ const $ = (id) => document.getElementById(id);
 const note = (t) => { $("note").textContent = t; };
 const current = chrome.runtime.getManifest().version;
 $("ver").textContent = `v${current}`;
+chrome.storage.local.get("dev").then(({ dev }) => { if (dev) $("ver").textContent = `v${current} · dev`; });
 const DEFAULTS = globalThis.DT_DEFAULTS;
 let settings;
 const merge = (base, patch) => { for (const [k, v] of Object.entries(patch || {})) { if (v && typeof v === "object" && !Array.isArray(v) && base[k] && typeof base[k] === "object" && !Array.isArray(base[k])) merge(base[k], v); else base[k] = v; } return base; };
@@ -15,7 +16,11 @@ async function load() {
   $("handle").checked = settings.panel?.handle !== false;
   $("developer").checked = settings.developer?.enabled === true;
 }
-async function save(patch) { merge(settings, patch); await chrome.storage.sync.set({ settings }); }
+async function save(patch) {
+  merge(settings, patch);
+  try { await chrome.storage.sync.set({ settings }); }
+  catch (e) { note(`Niet opgeslagen: ${e?.message || e}`); }
+}
 $("handle").onchange = () => save({ panel: { handle: $("handle").checked } });
 $("developer").onchange = () => save({ developer: { enabled: $("developer").checked } });
 $("options").onclick = () => chrome.runtime.openOptionsPage();
@@ -33,7 +38,7 @@ function renderUpdate(info) {
   const avail = !!upd?.available;
   $("update").hidden = !avail;
   $("upToDate").hidden = avail;
-  $("upToDate").textContent = upd?.error ? `Kon GitHub niet bereiken: ${upd.error}.` : upd?.latest ? `Je hebt de nieuwste versie (${current}).` : "Nog niet gecontroleerd op updates.";
+  $("upToDate").textContent = upd?.dev ? "Ontwikkelversie uit een lokale map: geen automatische updates." : upd?.error ? `Kon GitHub niet bereiken: ${upd.error}.` : upd?.latest ? `Je hebt de nieuwste versie (${current}).` : "Nog niet gecontroleerd op updates.";
   if (!avail) return;
   $("updTitle").textContent = `Versie ${upd.latest} beschikbaar`;
   $("updText").textContent = `Je gebruikt nu ${upd.current}.` + (upd.publishedAt ? ` Uitgebracht op ${new Date(upd.publishedAt).toLocaleDateString("nl-NL")}.` : "");

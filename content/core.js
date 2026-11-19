@@ -10,6 +10,11 @@
   const modules = new Map();
   let settings = structuredClone(DEFAULTS);
   const listeners = new Set();
+  /* Gedeelde waarnemer voor DT.observe: één MutationObserver voor alle modules. */
+  const waarnemers = new Set();
+  let waarnemer = null;
+  const alleWaarnemers = () => { for (const w of waarnemers) w.run(); };
+  const zichtbaar = () => { if (!document.hidden) alleWaarnemers(); };
 
   const DT = {
     version: chrome.runtime.getManifest().version,
@@ -27,10 +32,25 @@
       return settings;
     },
 
+    /* Geeft false als het bewaren niet lukte (opslaglimiet van Chrome, of de extensie is net bijgewerkt).
+     * De wijziging geldt dan nog wel in dit tabblad, en de gebruiker krijgt een melding in plaats van stilte. */
     async saveSettings(patch) {
       settings = deepMerge(settings, patch);
-      await chrome.storage.sync.set({ settings });
+      let ok = true;
+      try { await chrome.storage.sync.set({ settings }); }
+      catch (e) {
+        ok = false;
+        console.warn("[DT] instellingen bewaren mislukt", e);
+        const m = String(e?.message || e);
+        try {
+          DT.toast(/QUOTA_BYTES/i.test(m) ? "Instellingen niet bewaard: er staat te veel in (bijvoorbeeld veel links, coaches, periodes of verborgen elementen). Ruim iets op bij Instellingen."
+            : /context invalidated/i.test(m) ? "Instellingen niet bewaard: de extensie is bijgewerkt. Herlaad dit tabblad."
+            : /MAX_WRITE/i.test(m) ? "Instellingen niet bewaard: te veel wijzigingen kort na elkaar. Probeer het over een minuut opnieuw."
+            : `Instellingen niet bewaard: ${m}`, "err", 8000);
+        } catch {}
+      }
       listeners.forEach((fn) => fn(settings));
+      return ok;
     },
 
     onSettingsChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
@@ -50,6 +70,13 @@
     },
 
     module(id) { return modules.get(id); },
+
+    /* Letter of cijfer van een toets. Met Alt (Option op de Mac) maakt het toetsenbord er een ander teken
+     * van (Option+D geeft "∂"); dan telt de fysieke toets. */
+    keyOf(e) {
+      const m = e.altKey ? /^(?:Key([A-Z])|Digit([0-9]))$/.exec(e.code || "") : null;
+      return m ? (m[1] || m[2]).toLowerCase() : String(e.key || "").toLowerCase();
+    },
 
     /* ---------- Helpers ---------- */
 
@@ -103,7 +130,7 @@
         const id = Math.random().toString(36).slice(2);
         const h = (e) => { if (DT.sameOrigin(e.source) && e.data?.type === "dt:api:result" && e.data.id === id) { window.removeEventListener("message", h); resolve(e.data); } };
         window.addEventListener("message", h);
-        try { win.postMessage({ type: "dt:api:get", id, url, full, blob }, "*"); } catch { resolve({ status: 0, error: "frame onbereikbaar" }); }
+        try { win.postMessage({ type: "dt:api:get", id, url, full, blob }, location.origin); } catch { resolve({ status: 0, error: "frame onbereikbaar" }); }
         setTimeout(() => { window.removeEventListener("message", h); resolve({ status: 0, error: "time-out" }); }, timeout);
       });
     },
@@ -115,10 +142,32 @@
         const id = Math.random().toString(36).slice(2);
         const h = (e) => { if (DT.sameOrigin(e.source) && e.data?.type === "dt:api:found" && e.data.id === id) { window.removeEventListener("message", h); resolve(all ? (e.data.urls || []) : e.data.url); } };
         window.addEventListener("message", h);
-        try { win.postMessage({ type: "dt:api:find", id, pattern, all }, "*"); } catch { resolve(all ? [] : null); }
+        try { win.postMessage({ type: "dt:api:find", id, pattern, all }, location.origin); } catch { resolve(all ? [] : null); }
         setTimeout(() => { window.removeEventListener("message", h); resolve(all ? [] : null); }, timeout);
       });
     },
+
+    /* Zoals DT.api (met de hele JSON), maar wacht en probeert opnieuw als Magister om rust vraagt (429) of
+     * even niet kan (503): 1,5 s, 3 s, 6 s … hooguit zes pogingen. opWachten(poging) wordt vóór elke pauze
+     * aangeroepen, bijvoorbeeld om het in een voortgangsregel te melden; gooit die een fout (de gebruiker
+     * brak af), dan stopt het ophalen daarmee. */
+    async apiRetry(url, { opWachten = null, pogingen = 6, basis = 1500, ...opties } = {}) {
+      let r;
+      for (let poging = 0; poging < pogingen; poging++) {
+        r = await DT.api(url, { full: true, timeout: 25000, ...opties });
+        if (r.status !== 429 && r.status !== 503) return r;
+        if (poging === pogingen - 1) break;
+        if (opWachten) opWachten(poging);
+        await new Promise((ok) => setTimeout(ok, basis * 2 ** poging));
+      }
+      return r;
+    },
+
+    /* De rijen uit een API-antwoord (een lijst, of { items: [...] }); null als de aanvraag mislukte. */
+    lijst(r) { return (r && r.status === 200 && r.json) ? (Array.isArray(r.json) ? r.json : r.json.items || []) : null; },
+
+    /* Staat de module aan en is hij gestart? (DT.module geeft ook uitgeschakelde modules terug.) */
+    actief(id) { return !!modules.get(id)?.active; },
 
     sameOrigin(w) { try { return w === window || (!!w && w.location.host === location.host); } catch { return false; } },
 
@@ -158,29 +207,42 @@
       return `${f(p.begin)} – ${f(p.einde)}`;
     },
 
-    /* Reageert op DOM-wijzigingen. MutationObserver ziet geen shadow DOM,
-     * daarom wordt er daarnaast periodiek gescand. */
-    observe(callback, { debounce = 300, poll = 2000 } = {}) {
-      let timer = null;
+    /* Reageert op DOM-wijzigingen. MutationObserver ziet geen shadow DOM, daarom wordt er daarnaast periodiek
+     * gescand. Alle modules delen één MutationObserver. Het periodieke scannen pauzeert zolang het tabblad niet
+     * in beeld is (ookVerborgen: true houdt het aan, voor formulieren die in een nieuw tabblad worden ingevuld)
+     * en haalt het in zodra het tabblad weer zichtbaar wordt. Bij een aanhoudende stroom wijzigingen loopt de
+     * callback toch minstens elke paar seconden (anders zou het uitstellen hem blijven wegduwen). */
+    observe(callback, { debounce = 300, poll = 2000, ookVerborgen = false } = {}) {
       if (!document.body) return () => {};
-      const run = () => { clearTimeout(timer); timer = setTimeout(callback, debounce); };
-      const obs = new MutationObserver(run);
-      obs.observe(document.body, { childList: true, subtree: true });
-      const iv = poll ? setInterval(run, poll) : null;
-      window.addEventListener("hashchange", run);
+      const maxWacht = Math.max(debounce * 6, 2000);
+      const w = { timer: null, sinds: 0 };
+      const vuur = () => {
+        clearTimeout(w.timer); w.timer = null; w.sinds = 0;
+        try { const r = callback(); if (r && typeof r.catch === "function") r.catch((e) => console.warn("[DT] waarnemer", e)); }
+        catch (e) { console.warn("[DT] waarnemer", e); }
+      };
+      w.run = () => {
+        const nu = Date.now(); if (!w.sinds) w.sinds = nu;
+        clearTimeout(w.timer);
+        w.timer = setTimeout(vuur, Math.max(0, Math.min(debounce, maxWacht - (nu - w.sinds))));
+      };
+      waarnemers.add(w);
+      if (!waarnemer) {
+        waarnemer = new MutationObserver(alleWaarnemers);
+        waarnemer.observe(document.body, { childList: true, subtree: true });
+        window.addEventListener("hashchange", alleWaarnemers);
+        document.addEventListener("visibilitychange", zichtbaar);
+      }
+      const iv = poll ? setInterval(() => { if (ookVerborgen || !document.hidden) w.run(); }, poll) : null;
       callback();
-      return () => { obs.disconnect(); clearInterval(iv); window.removeEventListener("hashchange", run); };
-    },
-
-    /* Routewijzigingen in de SPA volgen. */
-    onRoute(callback) {
-      let last = location.href;
-      const check = () => { if (location.href !== last) { last = location.href; callback(location.href); } };
-      const push = history.pushState, replace = history.replaceState;
-      history.pushState = function () { push.apply(this, arguments); check(); };
-      history.replaceState = function () { replace.apply(this, arguments); check(); };
-      window.addEventListener("popstate", check);
-      callback(location.href);
+      return () => {
+        waarnemers.delete(w); clearTimeout(w.timer); clearInterval(iv);
+        if (!waarnemers.size && waarnemer) {
+          waarnemer.disconnect(); waarnemer = null;
+          window.removeEventListener("hashchange", alleWaarnemers);
+          document.removeEventListener("visibilitychange", zichtbaar);
+        }
+      };
     },
 
     /* Tekst van een cel, inclusief waarden van invoervelden, vinkjes en keuzelijsten. */

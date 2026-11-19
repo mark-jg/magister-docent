@@ -20,7 +20,8 @@ globalThis.DT_DEFAULTS = {
   aanwezigexport: { enabled: true },
   /* Lesregistraties: aanwezigheid van klassen per vak/docent over een periode (zijpaneel › Acties). */
   lesreg: { enabled: true },
-  leaderboard: { enabled: true },
+  /* zonderGeoorloofd: ziek en geoorloofd afwezig tellen niet mee in de ranglijst (knop op het leaderboard). */
+  leaderboard: { enabled: true, zonderGeoorloofd: false },
   lestools: { enabled: true },
   /* Plan van aanpak bij Begeleiding › Logboek van een student (SLB). Concepten blijven in deze browser. */
   pva: { enabled: true },

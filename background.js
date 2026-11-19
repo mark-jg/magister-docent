@@ -45,13 +45,36 @@ function scheduleUpdateCheck() {
   chrome.alarms.create(ALARM, { delayInMinutes: 1, periodInMinutes: CHECK_INTERVAL_MIN });
 }
 
+/* Ontwikkelmap herkennen: package.json zit niet in de zip van een release, alleen in een map die uit git komt
+ * (de dev-map, of een git clone). Zo'n map werk je bij met git; de updater blijft er dan af, er wordt niet op
+ * updates gecontroleerd en het icoon krijgt het label DEV, zodat je ziet welke versie je voor je hebt. */
+let devBelofte = null;
+function isDev() {
+  return devBelofte ||= fetch(chrome.runtime.getURL("package.json")).then((r) => r.ok, () => false);
+}
+async function devLabel() {
+  const dev = await isDev();
+  await chrome.storage.local.set({ dev });
+  if (!dev) return false;
+  await chrome.action.setBadgeText({ text: "DEV" });
+  await chrome.action.setBadgeBackgroundColor({ color: "#AF52DE" });
+  await chrome.action.setTitle({ title: `Docent Tools voor Magister ${chrome.runtime.getManifest().version} (ontwikkelversie)` });
+  return true;
+}
+
 async function setBadge(on) {
+  if (await isDev()) return;   // het label DEV blijft staan
   await chrome.action.setBadgeText({ text: on ? "1" : "" });
   if (on) await chrome.action.setBadgeBackgroundColor({ color: "#E8B84A" });
 }
 
 async function checkForUpdate(force = false) {
   const current = chrome.runtime.getManifest().version;
+  if (await devLabel()) {
+    const info = { current, latest: null, available: false, dev: true, checkedAt: Date.now(), error: null };
+    await chrome.storage.local.set({ update: info });
+    return info;
+  }
   if (!force && !(await updatesEnabled())) {
     await setBadge(false);
     return { current, disabled: true };
@@ -80,6 +103,7 @@ async function checkForUpdate(force = false) {
       const rel = await res.json();
       const latest = String(rel.tag_name || "").replace(/^v/i, "");
       const asset = (rel.assets || []).find((a) => /\.zip$/i.test(a.name));
+      const som = asset && (rel.assets || []).find((a) => a.name === `${asset.name}.sha256`);   // controlegetal van de zip
       info = {
         current,
         latest,
@@ -88,6 +112,8 @@ async function checkForUpdate(force = false) {
         zip: asset?.browser_download_url || null,
         zipApi: asset?.url || null,
         zipName: asset?.name || null,
+        sha: som?.browser_download_url || null,
+        shaApi: som?.url || null,
         hasToken: Boolean(token),
         notes: String(rel.body || "").slice(0, 1500),
         publishedAt: rel.published_at || null,

@@ -165,13 +165,14 @@ DT.register({
     const peil = this.ymd(new Date());
     const lijst = (x) => (x && x.status === 200 && x.json) ? (Array.isArray(x.json) ? x.json : x.json.items || []) : null;
     const wacht = (ms) => new Promise((r) => setTimeout(r, ms));
-    const api = async (url) => { let x; for (let i = 0; i < 6; i++) { x = await DT.api(url, { full: true, timeout: 25000 }); if (x.status !== 429 && x.status !== 503) return x; voortgang(klaar, lln.length, "Even wachten: Magister vraagt om rustiger aan te doen…"); await wacht(1500 * 2 ** i); } return x; };
+    const api = (url) => DT.apiRetry(url, { opWachten: () => voortgang(klaar, lln.length, "Even wachten: Magister vraagt om rustiger aan te doen…") });
     const lln = [];
     let klaar = 0;
     for (const klas of klassen) {
       voortgang(0, 1, `Klas ${klas} ophalen…`);
       const z = await api(`/api/leerlingen/zoeken?q=**&top=300&skip=0&peildatum=${peil}&klassen=${encodeURIComponent(klas)}&velden=stamnummer&velden=naam`);
-      for (const x of lijst(z) || []) if (!lln.some((l) => l.id === x.id)) lln.push({ id: x.id, naam: this.naam(x), achternaam: x.achternaam || "", stam: String(x.code ?? x.stamnummer ?? ""), klas });
+      if (!lijst(z)) throw new Error(`klas ${klas} ophalen lukte niet (Magister antwoordde ${z.status === 429 ? "te veel aanvragen" : z.status || "niet"})`);
+      for (const x of lijst(z)) if (!lln.some((l) => l.id === x.id)) lln.push({ id: x.id, naam: this.naam(x), achternaam: x.achternaam || "", stam: String(x.code ?? x.stamnummer ?? ""), klas });
     }
     lln.sort((a, b) => a.klas.localeCompare(b.klas, "nl", { numeric: true }) || a.achternaam.localeCompare(b.achternaam, "nl"));
     const werk = lln.slice(), uit = [];

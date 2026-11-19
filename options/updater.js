@@ -44,6 +44,20 @@ async function dtUnzip(buffer) {
 }
 globalThis.dtUnzip = dtUnzip;
 
+/* SHA-256 van een buffer als hex. Bij elke release staat naast de zip een bestand <zip>.sha256; de updater
+ * vergelijkt de download daarmee. Dat vangt een afgebroken of beschadigde download. Het beschermt níet tegen
+ * iemand die het GitHub-account overneemt: die kan zip en controlegetal allebei vervangen. */
+async function dtSha256(buffer) {
+  const h = new Uint8Array(await crypto.subtle.digest("SHA-256", buffer));
+  return [...h].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+/* Inhoud van een .sha256-bestand ("<hex>  bestandsnaam") -> hex, of null als er geen geldig getal in staat. */
+function dtShaUitBestand(tekst) {
+  const m = /^\s*([0-9a-f]{64})\b/i.exec(String(tekst || ""));
+  return m ? m[1].toLowerCase() : null;
+}
+globalThis.dtSha256 = dtSha256; globalThis.dtShaUitBestand = dtShaUitBestand;
+
 if (typeof document !== "undefined" && typeof chrome !== "undefined" && chrome.storage) (() => {
   const $ = (id) => document.getElementById(id);
   const manifest = chrome.runtime.getManifest();
@@ -96,6 +110,12 @@ if (typeof document !== "undefined" && typeof chrome !== "undefined" && chrome.s
     $("forgetFolder").hidden = !dir;
     const inPopup = !$("updates");
     if (inPopup) { $("pickFolder").hidden = !!dir; $("folderName").hidden = !dir; }
+    if (update?.dev) {
+      // Ontwikkelmap (uit git): de updater zou het werk in deze map overschrijven met de laatste release.
+      for (const id of ["doUpdate", "pickFolder"]) $(id).disabled = true;
+      progress("Dit is de ontwikkelversie uit een lokale map. Die werk je bij met git; de updater blijft er af.");
+      return;
+    }
     const can = supported && dir && update?.available && (update.zipApi || update.zip);
     $("doUpdate").disabled = !can;
     $("doUpdate").textContent = update?.available ? `Nu bijwerken naar ${update.latest}` : "Nu bijwerken";
@@ -136,15 +156,33 @@ if (typeof document !== "undefined" && typeof chrome !== "undefined" && chrome.s
     throw new Error("geen downloadlink in de release");
   }
 
+  /* Het controlegetal uit de release; null als deze release er (nog) geen heeft. */
+  async function fetchSha() {
+    if (!update.shaApi && !update.sha) return null;
+    const headers = await chrome.runtime.sendMessage({ type: "getDownloadHeaders" });
+    for (const [url, init] of [[update.shaApi, { headers, cache: "no-store" }], [update.sha, { credentials: "include", cache: "no-store" }]]) {
+      if (!url) continue;
+      try { const res = await fetch(url, init); if (res.ok) { const hex = dtShaUitBestand(await res.text()); if (hex) return hex; } } catch {}
+    }
+    throw new Error("het controlegetal van de release kon niet worden opgehaald");
+  }
+
   $("doUpdate").onclick = async () => {
     const btn = $("doUpdate");
     btn.disabled = true;
     try {
+      if (update?.dev) throw new Error("dit is de ontwikkelversie; die wordt niet door de updater overschreven");
       // Toestemming eerst, zolang de klik nog "vers" is.
       if (!(await ensurePermission(dir))) throw new Error("geen toestemming voor de map");
       await verifyFolder(dir);
       progress("Downloaden…");
       const buf = await fetchZip();
+      const verwacht = await fetchSha();
+      if (verwacht) {
+        progress("Download controleren…");
+        const som = await dtSha256(buf);
+        if (som !== verwacht) throw new Error("de download is beschadigd of onvolledig (het controlegetal klopt niet); er is niets gewijzigd");
+      }
       progress("Uitpakken…");
       const files = await dtUnzip(buf);
       // Bovenste map in de zip (magister-docent-tools/) weglaten.

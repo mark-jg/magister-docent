@@ -7,7 +7,9 @@
   if (window.__dtNetlog) return;
   const log = []; window.__dtNetlog = log;
   const MAX = 200;
-  const anon = (u) => String(u).replace(/\d{3,}/g, "{id}").replace(/[0-9a-f]{8}-[0-9a-f-]{27}/gi, "{guid}").slice(0, 600);
+  /* Waarden van zoek- en filterparameters (een naam, een klas) horen niet in een rapport: alleen de sleutel blijft. */
+  const anon = (u) => String(u).replace(/([?&](?:q|zoek\w*|search\w*|naam|name|klas\w*|groep\w*|filter\w*|term)=)[^&#]*/gi, "$1{…}")
+    .replace(/\d{3,}/g, "{id}").replace(/[0-9a-f]{8}-[0-9a-f-]{27}/gi, "{guid}").slice(0, 600);
   // Headers van de laatste geslaagde API-call van Magister zelf; nodig om dezelfde API te mogen bevragen.
   let lastHeaders = null;
   const sameApi = (u) => { try { const x = new URL(u, location.href); return x.host === location.host && /\/api\//.test(x.pathname); } catch { return false; } };
@@ -76,6 +78,16 @@
    * het logboek-frame vraagt zo de API-calls op die de bovenliggende detailkaart deed). */
   const trusted = (e) => { try { return e.source === window || (e.source && e.source.location.host === location.host); } catch { return false; } };
   const reply = (e, msg) => { try { e.source.postMessage(msg, e.origin || "*"); } catch {} };
+  /* De brug haalt alleen Magister-adressen op, en Magisters inlogheaders gaan alleen mee naar het eigen
+   * domein. Geeft null (weigeren) of { href, eigen }. */
+  const brugDoel = (u) => {
+    try {
+      const x = new URL(u, location.href);
+      if (x.protocol !== "https:" && x.host !== location.host) return null;
+      if (x.host === location.host) return { href: x.href, eigen: true };
+      return /(^|\.)magister\.net$/i.test(x.hostname) ? { href: x.href, eigen: false } : null;
+    } catch { return null; }
+  };
 
   /* Laatste echte URL die op een patroon past (voor de probe); met all=true alle (max 12). */
   window.addEventListener("message", (e) => {
@@ -95,10 +107,13 @@
   window.addEventListener("message", async (e) => {
     if (!(e.data && e.data.type === "dt:api:get" && trusted(e))) return;
     const { id, url, full, blob } = e.data;
+    const doel = brugDoel(url);
+    if (!doel) { reply(e, { type: "dt:api:result", id, status: 0, error: "adres buiten Magister geweigerd" }); return; }
+    const eigen = doel.eigen ? (lastHeaders || {}) : {};
     /* blob=true: een afbeelding (bijv. een pasfoto) als data-URL teruggeven. */
     if (blob) {
       try {
-        const res = await of(url, { method: "GET", credentials: "include", headers: { ...(lastHeaders || {}), Accept: "image/*" } });
+        const res = await of(doel.href, { method: "GET", credentials: "include", headers: { ...eigen, Accept: "image/*" } });
         let data = null;
         if (res.ok && /^image\//.test(res.headers.get("content-type") || "")) {
           const b = await res.blob();
@@ -110,7 +125,7 @@
     }
     try {
       const t0 = performance.now();
-      const res = await of(url, { method: "GET", credentials: "include", headers: { Accept: "application/json", ...(lastHeaders || {}) } });
+      const res = await of(doel.href, { method: "GET", credentials: "include", headers: { Accept: "application/json", ...eigen } });
       let json = null, text = ""; try { text = await res.clone().text(); json = JSON.parse(text); } catch {}
       try { record("GET (Docent Tools)", url, res.status, text, performance.now() - t0); } catch {}
       reply(e, { type: "dt:api:result", id, status: res.status, shape: json ? shape(json) : null, json: full ? json : undefined, hadHeaders: !!lastHeaders });
@@ -163,9 +178,12 @@
     reply(e, { type: "dt:state:result", id: e.data.id, ok, error });
   });
   window.addEventListener("message", (e) => {
-    if (e.data && e.data.type === "dt:netlog:get" && e.source) {
-      try { e.source.postMessage({ type: "dt:netlog:data", frame: (window === window.top ? "hoofdpagina" : location.host + location.pathname.replace(/\d{3,}/g, "{id}")), log }, "*"); } catch {}
-    }
+    /* Alleen aan vensters van Magister zelf (de Inspector vraagt ook frames op een ander subdomein), en het
+     * antwoord gaat gericht naar die afzender; een andere site die dit tabblad opende krijgt niets. */
+    if (!(e.data && e.data.type === "dt:netlog:get" && e.source)) return;
+    let ok = false; try { ok = trusted(e) || /^https:\/\/([a-z0-9-]+\.)*magister\.net$/i.test(e.origin); } catch {}
+    if (!ok) return;
+    try { e.source.postMessage({ type: "dt:netlog:data", frame: (window === window.top ? "hoofdpagina" : location.host + location.pathname.replace(/\d{3,}/g, "{id}")), log }, e.origin); } catch {}
   });
 
   /* ---- Eigen periodes in Magisters verzuimoverzichten ----
@@ -195,25 +213,46 @@
     const s = new Date(periode.start), e = new Date(periode.end);
     return +m[1] === (s.getFullYear() !== e.getFullYear() ? e.getFullYear() : s.getFullYear()) && +m[2] === isoWeekNr(s);
   };
+  /* Telt de aantallen van twee weekrapporten op. Velden die geen aantal zijn blijven zoals in de eerste week:
+   * de leerling zelf, nummers en codes (id, jaar, week) en percentages (die zijn niet op te tellen). */
+  const NIET_OPTELLEN = /^(student|leerling|persoon|id|.*Id|code|stamnummer|studentNumber|year|jaar|week|number|nummer|month|maand)$|percent|ratio|gemiddeld|average/i;
   const optel = (a, b) => {
     if (typeof a === "number" && typeof b === "number") return a + b;
     if (a && b && typeof a === "object" && typeof b === "object" && !Array.isArray(a) && !Array.isArray(b)) {
-      const o = { ...a }; for (const k of Object.keys(b)) o[k] = k in a ? optel(a[k], b[k]) : b[k]; return o;
+      const o = { ...a }; for (const k of Object.keys(b)) o[k] = !(k in a) ? b[k] : NIET_OPTELLEN.test(k) ? a[k] : optel(a[k], b[k]); return o;
     }
     return a ?? b;
   };
+  const pauze = (ms) => new Promise((r) => setTimeout(r, ms));
   async function periodeRapport(url, input, init) {
     const weken = [];
     for (let ma = maandag(new Date(periode.start)); ma.getTime() <= periode.end; ma = plusDagen(ma, 7)) weken.push(weekSleutel(ma));
     const urls = weken.map((k) => url.replace(REPORT, (m) => m.replace(/year\/\d+\/week\/\d+/, `year/${k.year}/week/${k.number}`)));
     const haal = (u) => (typeof input === "string" || input instanceof URL ? of.call(window, u, init) : of.call(window, new Request(u, input)));
     const out = []; let status = 200;
+    /* Bij "te veel aanvragen" (429) of een serverfout even wachten en opnieuw proberen, hooguit drie keer. */
+    const week = async (u) => {
+      for (let poging = 0; ; poging++) {
+        let r; try { r = await haal(u); } catch { r = null; }
+        if (r && r.ok) return r.json();
+        const st = r ? r.status : 0;
+        if (poging >= 3 || !(st === 429 || st >= 500 || st === 0)) { status = st || 599; return null; }
+        const na = r ? Number(r.headers.get("Retry-After")) : 0;
+        await pauze(Math.min(15000, na > 0 ? na * 1000 : 800 * 2 ** poging));
+      }
+    };
     for (let i = 0; i < urls.length; i += 4) {
-      const part = await Promise.all(urls.slice(i, i + 4).map(async (u) => { const r = await haal(u); if (!r.ok) { status = r.status; return null; } return r.json(); }));
+      const part = await Promise.all(urls.slice(i, i + 4).map(week));
       out.push(...part);
       if (status !== 200) break;
     }
-    if (status !== 200) return haal(url);
+    if (status !== 200) {
+      /* Niet alle weken zijn binnen: géén halve som tonen. De eigen periode vervalt en de extensie
+       * (periodes.js) zet Magisters eigen bereik terug en meldt het. */
+      periode = null;
+      try { window.postMessage({ type: "dt:periode:fout", target: "att-insights-page", status, weken: urls.length }, location.origin); } catch {}
+      return haal(url);
+    }
     const per = new Map(); let basis = null;
     for (const j of out.filter(Boolean)) {
       basis = basis ? { ...basis, totals: optel(basis.totals, j.totals) } : { ...j };
@@ -243,8 +282,9 @@
     let ok = false, error = "";
     try {
       const el = zoek(target);
-      if (!el) throw new Error(`${target} niet gevonden`);
-      if (!p && !herstel) { periode = null; ok = true; }
+      if (!p && target === "att-insights-page") periode = null;   // loslaten lukt ook als het onderdeel al weg is
+      if (!p && !herstel) ok = true;
+      else if (!el) throw new Error(`${target} niet gevonden`);
       else {
         const range = p ? { start: new Date(p.start), end: new Date(p.end) } : normaal(el.selectedPeriod);
         if (target === "att-insights-page") {

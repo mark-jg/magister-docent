@@ -19,15 +19,25 @@ DT.register({
     this.render(DT);
     this._unsub = DT.onSettingsChange(() => { this._handle.hidden = DT.settings.panel.handle === false; this.render(DT); });
     this._timer = setInterval(() => this.tick(), 1000 * 15);
+    /* Alt+D in een iframe (logboek, leerlingkaart): dat frame vraagt het hoofdvenster het paneel te wisselen. */
+    this._cmd = (e) => { if (DT.sameOrigin(e.source) && e.data?.type === "dt:cmd" && e.data.command === "toggle-panel") this.toggle(); };
+    window.addEventListener("message", this._cmd);
   },
 
   destroy() {
     this._panel?.remove(); this._handle?.remove();
     clearInterval(this._timer);
     this._unsub && this._unsub();
+    this._cmd && window.removeEventListener("message", this._cmd);
+    this._panel = this._handle = null;
   },
 
   toggle(force) {
+    if (!this._panel) {
+      // Geen paneel in dit frame (iframe, of nog niet opgebouwd): alleen het wisselen doorgeven aan het hoofdvenster.
+      if (!DT.isTop && force === undefined) { try { window.top.postMessage({ type: "dt:cmd", command: "toggle-panel" }, location.origin); } catch {} }
+      return;
+    }
     const open = force ?? !this._panel.classList.contains("dt-open");
     this._panel.classList.toggle("dt-open", open);
     if (open) {
@@ -42,7 +52,7 @@ DT.register({
     if (!c) return;
     const now = new Date();
     c.firstChild.textContent = now.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
-    c.querySelector("small").textContent = now.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" }) + " · week " + isoWeek(now);
+    c.querySelector("small").textContent = now.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" }) + " · week " + dtWeekNummer(now);
   },
 
   render(DT) {
@@ -179,7 +189,8 @@ DT.register({
   }
 });
 
-function isoWeek(d) {
+/* Eigen naam: verzuiminzicht.js heeft een isoWeek die { y, w } teruggeeft en later laadt. */
+function dtWeekNummer(d) {
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   const day = date.getUTCDay() || 7;
   date.setUTCDate(date.getUTCDate() + 4 - day);

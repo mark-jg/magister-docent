@@ -71,9 +71,9 @@ DT.register({
 
   init(DT) {
     if (/^\/magister-lvs\//.test(location.pathname)) {
-      this._stop = DT.observe(() => { DTForms.vulLogboek(this.NOTITIE); this.knop(DT); }, { debounce: 250, poll: 1000 });
+      this._stop = DT.observe(() => { DTForms.vulLogboek(this.NOTITIE); this.knop(DT); }, { debounce: 250, poll: 1000, ookVerborgen: true });
     } else if (DT.isTop) {
-      this._stop = DT.observe(() => { DTForms.vulAfspraak(this.AFSPRAAK); this.vandaagKaart(DT); }, { debounce: 400, poll: 3000 });
+      this._stop = DT.observe(() => { DTForms.vulAfspraak(this.AFSPRAAK); this.vandaagKaart(DT); }, { debounce: 400, poll: 3000, ookVerborgen: true });
     }
   },
   destroy() {

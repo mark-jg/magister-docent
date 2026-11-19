@@ -63,7 +63,7 @@ DT.register({
     this._style = DT.el("style", { id: "dt-melding-style", text: this.css() });
     document.head.append(this._style);
     this._onKey = (e) => {
-      if (e.altKey && !e.ctrlKey && !e.metaKey && e.key.toLowerCase() === "m" && this.isMeldingPage()) {
+      if (e.altKey && !e.ctrlKey && !e.metaKey && DT.keyOf(e) === "m" && this.isMeldingPage()) {
         e.preventDefault(); this.trigger(DT);
       }
     };

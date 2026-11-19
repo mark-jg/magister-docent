@@ -7,6 +7,9 @@
  * (/api/leerlingen/zoeken/filters), leerlingen via /api/leerlingen/zoeken?klassen=...
  * Per leerling dezelfde berekening als Inzicht en de Excel-export (vzStats in verzuiminzicht.js):
  * afwezig = absent, ziek of uitgestuurd; te laat telt als aanwezig; vrijgestelde lessen tellen niet mee.
+ * Met de knop "Ziek telt niet mee" (instelling leaderboard.zonderGeoorloofd, standaard uit) vallen lessen waarin een
+ * leerling ziek of geoorloofd afwezig was buiten de telling, net als vrijgestelde lessen: ziek zijn kost dan geen
+ * plaats. Alleen ongeoorloofd afwezig en uitgestuurd tellen dan nog als gemist.
  * Volgorde: aanwezig %, dan minder vaak te laat, dan meer lessen aanwezig. Gelijke cijfers delen een
  * plaats en de plaatsen lopen door zonder gaten (1, 1, 2), zodat er altijd een 1, 2 en 3 op het podium staan.
  * Per leerling wordt ook de week ervoor opgehaald (in dezelfde aanvragen), voor de pijl omhoog/omlaag/gelijk
@@ -101,6 +104,16 @@ DT.register({
       title: "Pasfoto's uit Magister tonen in plaats van initialen. Houd je aan de afspraken van je school over beeldmateriaal, zeker op het digibord.",
       html: `<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="6.3" r="2.3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3.8 13.5c.8-2 2.4-3 4.2-3s3.4 1 4.2 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>Foto's</span>` });
     this._fotoKnop.addEventListener("click", () => this.fotos(DT, !this._fotosAan));
+    this._zonderGeoorloofd = DT.settings.leaderboard?.zonderGeoorloofd === true;
+    this._ziekKnop = DT.el("button", { class: "dt-lb-nu dt-lb-fotoknop dt-lb-ziekknop", type: "button", "aria-pressed": String(this._zonderGeoorloofd), text: "Ziek telt niet mee",
+      title: "Aan: lessen waarin een leerling ziek of geoorloofd afwezig was vallen buiten de ranglijst, zodat ziek zijn geen plaats kost. Uit: elke gemiste les telt." });
+    this._ziekKnop.addEventListener("click", async () => {
+      this._zonderGeoorloofd = !this._zonderGeoorloofd;
+      this._ziekKnop.setAttribute("aria-pressed", String(this._zonderGeoorloofd));
+      const c = this._cache.get(`${this._klas}|${this.ymd(this._ma)}`);
+      if (c) this.teken(c);
+      await DT.saveSettings({ leaderboard: { zonderGeoorloofd: this._zonderGeoorloofd } });
+    });
     this._vorige = DT.el("button", { class: "dt-lb-pijl", type: "button", "aria-label": "Vorige week", html: `<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>` });
     this._volgende = DT.el("button", { class: "dt-lb-pijl", type: "button", "aria-label": "Volgende week", html: `<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>` });
     this._vorige.addEventListener("click", () => this.kies(DT, { week: this.plus(this._ma, -7) }));
@@ -113,7 +126,7 @@ DT.register({
       DT.el("div", { class: "dt-lb-kop dt-lb-card" }, [
         DT.el("nav", { class: "dt-lb-crumbs", "aria-label": "Kruimelpad" }, [terug, DT.el("span", { "aria-hidden": "true", text: "›" }), DT.el("span", { text: "Leaderboard" })]),
         DT.el("h1", { html: `Leaderboard<span class="dt-lb-punt">.</span>` }),
-        DT.el("div", { class: "dt-lb-bediening" }, [this._klassen, DT.el("div", { class: "dt-lb-weeknav" }, [this._nu, this._vorige, this._week, this._volgende, this._fotoKnop, this._bordKnop])]),
+        DT.el("div", { class: "dt-lb-bediening" }, [this._klassen, DT.el("div", { class: "dt-lb-weeknav" }, [this._nu, this._vorige, this._week, this._volgende, this._fotoKnop, this._ziekKnop, this._bordKnop])]),
       ]),
       this._status, this._podium,
       DT.el("div", { class: "dt-lb-card dt-lb-tabel" }, [
@@ -174,7 +187,7 @@ DT.register({
     if (!c || !c.bezig) {
       c = { lln: null, rijen: [], klaar: false, bezig: true };
       this._cache.set(key, c);
-      this.vul(DT, c, klas, ma).finally(() => { c.bezig = false; });
+      this.vul(DT, c, klas, ma).catch((e) => { c.fout ||= `Ophalen lukte niet: ${e?.message || e}`; }).finally(() => { c.bezig = false; });
     }
     /* Tekent mee zolang deze klas en week gekozen zijn. */
     while (gen === this._gen && this._view) {
@@ -187,15 +200,7 @@ DT.register({
   async vul(DT, c, klas, ma) {
     const wacht = (ms) => new Promise((r) => setTimeout(r, ms));
     /* Magister begrenst het aantal aanvragen (429): na elkaar, met korte pauzes, en bij 429/503 langer wachten. */
-    const api = async (url) => {
-      let r;
-      for (let poging = 0; poging < 6; poging++) {
-        r = await DT.api(url, { full: true, timeout: 25000 });
-        if (r.status !== 429 && r.status !== 503) return r;
-        await wacht(1500 * 2 ** poging);
-      }
-      return r;
-    };
+    const api = (url) => DT.apiRetry(url);
     const lijst = (r) => (r && r.status === 200 && r.json) ? (Array.isArray(r.json) ? r.json : r.json.items || []) : null;
     const r = await api(`/api/leerlingen/zoeken?q=**&top=250&skip=0&orderby=roepnaam%20asc&peildatum=${this.ymd(new Date())}&Rol=Docent&klassen=${encodeURIComponent(klas)}&velden=stamnummer&velden=naam&velden=klassen`);
     const items = lijst(r);
@@ -231,7 +236,10 @@ DT.register({
     const met = [], zonder = [];
     for (const x of rijen) {
       const T = x[veld];
-      if (T && T.telt > 0) met.push({ ...x, T, aanw: T.telt - T.afwezig, pct: (T.telt - T.afwezig) / T.telt });
+      /* Ziek en geoorloofd afwezig buiten de telling laten (zoals vrijstelling), als dat is gekozen. */
+      const buiten = T && this._zonderGeoorloofd ? (T.per?.ZK || 0) + (T.per?.AB_OK || 0) : 0;
+      const telt = T ? T.telt - buiten : 0, gemist = T ? T.afwezig - buiten : 0;
+      if (telt > 0) met.push({ ...x, T, telt, aanw: telt - gemist, pct: (telt - gemist) / telt });
       else zonder.push(x);
     }
     met.sort((a, b) => b.pct - a.pct || a.T.teLaat - b.T.teLaat || b.aanw - a.aanw || a.l.naam.localeCompare(b.l.naam, "nl"));
@@ -252,7 +260,7 @@ DT.register({
     else this.status(n ? "" : "Deze klas heeft geen leerlingen.");
     const { met, zonder } = this.rangschik(c.rijen);
     const pct = (r) => `${Math.floor(r.pct * 100)}%`;
-    const lessen = (r) => `${r.aanw} van ${r.T.telt}`;
+    const lessen = (r) => `${r.aanw} van ${r.telt}`;
     const open = (r) => () => typeof openLeerling === "function" && openLeerling(r.l.id);
 
     /* Vergeleken met vorige week (alleen als alles binnen is). */

@@ -419,8 +419,8 @@ function tokenCss(p, dark) {
     div.container, ui-view[name="main"] { background: ${p.bg} !important; }
     .appbar-host, mg-appbar, div.appbar { background: ${mix(p.accent, "#000000", .25)} !important; }
     .menu-host, nav.menu, .menu-container { background: ${dark ? p.surface : p.accent} !important; }
-    .menu-footer, .menu-footer a { background: ${dark ? p.surface2 : mix(p.accent, "#000000", .15)} !important; color: ${dark ? p.fg : "#ffffff"} !important; }
-    ul.main-menu li a, ul.main-menu li span.caption { color: ${dark ? p.fg : "#ffffff"} !important; }
+    .menu-footer, .menu-footer a { background: ${dark ? p.surface2 : mix(p.accent, "#000000", .15)} !important; color: ${dark ? p.fg : contrastInk(mix(p.accent, "#000000", .15))} !important; }
+    ul.main-menu li a, ul.main-menu li span.caption { color: ${dark ? p.fg : contrastInk(p.accent)} !important; }
     ul.main-menu li.active > a, ul.main-menu li[class*="active"] > a, ul.main-menu li a[class*="active"], ul.main-menu li[class*="selected"] > a { background: ${dark ? p.accent : mix(p.accent, "#ffffff", .25)} !important; color: ${dark ? contrastInk(p.accent) : "#ffffff"} !important; }
     ui-view[name="main"] h1, dna-page-header, .page-title, .head-bar h1 { color: ${p.accent} !important; }
     /* Kopbalken en de strook erboven (lesdashboard, leerlingdetail, guest apps) */
@@ -1739,6 +1739,9 @@ function contrastInk(hex) {
   const h = (hex || "#000").replace("#", "");
   const n = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
   const r = parseInt(n.slice(0, 2), 16), g = parseInt(n.slice(2, 4), 16), b = parseInt(n.slice(4, 6), 16);
-  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return lum > 0.6 ? "#111111" : "#ffffff";
+  /* De inktkleur met het hoogste contrast volgens WCAG (relatieve luminantie), niet een vaste grens op de
+   * helderheid: op middentinten zoals roze of oranje gaf die witte tekst met te weinig contrast. */
+  const lin = (c) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
+  const L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  return (L + 0.05) / (0.0056 + 0.05) >= 1.05 / (L + 0.05) ? "#111111" : "#ffffff";   // 0.0056 = luminantie van #111111
 }

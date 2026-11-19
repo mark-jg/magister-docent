@@ -25,11 +25,11 @@ DT.register({
   init(DT) {
     /* In het logboek-frame van Magister (magister-lvs): alleen de notitie invullen. */
     if (!DT.isTop) {
-      if (/^\/magister-lvs\//.test(location.pathname)) this._stop = DT.observe(() => this.vulNotitie(), { debounce: 250, poll: 1000 });
-      else if (/^\/magister-berichten\//.test(location.pathname)) this._stop = DT.observe(() => DTForms.vulBericht("dt-cb-bericht"), { debounce: 400, poll: 1000 });
+      if (/^\/magister-lvs\//.test(location.pathname)) this._stop = DT.observe(() => this.vulNotitie(), { debounce: 250, poll: 1000, ookVerborgen: true });
+      else if (/^\/magister-berichten\//.test(location.pathname)) this._stop = DT.observe(() => DTForms.vulBericht("dt-cb-bericht"), { debounce: 400, poll: 1000, ookVerborgen: true });
       return;
     }
-    this._stop = DT.observe(() => { this.tegel(DT); this.vulAfspraak(); }, { debounce: 300, poll: 1500 });
+    this._stop = DT.observe(() => { this.tegel(DT); this.vulAfspraak(); }, { debounce: 300, poll: 1500, ookVerborgen: true });
     /* Weg van Aanwezigheid: de balie sluit, net als elke andere subpagina. */
     this._hash = () => { if (this._scherm && !/^#\/aanwezigheid\/?$/.test(location.hash)) this.sluit(); };
     window.addEventListener("hashchange", this._hash);
@@ -104,6 +104,51 @@ DT.register({
       });
     } catch {}
   },
+  async kopieen() {
+    try {
+      const db = await this.db();
+      return await new Promise((ok) => {
+        const uit = [], r = db.transaction("kopie").objectStore("kopie").openCursor(null, "prev");
+        r.onsuccess = () => { const c = r.result; if (!c) return ok(uit); uit.push(Object.assign({ sleutel: c.key }, c.value)); c.continue(); };
+        r.onerror = () => ok(uit);
+      });
+    } catch { return []; }
+  },
+  /* Reservekopieën uit deze browser bekijken, downloaden of terugzetten als de gedeelde stand. */
+  async kopieVenster(DT) {
+    const SOORT = { uurlijks: "Reservekopie (elk uur)", conflict: "Jouw stand bij een conflict", afsluiten: "Bij het sluiten van het tabblad", terugzetten: "Stand vóór terugzetten" };
+    const lijst = await this.kopieen();
+    const rijen = lijst.map((k) => {
+      let g = null; try { g = JSON.parse(k.json); } catch {}
+      const n = g ? (g.registraties || []).length : null;
+      const terug = this.knop(DT, "Terugzetten", () => this.kopieTerug(DT, k, g), false, "klein");
+      if (!g || this._kijkt || !this._map) terug.setAttribute("disabled", "");
+      return DT.el("tr", {}, [
+        DT.el("td", { text: this.moment(k.op) }), DT.el("td", { text: SOORT[k.soort] || k.soort || "" }),
+        DT.el("td", { text: n === null ? "niet leesbaar" : `${n} meldingen` }),
+        DT.el("td", {}, DT.el("div", { class: "dt-cb-rij eind" }, [this.knop(DT, "Downloaden", () => DT.download(`tardy-kopie-${String(k.op).slice(0, 16).replace(/[:T]/g, "-")}.json`, k.json, "application/json"), false, "klein stil"), terug]))
+      ]);
+    });
+    this.modal("Reservekopieën in deze browser", [
+      DT.el("p", { class: "dt-cb-zacht", text: "De balie bewaart hooguit één kopie per uur (de laatste 40), jouw stand bij een conflict met een collega en de stand bij het sluiten van het tabblad. Terugzetten vervangt de gedeelde gegevens voor iedereen; de huidige stand wordt eerst zelf als kopie bewaard." }),
+      rijen.length ? DT.el("table", { class: "dt-cb-tabel" }, [DT.el("thead", {}, DT.el("tr", {}, ["Wanneer", "Soort", "Inhoud", ""].map((t) => DT.el("th", { scope: "col", text: t })))), DT.el("tbody", {}, rijen)])
+        : DT.el("p", { text: "Er staan nog geen kopieën in deze browser." })
+    ]).classList.add("breed");
+  },
+  async kopieTerug(DT, k, g) {
+    if (!g || !this._map || this._kijkt) return;
+    if (!confirm(`De stand van ${this.moment(k.op)} terugzetten?\n\nDit vervangt de gedeelde gegevens voor iedereen die deze map gebruikt. De huidige stand wordt eerst als kopie bewaard, zodat je terug kunt.`)) return;
+    /* Eerst de nieuwste stand van schijf lezen: die wordt de kopie, en zijn revisie de basis voor het wegschrijven. */
+    let nu = null; try { nu = JSON.parse(await this.lees(this.BESTAND) || "null"); } catch {}
+    await this.kopie("terugzetten", JSON.stringify(nu ? this.splits(nu) : this.splits(TardyKern.S)));
+    const basis = Math.max(this._basis || 0, nu?.revisie || 0);
+    this.sluitModal();
+    this.laadStand(JSON.parse(k.json));
+    this._basis = basis;   // de kopie zelf heeft geen revisie; verder tellen vanaf de huidige
+    await this.schrijfNu();
+    this.teken();
+    this.melding(`De stand van ${this.moment(k.op)} is teruggezet.`, "info", 7000);
+  },
   apparaat() {
     let id = null; try { id = localStorage.getItem("dt-cb-apparaat"); } catch {}
     if (!id) { id = "chrome-" + Math.random().toString(36).slice(2, 10); try { localStorage.setItem("dt-cb-apparaat", id); } catch {} }
@@ -139,7 +184,11 @@ DT.register({
     this.volgPeriodes();
     if (!K.UI.periodeId || !K.periodeById(K.UI.periodeId)) K.UI.periodeId = (K.periodeVanDatum(K.vandaag()) || K.huidigePeriode()).id;
   },
-  /* De periodes van de plugin (zijpaneel › Periodes) zijn leidend, zodra daar periodes staan. Een periode houdt
+  /* De periodes van de plugin (zijpaneel › Periodes) zijn leidend, zodra daar periodes staan. Maar alleen wie zijn
+   * periodes in het zijpaneel wíjzigt, past het gedeelde bestand aan: deze browser onthoudt welke periodes hij al
+   * heeft doorgevoerd. Wijkt het bestand daarna af, dan heeft een collega ze aangepast en volgt de balie het
+   * bestand. Zonder dat geheugen zouden twee collega's met verschillende periodes elkaars periodes bij elk bezoek
+   * terugdraaien (en zouden afgehandelde signalen terugkomen). Een periode houdt
    * de code die hij in Tardy al had (zelfde begindatum of naam), zodat afgehandelde signalen, acties en
    * Magister-cijfers bij die periode blijven horen. Meldingen blijven altijd bewaard; die van een verwijderde
    * periode vallen alleen buiten de signalen. Geeft true als de periodes zijn gewijzigd. */
@@ -155,10 +204,24 @@ DT.register({
       gebruikt.add(id);
       return { id, naam: p.naam, start, eind };
     });
-    if (JSON.stringify(nieuw) === JSON.stringify(oud)) return false;
+    const mijn = JSON.stringify(nieuw.map((p) => [p.naam, p.start, p.eind]));
+    const gezien = (() => { try { return localStorage.getItem("dt-cb-periodes"); } catch { return null; } })();
+    const onthoud = () => { try { localStorage.setItem("dt-cb-periodes", mijn); } catch {} };
+    if (JSON.stringify(nieuw) === JSON.stringify(oud)) { onthoud(); this._perAnders = false; return false; }
+    if (oud.length && (gezien === null || gezien === mijn)) {
+      /* Mijn periodes zijn niet veranderd sinds ik ze doorvoerde (of ik ben hier voor het eerst): het bestand
+       * is door een collega aangepast en blijft leidend. */
+      if (gezien === null) onthoud();
+      if (!this._perAnders) {
+        this._perAnders = true;
+        setTimeout(() => this.melding("De periodes van de balie komen uit het gedeelde bestand en wijken af van jouw periodes in het zijpaneel. Pas je periodes in het zijpaneel aan om ze voor iedereen te wijzigen.", "info", 9000), 800);
+      }
+      return false;
+    }
+    this._perAnders = false;
     K.S.instellingen.periodes = nieuw;
     if (!K.periodeById(K.UI.periodeId)) K.UI.periodeId = (K.periodeVanDatum(K.vandaag()) || nieuw[0]).id;
-    if (this._map && !this._kijkt) { this.bewaar(); this.opnieuwOphalen("De periodes zijn gewijzigd"); }
+    if (this._map && !this._kijkt) { onthoud(); this.bewaar(); this.opnieuwOphalen("De periodes zijn gewijzigd"); }
     return true;
   },
   /* Magister-cijfers per periode horen bij de periodegrenzen; na een wijziging (of met gegevens van vóór de
@@ -190,10 +253,12 @@ DT.register({
 
   bewaar() {
     clearTimeout(this._schrijfTimer);
+    this._wacht = true;   // er staat een wijziging klaar die nog niet in de map staat
     this._schrijfTimer = setTimeout(() => this.schrijfNu(), 250);
   },
   async schrijfNu() {
     clearTimeout(this._schrijfTimer);
+    this._wacht = false;
     if (!this._map || !TardyKern.S) return;
     if (this._kijkt) { this.melding(`${this._ander?.naam || "Je collega"} werkt nu in Tardy. Je kijkt mee, dus deze wijziging wordt niet bewaard.`, "err"); return this.herlaad(); }
     if (this._bezig) return this.bewaar();
@@ -235,7 +300,10 @@ DT.register({
       this.melding(`${b.naam || "Je collega"} heeft Tardy overgenomen. Je kijkt nu mee.`, "info", 8000);
     } else {
       if ((this._tik = (this._tik || 0) + 1) % 2 === 0) this.bezettingZet();
-      if (rev > this._basis && !this._bezig) { await this.herlaad(); this.melding(`Bijgewerkt met wijzigingen van ${JSON.parse(tekst).gewijzigdDoor || "je collega"}.`); }
+      /* Niet herladen terwijl je in een venster bezig bent, er nog een wijziging klaarstaat of het verzuim wordt
+       * opgehaald: de stand onder je handen vervangen zou die invoer ongemerkt laten vervallen. De volgende
+       * controle (30 s) probeert het opnieuw; bij opslaan vangt de revisiecontrole een conflict op. */
+      if (rev > this._basis && !this._bezig && !this._wacht && !this._modal && !this._haal) { await this.herlaad(); this.melding(`Bijgewerkt met wijzigingen van ${JSON.parse(tekst).gewijzigdDoor || "je collega"}.`); }
     }
     this.tekenStand();
   },
@@ -293,6 +361,17 @@ DT.register({
     document.body.append(this._toast);
     this._toets = (e) => { if (e.key === "Escape" && this._modal) { e.preventDefault(); this.sluitModal(); } };
     document.addEventListener("keydown", this._toets, true);
+    /* Tabblad of venster sluiten: de laatste wijziging nog wegschrijven en de bezetting vrijgeven (anders
+     * blijft de balie 10 minuten "in gebruik"). Lukt het schrijven niet meer op tijd, dan staat de stand in
+     * elk geval als reservekopie in deze browser. */
+    if (!this._weg) {
+      this._weg = () => {
+        if (!this._scherm || !this._map || this._kijkt || !TardyKern.S) return;
+        if (this._wacht) { try { this.kopie("afsluiten", JSON.stringify(this.splits(TardyKern.S))); } catch {} this.schrijfNu().finally(() => this.bezettingVrij()); }
+        else this.bezettingVrij();
+      };
+      window.addEventListener("pagehide", this._weg);
+    }
     uv.classList.add("dt-cb-open");
     uv.append(pagina);
     this._view = "melden";
@@ -1461,15 +1540,8 @@ Signalen krijgen de status afgehandeld, meldafspraken vervallen. Je kunt ze late
 
   ymd(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; },
 
-  async apiOpnieuw(url) {
-    const wacht = (ms) => new Promise((r) => setTimeout(r, ms));
-    let r;
-    for (let poging = 0; poging < 6; poging++) {
-      r = await DT.api(url, { full: true, timeout: 25000 });
-      if (r.status !== 429 && r.status !== 503) return r;
-      await wacht(1500 * 2 ** poging);
-    }
-    return r;
+  apiOpnieuw(url) {
+    return DT.apiRetry(url);
   },
 
   async haalMagister(DT, stamnrs, { stil = false } = {}) {
@@ -1562,12 +1634,14 @@ Signalen krijgen de status afgehandeld, meldafspraken vervallen. Je kunt ze late
     K.H.tellingenPlus = (t, sn, pid) => this.tellingenPlus(t, sn, pid);
     /* "16 klokuren in 4 weken" en "ziek in 8 weken" keken altijd naar de laatste weken vanaf vandaag, ook bij een
      * andere periode. Nu: de weken tot het einde van de gekozen periode (of tot vandaag), en niets voor een periode
-     * die nog moet beginnen. */
+     * die nog moet beginnen. Standaard stopt het venster bij het begin van de periode; met de gedeelde instelling
+     * vensterOverGrens (Instellingen › Signalen) loopt het door in de weken ervoor, zodat verzuim rond een
+     * periodewissel ook de wettelijke grens kan halen. */
     const venster = (pid, dagen) => {
       const p = K.periodeById(pid), v = K.vandaag();
       if (!p || p.start > v) return null;
       const eind = p.eind < v ? p.eind : v, van = K.plusDagen(eind, -dagen);
-      return { van: van < p.start ? p.start : van, tot: eind };   // niet terug over het begin van de periode
+      return { van: van < p.start && !K.S.instellingen.vensterOverGrens ? p.start : van, tot: eind };
     };
     const k4 = K.TELLERS.klokuren4w;
     if (k4 && !k4._dt) {
@@ -2530,12 +2604,14 @@ Signalen krijgen de status afgehandeld, meldafspraken vervallen. Je kunt ze late
     zwarting.addEventListener("change", async () => { await DT.saveSettings({ cb: { zwarting: +zwarting.value } }); Object.assign(K.S.instellingen, this.persoonlijk()); });
     const auto = DT.el("input", { type: "checkbox" }); auto.checked = !!c.autoPrint;
     auto.addEventListener("change", async () => { await DT.saveSettings({ cb: { autoPrint: auto.checked } }); Object.assign(K.S.instellingen, this.persoonlijk()); });
+    const overGrens = DT.el("input", { type: "checkbox" }); overGrens.checked = !!i.vensterOverGrens;
+    overGrens.addEventListener("change", () => { i.vensterOverGrens = overGrens.checked; this.bewaar(); this.melding(overGrens.checked ? "Bewaard: de termijnen tellen nu door over het begin van de periode." : "Bewaard: de termijnen tellen alleen binnen de periode."); });
     const printer = i.bonPrinter?.naam;
     h.replaceChildren(
       DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("h2", { text: "Gedeelde map" }),
         DT.el("p", { text: this._map ? `In gebruik: "${this._map.name}" · revisie ${this._basis}${this._door ? ` · laatst opgeslagen door ${this._door} ${this.moment(this._op)}` : ""}.` : "Nog geen map gekozen." }),
         DT.el("p", { class: "dt-cb-zacht", text: "Dezelfde map als de Tardy-app: tardy-gegevens.json en tardy-in-gebruik.json. Jullie werken om de beurt. Een kopie van de stand blijft ook in deze browser bewaard (hooguit één per uur, de laatste 40, en bij een conflict)." }),
-        DT.el("div", { class: "dt-cb-rij" }, [this.knop(DT, "Andere map kiezen", () => this.kiesMap(DT)), this.knop(DT, "Meldingen overnemen uit ander bestand…", () => this.importeer(DT)), this.knop(DT, "Map loskoppelen", async () => { if (!confirm("De balie loskoppelen van deze map? De map zelf blijft staan.")) return; await this.bezettingVrij(); await this.kv("map", null); this._map = null; this.koppel(DT); }, false, "stil")])]),
+        DT.el("div", { class: "dt-cb-rij" }, [this.knop(DT, "Andere map kiezen", () => this.kiesMap(DT)), this.knop(DT, "Meldingen overnemen uit ander bestand…", () => this.importeer(DT)), this.knop(DT, "Reservekopieën…", () => this.kopieVenster(DT)), this.knop(DT, "Map loskoppelen", async () => { if (!confirm("De balie loskoppelen van deze map? De map zelf blijft staan.")) return; await this.bezettingVrij(); await this.kv("map", null); this._map = null; this.koppel(DT); }, false, "stil")])]),
       DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("h2", { text: "Jij" }), DT.el("p", { class: "dt-cb-zacht", text: "Alleen in deze browser, niet in de gedeelde map (zoals in Tardy)." }),
         veld("Naam", "naam"), veld("Paraaf", "paraaf"), veld("E-mail", "email", "email"), veld("Lokaal", "lokaal", "text", c.lokaal || i.lokaal || "", "staat in mails en op het briefje"),
         (() => { const r = veld("Logboektype bij Notitie", "logboekType", "text", c.logboekType || "Notitie", "zoals in Magister › Begeleiding › Toevoegen, bijv. Notitie of Gespreksnotitie");
@@ -2545,6 +2621,9 @@ Signalen krijgen de status afgehandeld, meldafspraken vervallen. Je kunt ze late
       DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("h2", { text: "Meldafspraken" }),
         DT.el("label", { class: "dt-cb-veldrij" }, [DT.el("span", { text: "Meldtijd" }), meldtijd, DT.el("small", { text: "gedeeld met Tardy" })]),
         DT.el("p", { class: "dt-cb-zacht", text: `Periodes, mentoren en mailteksten komen uit de gedeelde gegevens en pas je aan in de Tardy-app. Het protocol (${K.protocol().naam || "standaardprotocol"}) pas je aan op het tabblad Protocol.` })]),
+      DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("h2", { text: "Signalen" }),
+        DT.el("label", { class: "dt-cb-schakel" }, [overGrens, DT.el("span", { text: "Wettelijke termijnen laten doortellen over het begin van de periode" })]),
+        DT.el("p", { class: "dt-cb-zacht", text: "Geldt voor \"16 klokuren ongeoorloofd in 4 weken\" en \"ziek in 8 weken\". Uit: alleen de weken binnen de gekozen periode tellen. Aan: de laatste 4 of 8 weken tellen helemaal mee, ook de weken vóór het begin van de periode; verzuim van vlak voor de periodewissel kan dan in beide periodes een signaal geven. Deze keuze staat in de gedeelde gegevens en geldt voor alle collega's." })]),
       this.tekstenKaart(DT),
       DT.el("dna-card", { class: "dt-cb-kaart" }, [DT.el("h2", { text: "Briefjes" }),
         DT.el("p", { text: printer ? `Bonprinter: ${printer}.` : "Geen bonprinter gekoppeld: briefjes gaan naar de gewone printer (twee per rij op A4)." }),

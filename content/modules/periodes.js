@@ -20,10 +20,23 @@ DT.register({
     if (!DT.isTop) return;
     this._stop = DT.observe(() => this.mount(DT), { debounce: 400, poll: 2000 });
     this._unsub = DT.onSettingsChange(() => this.mount(DT, true));
+    /* De optelsom van de weekrapporten is niet gelukt (netlog.js): periode loslaten en Magisters eigen
+     * bereik terugzetten, zodat het scherm niet één week toont onder de naam van een hele periode. */
+    this._fout = (e) => {
+      if (e.source !== window || e.data?.type !== "dt:periode:fout") return;
+      const tag = e.data.target; if (!this._actief[tag]) return;
+      const host = this._actief[tag].host, dp = host?.shadowRoot?.querySelector(".toolbar .date-picker");
+      delete this._actief[tag];
+      if (dp) { this.state(dp, null); const sel = dp.querySelector(".dt-per-sel"); if (sel) sel.value = ""; }
+      DT.toast(`De periode kon niet worden opgeteld (Magister gaf ${e.data.status === 429 ? "te veel aanvragen" : "fout " + e.data.status}). Je ziet weer Magisters eigen overzicht; probeer het over een minuut opnieuw.`, "err", 9000);
+      setTimeout(async () => { await this.send(tag, null); this.mount(DT, true); }, 300);
+    };
+    window.addEventListener("message", this._fout);
   },
 
   destroy() {
     this._stop && this._stop(); this._unsub && this._unsub();
+    this._fout && window.removeEventListener("message", this._fout);
     for (const tag of Object.keys(this._actief)) this.send(tag, null);
     this._actief = {};
     for (const el of DT.deepQueryAll(".dt-per-ctl")) { el.closest(".date-picker")?.classList.remove("dt-per-on"); el.remove(); }
@@ -35,7 +48,7 @@ DT.register({
       const host = DT.deepQuery(tag), root = host?.shadowRoot;
       const dp = root?.querySelector(".toolbar .date-picker");
       const group = dp?.querySelector(":scope > sl-toggle-group");
-      if (this._actief[tag] && this._actief[tag].host !== host) delete this._actief[tag];
+      if (this._actief[tag] && this._actief[tag].host !== host) { delete this._actief[tag]; this.send(tag, null, false); }   // scherm verlaten: ook de optelsom in de pagina loslaten
       if (!group) continue;
       let ctl = dp.querySelector(":scope > .dt-per-ctl");
       if (!lijst.length) { ctl?.remove(); dp.classList.remove("dt-per-on"); if (this._actief[tag]) { delete this._actief[tag]; this.send(tag, null); } continue; }
@@ -104,7 +117,7 @@ DT.register({
       const id = Math.random().toString(36).slice(2);
       const h = (e) => { if (e.source === window && e.data?.type === "dt:periode:result" && e.data.id === id) { window.removeEventListener("message", h); resolve(e.data); } };
       window.addEventListener("message", h);
-      window.postMessage({ type: "dt:periode:set", id, target: tag, herstel, periode: p ? { start: p.begin.getTime(), end: p.einde.getTime() } : null }, "*");
+      window.postMessage({ type: "dt:periode:set", id, target: tag, herstel, periode: p ? { start: p.begin.getTime(), end: p.einde.getTime() } : null }, location.origin);
       setTimeout(() => { window.removeEventListener("message", h); resolve({ ok: false, error: "time-out" }); }, 20000);
     });
   },

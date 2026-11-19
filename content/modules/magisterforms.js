@@ -8,7 +8,15 @@ var DTForms = (() => {
   "use strict";
   const bezig = {};
   const wacht = (ms) => new Promise((r) => setTimeout(r, ms));
-  const lees = (sleutel) => { try { const c = JSON.parse(localStorage.getItem(sleutel) || "null"); return c && Date.now() - c.t < 3 * 60000 ? c : null; } catch { return null; } };
+  /* Een verlopen concept wordt meteen gewist: er staan een naam en een tekst in, die horen niet te blijven liggen. */
+  const lees = (sleutel) => {
+    try {
+      const c = JSON.parse(localStorage.getItem(sleutel) || "null");
+      if (c && Date.now() - c.t < 3 * 60000) return c;
+      if (c) localStorage.removeItem(sleutel);
+    } catch {}
+    return null;
+  };
   const schrijf = (sleutel, c) => { try { localStorage.setItem(sleutel, JSON.stringify(c)); return true; } catch { return false; } };
   const weg = (sleutel) => { try { localStorage.removeItem(sleutel); } catch {} };
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -34,6 +42,17 @@ var DTForms = (() => {
       let item = null;
       for (let i = 0; i < 20 && !item; i++) { await wacht(150); item = [...document.querySelectorAll("dna-menu-item")].find((m) => norm(m.textContent).startsWith(c.type.toLowerCase())); }
       if (item) { c.gekozen = true; schrijf(sleutel, c); item.click(); }
+      else {
+        /* Type niet gevonden: één keer melden en het menu open laten, in plaats van elke seconde opnieuw op
+         * Toevoegen te klikken. Kiest de gebruiker zelf een type, dan wordt het formulier alsnog ingevuld. */
+        c.gekozen = true; schrijf(sleutel, c);
+        if (!document.getElementById("dt-logboek-melding")) {
+          const b = banner(`${c.bron || "Docent Tools"}:`, `het logboektype "${c.type}" staat niet bij Toevoegen. Kies zelf het juiste type; de tekst voor ${c.naam} wordt daarna ingevuld. Het type pas je aan bij de instellingen van de balie.`);
+          b.id = "dt-logboek-melding";
+          (knop.closest("dna-page-header, header, .toolbar") || knop.parentElement || document.body).after(b);
+          setTimeout(() => b.remove(), 3 * 60000);
+        }
+      }
       bezig[sleutel] = false;
       return;
     }
@@ -43,6 +62,7 @@ var DTForms = (() => {
       if (!veld || !ed) return;
       bezig[sleutel] = true;
       weg(sleutel);
+      document.getElementById("dt-logboek-melding")?.remove();
       veld.focus(); veld.value = c.omschrijving;
       for (const t of ["input", "change", "blur"]) veld.dispatchEvent(new Event(t, { bubbles: true }));
       ed.focus();
@@ -52,6 +72,7 @@ var DTForms = (() => {
       if (c.bijlage?.base64) {
         const inp = document.querySelector("input[type=file]");
         try {
+          if (!inp) throw new Error("geen bestandsveld");
           const bin = atob(c.bijlage.base64), bytes = new Uint8Array(bin.length);
           for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
           const dt = new DataTransfer();
@@ -85,12 +106,20 @@ var DTForms = (() => {
       zet(zoek, q); zoek.focus();
       for (let i = 0; i < 25 && !hoofd.querySelector("li.item.person"); i++) await wacht(200);
       const items = [...hoofd.querySelectorAll("li.item.person")];
-      const doel = items.find((li) => c.stamnr && li.textContent.includes(c.stamnr)) || (items.length === 1 ? items[0] : null);
+      /* Alleen een zekere treffer: het stamnummer als los getal, of één resultaat waarin de hele naam staat. */
+      const nr = String(c.stamnr || "").replace(/\D/g, "");
+      const heeftNr = (li) => !!nr && new RegExp(`(^|\\D)${nr}(\\D|$)`).test(li.textContent);
+      const heeftNaam = (li) => { const t = li.textContent.toLowerCase(); const delen = String(c.naam || "").toLowerCase().split(/\s+/).filter((w) => w.length > 1); return delen.length > 1 && delen.every((w) => t.includes(w)); };
+      const doel = items.find(heeftNr) || (items.length === 1 && heeftNaam(items[0]) ? items[0] : null);
       if (!doel) continue;
       for (let i = 0; i < 12 && !doel.classList.contains("selected"); i++) { zoek.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", keyCode: 40, which: 40, bubbles: true })); await wacht(80); }
+      /* Enter kiest de regel die geselecteerd staat. Is dat niet de bedoelde student, dan niet kiezen:
+       * liever zelf toevoegen dan de verkeerde persoon in de afspraak. */
+      if (!doel.classList.contains("selected")) continue;
       for (const t of ["keydown", "keyup"]) zoek.dispatchEvent(new KeyboardEvent(t, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
       gevonden = true; await wacht(300);
     }
+    if (!gevonden && zoek) zet(zoek, "");
     zet(onderwerp, c.onderwerp); zet(document.getElementById("locatie"), c.locatie);
     zet(document.getElementById("Startdatum"), c.datum); zet(document.getElementById("Einddatum"), c.datum);
     const tijden = [...hoofd.querySelectorAll("input.time-input")];
@@ -122,9 +151,12 @@ var DTForms = (() => {
     bezig[sleutel] = true;
     const typ = (el, tekst) => { el.focus(); document.execCommand("insertText", false, tekst); };
     const optie = async (bereik, zoek) => {
+      /* Een stamnummer moet als los getal in de regel staan: 12345 mag niet op 112345 passen. */
+      const nr = /^\d+$/.test(String(zoek)) ? new RegExp(`(^|\\D)${zoek}(\\D|$)`) : null;
+      const past = (t) => (nr ? nr.test(t) : t.includes(zoek));
       for (let i = 0; i < 25; i++) {
         await wacht(200);
-        const o = [...bereik.querySelectorAll("[role=option]")].find((e) => e.offsetParent && e.textContent.includes(zoek) && !/Snelle acties|Mentoren van/.test(e.textContent));
+        const o = [...bereik.querySelectorAll("[role=option]")].find((e) => e.offsetParent && past(e.textContent) && !/Snelle acties|Mentoren van/.test(e.textContent));
         if (o) return o;
       }
       return null;

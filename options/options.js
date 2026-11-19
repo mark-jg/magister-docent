@@ -72,12 +72,35 @@ function renderCoaches() {
   });
 }
 
-let t;
-async function save() {
-  await chrome.storage.sync.set({ settings });
-  const s = document.getElementById("status");
-  s.classList.add("show"); clearTimeout(t); t = setTimeout(() => s.classList.remove("show"), 1200);
+/* Bewaren met een korte vertraging: Chrome staat maar een beperkt aantal schrijfacties per minuut toe, en
+ * bij elke toetsaanslag bewaren liep daar tegenaan. Een mislukte opslag blijft zichtbaar in de statusregel. */
+let t, saveTimer, wachtend = false;
+function save() {
+  wachtend = true;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNow, 400);
 }
+async function saveNow() {
+  clearTimeout(saveTimer);
+  if (!wachtend) return;
+  wachtend = false;
+  const s = document.getElementById("status");
+  clearTimeout(t);
+  try {
+    await chrome.storage.sync.set({ settings });
+    s.textContent = "Opgeslagen"; s.style.background = ""; s.style.color = "";
+    s.classList.add("show"); t = setTimeout(() => s.classList.remove("show"), 1200);
+  } catch (e) {
+    const m = String(e?.message || e);
+    s.textContent = /QUOTA_BYTES/i.test(m) ? "Niet opgeslagen: de instellingen zijn te groot voor Chrome. Verwijder iets (links, coaches, periodes, verborgen elementen)."
+      : /MAX_WRITE/i.test(m) ? "Niet opgeslagen: te veel wijzigingen kort na elkaar. Wacht een minuut en wijzig nog iets."
+      : `Niet opgeslagen: ${m}`;
+    s.style.background = "#b3261e"; s.style.color = "#fff";
+    s.classList.add("show");
+  }
+}
+window.addEventListener("pagehide", saveNow);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveNow(); });
 
 document.addEventListener("input", (e) => {
   const el = e.target; if (!el.dataset?.path) return;
@@ -96,7 +119,7 @@ document.getElementById("addLink").onclick = () => { settings.links.push({ label
 document.getElementById("addCoach").onclick = () => { settings.melding.coaches.push({ name: "", email: "" }); renderCoaches(); document.querySelector("#coaches input:last-of-type")?.focus(); };
 document.getElementById("reset").onclick = async () => {
   if (!confirm("Alle instellingen terugzetten naar standaard?")) return;
-  settings = structuredClone(DEFAULTS); await save(); load();
+  settings = structuredClone(DEFAULTS); save(); await saveNow(); load();
 };
 
 document.getElementById("versionLine").textContent = `Versie ${chrome.runtime.getManifest().version}`;
