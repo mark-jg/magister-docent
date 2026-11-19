@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Docent Tools voor Magister",
   "version": "0.60.0",
-  "description": "Verbeteringen voor Magister (docenten/personeel): thema, overzichtspaneel, tabelexport naar Excel, snelle invoer, AI-hulp en een concept-mail naar de begeleidingscoach bij een Melding Expertisecentrum. Draait volledig lokaal.",
+  "description": "Verbeteringen voor Magister (docenten/personeel): thema, zijkolom, tabelexport naar Excel, snelle invoer, AI-hulp en een concept-mail naar de begeleidingscoach bij een Melding Expertisecentrum. Draait volledig lokaal.",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -12,8 +12,13 @@
   "permissions": [
     "storage",
     "clipboardWrite",
-    "alarms"
+    "alarms",
+    "sidePanel"
   ],
+  "minimum_chrome_version": "116",
+  "side_panel": {
+    "default_path": "sidepanel/sidepanel.html"
+  },
   "host_permissions": [
     "*://*.magister.net/*",
     "https://api.github.com/*",
@@ -22,7 +27,6 @@
   ],
   "action": {
     "default_title": "Docent Tools voor Magister",
-    "default_popup": "popup/popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",
@@ -39,6 +43,11 @@
         "lib/xlsx.full.min.js",
         "content/defaults.js",
         "content/core.js",
+        "content/modules/theme-kleur.js",
+        "content/modules/theme-pagina.js",
+        "content/modules/theme-apple.js",
+        "content/modules/theme-magisterkleuren.js",
+        "content/modules/theme-themas.js",
         "content/modules/theme.js",
         "content/modules/compact.js",
         "content/modules/panel.js",
@@ -57,12 +66,26 @@
         "content/modules/xlsx-visueel.js",
         "content/modules/lesreg.js",
         "content/modules/leaderboard.js",
+        "content/modules/opleidingen-reken.js",
+        "content/modules/opleidingen.js",
         "content/modules/lestools.js",
         "content/modules/pva-docx.js",
         "content/modules/magisterforms.js",
         "content/modules/pva.js",
         "content/modules/cb-kern.js",
         "content/modules/cb.js",
+        "content/modules/cb-opslag.js",
+        "content/modules/cb-pagina.js",
+        "content/modules/cb-melden.js",
+        "content/modules/cb-afspraken.js",
+        "content/modules/cb-signalen.js",
+        "content/modules/cb-magister.js",
+        "content/modules/cb-acties.js",
+        "content/modules/cb-protocol.js",
+        "content/modules/cb-teksten.js",
+        "content/modules/cb-css.js",
+        "content/modules/cb-start.js",
+        "content/kolom.js",
         "content/boot.js"
       ],
       "css": [
@@ -95,7 +118,7 @@
       "suggested_key": {
         "default": "Alt+D"
       },
-      "description": "Docentenpaneel openen/sluiten"
+      "description": "Zijkolom openen/sluiten"
     },
     "toggle-theme": {
       "suggested_key": {

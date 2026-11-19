@@ -1,3 +1,28 @@
+/* In de zijkolom van de browser wordt deze pagina smal en zonder eigen kop getoond (zie sidepanel/). */
+const vraag = new URLSearchParams(location.search);
+if (vraag.has("kolom")) document.documentElement.classList.add("kolom");
+if (vraag.get("blad")) document.documentElement.dataset.blad = vraag.get("blad");
+
+/* Een onderdeel open- of dichtklappen (klik op de naam). */
+function klap(sectie, open) {
+  const knop = sectie?.querySelector(".modnaam"), inhoud = sectie?.querySelector(".inhoud");
+  if (!knop || !inhoud) return;
+  const aan = open ?? knop.getAttribute("aria-expanded") !== "true";
+  knop.setAttribute("aria-expanded", String(aan)); inhoud.hidden = !aan;
+}
+document.addEventListener("click", (e) => { const knop = e.target.closest?.(".modnaam"); if (knop) klap(knop.closest(".mod")); });
+/* Een link naar een onderdeel (options.html#updates) klapt het open en zet het in beeld. In de zijkolom hoort
+ * het onderdeel bij een tabblad; dat wordt dan ook gekozen. */
+function naarAnker() {
+  const sectie = location.hash.length > 1 ? document.getElementById(location.hash.slice(1) === "update" ? "updates" : location.hash.slice(1)) : null;
+  if (!sectie) return;
+  if (sectie.dataset.blad && document.documentElement.dataset.blad) document.documentElement.dataset.blad = sectie.dataset.blad;
+  klap(sectie, true);
+  setTimeout(() => sectie.scrollIntoView({ block: "start" }), 60);
+}
+window.addEventListener("hashchange", naarAnker);
+document.addEventListener("DOMContentLoaded", naarAnker);
+
 const DEFAULTS = globalThis.DT_DEFAULTS;
 
 let settings;
@@ -5,12 +30,20 @@ const get = (obj, path) => path.split(".").reduce((o, k) => (o ? o[k] : undefine
 const set = (obj, path, val) => { const ks = path.split("."); const last = ks.pop(); const o = ks.reduce((o, k) => (o[k] ??= {}), obj); o[last] = val; };
 
 function fillPresets() {
-  const sel = document.getElementById("presetSelect"); if (!sel || sel.options.length) return;
-  for (const [label, dark] of [["Licht", false], ["Donker", true], ["Zelf instellen", null]]) {
-    const g = document.createElement("optgroup"); g.label = label;
-    for (const [v, l, d] of globalThis.DT_PRESETS_LIST) if (d === dark) { const o = document.createElement("option"); o.value = v; o.textContent = l; g.append(o); }
-    sel.append(g);
-  }
+  const vul = (id, lijst) => {
+    const sel = document.getElementById(id); if (!sel || sel.options.length) return;
+    for (const [v, l] of lijst) { const o = document.createElement("option"); o.value = v; o.textContent = l; sel.append(o); }
+  };
+  vul("presetSelect", globalThis.DT_THEMAS_LIST.map(([v, l, sub]) => [v, `${l}: ${sub.toLowerCase()}`]));
+  vul("kleurSelect", globalThis.DT_KLEUREN_LIST);
+}
+/* Wat bij de gekozen combinatie niet van toepassing is, wordt uitgeschakeld in plaats van genegeerd. */
+function syncThema() {
+  const t = settings.theme;
+  const uit = (id, aan) => { const el = document.getElementById(id); if (el) el.disabled = aan; };
+  uit("modeSelect", t.preset === "magister");
+  uit("kleurSelect", t.preset === "magister" || t.preset === "contrast");
+  uit("accentKleur", t.preset === "magister" || t.preset === "contrast" || t.kleur !== "eigen");
 }
 function syncDev() {
   const on = settings.developer?.enabled === true;
@@ -20,6 +53,7 @@ async function load() {
   fillPresets();
   const stored = (await chrome.storage.sync.get("settings")).settings || {};
   settings = merge(structuredClone(DEFAULTS), stored);
+  globalThis.DT_THEMA_MIGRATIE(settings.theme);
   for (const el of document.querySelectorAll("[data-path]")) {
     const v = get(settings, el.dataset.path);
     if (el.type === "checkbox") el.checked = v !== false;
@@ -36,6 +70,7 @@ async function load() {
   }
   renderCoaches();
   syncDev();
+  syncThema();
   const ex = document.getElementById("extraList");
   ex.value = (settings.theme.extra || []).map((x) => `${x.role} | ${x.sel}`).join("\n");
   ex.oninput = () => {
@@ -96,6 +131,8 @@ async function saveNow() {
       : /MAX_WRITE/i.test(m) ? "Niet opgeslagen: te veel wijzigingen kort na elkaar. Wacht een minuut en wijzig nog iets."
       : `Niet opgeslagen: ${m}`;
     s.style.background = "#b3261e"; s.style.color = "#fff";
+    /* In de zijkolom staat deze statusregel onderaan een lange pagina: daar de melding van de kolom gebruiken. */
+    if (document.documentElement.classList.contains("kolom")) { try { parent.DT.toast(s.textContent, "err", 9000); } catch {} }
     s.classList.add("show");
   }
 }
@@ -113,6 +150,7 @@ document.addEventListener("input", (e) => {
   set(settings, el.dataset.path, v);
   save();
   if (el.dataset.path === "developer.enabled") syncDev();
+  if (el.dataset.path.startsWith("theme.")) syncThema();
 });
 
 document.getElementById("addLink").onclick = () => { settings.links.push({ label: "", url: "" }); renderLinks(); };

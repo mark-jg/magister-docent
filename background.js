@@ -132,9 +132,40 @@ async function checkForUpdate(force = false) {
 chrome.alarms.onAlarm.addListener((alarm) => { if (alarm.name === ALARM) checkForUpdate(); });
 chrome.runtime.onStartup.addListener(() => { scheduleUpdateCheck(); checkForUpdate(); });
 
+/* ---------- Zijkolom ----------
+ * Het paneel, de updates en de instellingen staan in de zijkolom van de browser (sidepanel/). Een klik op het
+ * icoon opent hem. De kolom meldt zich hier per venster aan, zodat Alt+D hem ook weer kan sluiten en een ander
+ * onderdeel hem een tabblad kan laten tonen. De browser opent de kolom alleen direct na een klik of toets:
+ * daarom hier nergens eerst wachten (await) vóór chrome.sidePanel.open. */
+chrome.sidePanel?.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
+const kolommen = new Map();   // venster -> verbinding met de open kolom
+const straks = new Map();     // venster -> { blad, anker } om te tonen zodra de kolom open is
+chrome.runtime.onConnect.addListener((lijn) => {
+  if (lijn.name !== "dt-kolom") return;
+  let venster = null;
+  lijn.onMessage.addListener((m) => {
+    if (m?.windowId == null) return;
+    venster = m.windowId; kolommen.set(venster, lijn);
+    const wens = straks.get(venster);
+    if (wens) { straks.delete(venster); lijn.postMessage({ type: "toon", ...wens }); }
+  });
+  lijn.onDisconnect.addListener(() => { if (venster != null && kolommen.get(venster) === lijn) kolommen.delete(venster); });
+});
+function zijkolom(windowId, { alleenOpenen = false, blad = null, anker = "" } = {}) {
+  if (windowId == null || !chrome.sidePanel) return chrome.runtime.openOptionsPage();
+  const open = kolommen.get(windowId);
+  if (open) {
+    try { open.postMessage(blad ? { type: "toon", blad, anker } : alleenOpenen ? { type: "toon", blad: "start" } : { type: "sluit" }); } catch {}
+    return;
+  }
+  if (blad) straks.set(windowId, { blad, anker });
+  chrome.sidePanel.open({ windowId }).catch(() => { straks.delete(windowId); if (blad === "instellingen") chrome.runtime.openOptionsPage(); });
+}
+
 /* ---------- Sneltoetsen ---------- */
-// Stuurt sneltoetsen door naar het actieve Magister-tabblad.
-chrome.commands.onCommand.addListener(async (command) => {
+// Alt+D opent of sluit de zijkolom; de andere sneltoetsen gaan door naar het actieve Magister-tabblad.
+chrome.commands.onCommand.addListener(async (command, actief) => {
+  if (command === "toggle-panel") return zijkolom(actief?.windowId);
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab || !tab.url || !tab.url.includes("magister.net")) return;
   chrome.tabs.sendMessage(tab.id, { type: "command", command }).catch(() => {});
@@ -156,13 +187,16 @@ chrome.runtime.onInstalled.addListener(async ({ reason, previousVersion }) => {
 });
 
 /* ---------- Berichten van popup, instellingen en content ---------- */
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   switch (msg?.type) {
+    case "zijkolom":   // het handvat of Alt+D op de pagina
+      zijkolom(sender.tab?.windowId, { alleenOpenen: msg.alleenOpenen === true });
+      return false;
     case "openPopup":
-      (chrome.action.openPopup ? chrome.action.openPopup() : Promise.reject()).catch(() => chrome.runtime.openOptionsPage());
-      break;
+      zijkolom(sender.tab?.windowId, { alleenOpenen: true });
+      return false;
     case "openOptions":
-      chrome.runtime.openOptionsPage();
+      zijkolom(sender.tab?.windowId, { blad: "instellingen", anker: msg.anker || "" });
       return false;
     case "checkUpdate":
       checkForUpdate(true).then(sendResponse);

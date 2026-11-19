@@ -1,0 +1,53 @@
+/* Zijkolom van de browser: neemt de opmaak van het paneel over uit content/base.css en zet die in een gewone
+ * pagina (geen zwevend paneel meer). De breedte bepaalt de gebruiker door de rand van de kolom te verslepen. */
+html, body { height: 100%; margin: 0; }
+body { --dt-panel-bg: #F2F2F7; --dt-card: #ffffff; --dt-card-shadow: 0 1px 2px rgba(0,0,0,.05), 0 6px 18px rgba(0,0,0,.06);
+  display: flex; flex-direction: column; background: var(--dt-panel-bg); color: var(--dt-fg); font: 13px/1.35 var(--dt-font); }
+html.dt-dark body { --dt-panel-bg: #000; --dt-card: #1C1C1E; --dt-card-shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.35); --dt-fg: #F2F2F7; --dt-muted: #98989D; --dt-bg: #1C1C1E; --dt-line: #2b313b; color-scheme: dark; }
+
+.kolom-kop { position: sticky; top: 0; z-index: 5; padding: 12px 14px 0; background: var(--dt-panel-bg); }
+.kolom-titel { display: flex; align-items: baseline; gap: 8px; }
+.kolom-titel h1 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
+.kolom-titel span { font-size: 11px; color: var(--dt-muted); }
+.kolom-tabs { display: flex; gap: 2px; margin-top: 10px; padding: 2px; border-radius: 10px; background: color-mix(in srgb, var(--dt-fg) 8%, transparent); }
+.kolom-tabs button { flex: 1; appearance: none; border: 0; padding: 6px 10px; border-radius: 8px; background: transparent; color: var(--dt-muted); font: 500 13px var(--dt-font); cursor: pointer; }
+.kolom-tabs button[aria-selected="true"] { background: var(--dt-card); color: var(--dt-fg); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.14); }
+.kolom-tabs button:focus-visible, .kolom-melding button:focus-visible { outline: 2px solid var(--dt-accent); outline-offset: 2px; }
+
+main { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 12px 24px; display: flex; flex-direction: column; gap: 10px; }
+#instellingen { width: 100%; border: 0; background: transparent; display: block; flex: none; }
+/* Per tabblad één deel van het paneel; meldingen en de updateregel horen bij Start. */
+body[data-blad="start"] #dt-panel > :not([data-blad="start"]), body[data-blad="uiterlijk"] #dt-panel > :not([data-blad="uiterlijk"]),
+body[data-blad="modules"] #dt-panel > *, body[data-blad="meer"] #dt-panel > :not([data-blad="meer"]) { display: none; }
+body:not([data-blad="start"]) #meldingen, body:not([data-blad="start"]) .kolom-voet { display: none; }
+body[data-blad="modules"] #dt-panel, body[data-blad="meer"] #dt-panel:not(:has(> [data-blad="meer"] > *)) { display: none; }
+.dt-panel-body:empty { display: none; }
+#kolomDatum { margin-left: auto; }
+.kolom-tabs button { padding: 6px 4px; white-space: nowrap; }
+
+/* Het paneel uit base.css, maar dan gewoon in de pagina. */
+#dt-panel { position: static; width: auto; max-width: none; height: auto; transform: none; box-shadow: none; background: transparent; z-index: auto; transition: none; }
+#dt-panel .dt-panel-body { overflow: visible; padding: 0; }
+
+#meldingen { display: flex; flex-direction: column; gap: 8px; }
+#meldingen:not(:has(.kolom-melding:not([hidden]))) { display: none; }
+.kolom-melding { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 14px; background: var(--dt-card); box-shadow: var(--dt-card-shadow); }
+.kolom-melding[hidden] { display: none; }
+.kolom-melding strong { display: block; font-size: 13px; }
+.kolom-melding span { display: block; font-size: 12px; color: var(--dt-muted); margin-top: 2px; }
+.kolom-melding.is-update { background: color-mix(in srgb, var(--dt-gold) 22%, var(--dt-card)); }
+.kolom-melding.is-ok { background: color-mix(in srgb, #34C759 16%, var(--dt-card)); }
+
+/* Meldingen (DT.toast) onderin de kolom in plaats van midden op een pagina. */
+#dt-toasts { left: 12px; right: 12px; bottom: 12px; transform: none; width: auto; }
+
+.kolom-voet { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 4px 0; font-size: 12px; color: var(--dt-muted); }
+.kolom-voet button { appearance: none; border: 0; background: none; padding: 4px 0; font: inherit; color: var(--dt-accent); cursor: pointer; }
+html.dt-dark .kolom-voet button { color: #8fb6e6; }
+.kolom-voet button:hover { text-decoration: underline; }
+.kolom-voet button:focus-visible { outline: 2px solid var(--dt-accent); outline-offset: 2px; border-radius: 4px; }
+/* De themakeuze krijgt de ruimte; licht/donker staat eronder zodra de kolom smal is. */
+.dt-theme-row { flex-wrap: wrap; }
+.dt-theme-row .dt-select { flex: 1 1 130px; min-width: 0; }
+
+@media (max-width: 300px) { .dt-theme-row { flex-direction: column; align-items: stretch; } }

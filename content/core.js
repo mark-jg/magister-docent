@@ -15,6 +15,22 @@
   let waarnemer = null;
   const alleWaarnemers = () => { for (const w of waarnemers) w.run(); };
   const zichtbaar = () => { if (!document.hidden) alleWaarnemers(); };
+  /* Wordt de extensie herladen of bijgewerkt terwijl Magister openstaat, dan blijft dit script in het tabblad
+   * draaien zonder verbinding met de extensie: elke aanroep van chrome.* geeft dan "Extension context
+   * invalidated". Dan stoppen alle waarnemers, één keer, met een melding om het tabblad te herladen. */
+  const levend = () => { try { return !!chrome.runtime?.id; } catch { return false; } };
+  let gestopt = false;
+  const stopAlles = () => {
+    if (gestopt) return;
+    gestopt = true;
+    for (const w of waarnemers) { clearTimeout(w.timer); clearInterval(w.iv); }
+    waarnemers.clear();
+    if (waarnemer) { waarnemer.disconnect(); waarnemer = null; }
+    window.removeEventListener("hashchange", alleWaarnemers);
+    document.removeEventListener("visibilitychange", zichtbaar);
+    if (window === window.top) { try { DT.toast("Docent Tools is bijgewerkt of herladen. Herlaad dit tabblad om verder te werken.", "info", 12000); } catch {} }
+  };
+  const verlopen = (e) => !levend() || /context invalidated/i.test(String(e?.message || e));
 
   const DT = {
     version: chrome.runtime.getManifest().version,
@@ -29,6 +45,7 @@
     async loadSettings() {
       const stored = (await chrome.storage.sync.get("settings")).settings || {};
       settings = deepMerge(structuredClone(DEFAULTS), stored);
+      globalThis.DT_THEMA_MIGRATIE?.(settings.theme);   // oude themakeuze (t/m 0.60) omzetten
       return settings;
     },
 
@@ -191,6 +208,49 @@
     },
     deepQuery(selector, root = document) { return DT.deepQueryAll(selector, root)[0] || null; },
 
+    /* Eigen tegel tussen Magisters tegels (bv. op Aanwezigheid). Magister bouwt die met mc-nav-tile uit een eigen
+     * (scoped) registry: een element dat de extensie zelf maakt wordt daar niet opgebouwd. Daarom zetten we een
+     * leeg element met data-dt-upgrade neer en laat netlog.js (in de pagina) het via de shadow root opnieuw maken;
+     * zo is het precies hetzelfde onderdeel als Magisters eigen tegels. Staat er op de pagina nog het oudere
+     * dna-link-card, dan gebruiken we dat. Aanroepen bij elke ronde van DT.observe: de tegel wordt één keer
+     * gemaakt en krijgt zijn klik zodra hij is opgebouwd.
+     *   icoon: de inhoud van een <svg viewBox="0 0 512 512">; gebruik fill="var(--sl-icon-fill-accent)" voor de
+     *   lichte laag en fill="var(--sl-icon-fill-default)" voor de donkere. */
+    navTegel(wrap, { id, titel, tekst, icoon, viewBox = "0 0 512 512", open }) {
+      if (!wrap) return null;
+      const nieuw = !!wrap.querySelector("mc-nav-tile") || !wrap.querySelector("dna-link-card");
+      let c = wrap.querySelector("#" + id);
+      if (c && (c.localName === "mc-nav-tile") !== nieuw) { c.remove(); c = null; }   // Magister wisselde van onderdeel
+      if (!c) {
+        c = document.createElement(nieuw ? "mc-nav-tile" : "dna-link-card");
+        c.id = id; c.setAttribute("heading", titel); c.style.cursor = "pointer";
+        const svg = `<svg viewBox="${viewBox}" aria-hidden="true" style="inline-size:var(--sl-icon-size,4rem);block-size:var(--sl-icon-size,4rem);--sl-icon-fill-accent:var(--sl-color-background-info-subtle,#cfe3fb);--sl-icon-fill-default:var(--sl-color-background-info-bold,#2a6ac0)">${icoon}</svg>`;
+        if (nieuw) {
+          c.setAttribute("description", tekst);
+          c.setAttribute("href", location.hash || "#");   // met een href tekent de tegel zijn pijl; de klik vangen we zelf af
+          c.setAttribute("data-dt-upgrade", "");
+          c.innerHTML = svg;
+        } else {
+          c.setAttribute("tabindex", "0"); c.setAttribute("role", "link");
+          const oms = document.createElement("div"); oms.slot = "description"; oms.textContent = tekst;
+          const ico = document.createElement("span"); ico.slot = "icon"; ico.innerHTML = svg;
+          c.append(oms, ico);
+        }
+        wrap.append(c);
+        if (nieuw) { window.postMessage({ type: "dt:upgrade" }, location.origin); return null; }   // de volgende ronde is hij opgebouwd
+      }
+      if (c.hasAttribute("data-dt-upgrade")) { window.postMessage({ type: "dt:upgrade" }, location.origin); return null; }
+      if (!nieuw && c.shadowRoot?.querySelector("h1") && c.shadowRoot.querySelector("h1").textContent.trim() !== titel)
+        window.postMessage({ type: "dt:attr:opnieuw", selector: "#" + id, attr: "heading" }, location.origin);
+      if (!c._dtKlik) {
+        c._dtKlik = true;
+        const ga = (e) => { e.preventDefault(); e.stopPropagation(); open(e); };
+        c.addEventListener("click", ga, true);   // vangfase: de tegel handelt klikken in zijn eigen schaduw-DOM af
+        c.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && !e.repeat) ga(e); }, true);
+      }
+      return c;
+    },
+
     /* Eigen periodes uit de instellingen, gesorteerd, met begin om 00:00 en einde om 23:59:59.
      * Ongeldige regels (geen datum of einde voor begin) vallen weg. */
     periodes() {
@@ -213,13 +273,15 @@
      * en haalt het in zodra het tabblad weer zichtbaar wordt. Bij een aanhoudende stroom wijzigingen loopt de
      * callback toch minstens elke paar seconden (anders zou het uitstellen hem blijven wegduwen). */
     observe(callback, { debounce = 300, poll = 2000, ookVerborgen = false } = {}) {
-      if (!document.body) return () => {};
+      if (!document.body || gestopt) return () => {};
       const maxWacht = Math.max(debounce * 6, 2000);
       const w = { timer: null, sinds: 0 };
       const vuur = () => {
         clearTimeout(w.timer); w.timer = null; w.sinds = 0;
-        try { const r = callback(); if (r && typeof r.catch === "function") r.catch((e) => console.warn("[DT] waarnemer", e)); }
-        catch (e) { console.warn("[DT] waarnemer", e); }
+        if (!levend()) return stopAlles();
+        const fout = (e) => { if (verlopen(e)) stopAlles(); else console.warn("[DT] waarnemer", e); };
+        try { const r = callback(); if (r && typeof r.catch === "function") r.catch(fout); }
+        catch (e) { fout(e); }
       };
       w.run = () => {
         const nu = Date.now(); if (!w.sinds) w.sinds = nu;
@@ -233,7 +295,7 @@
         window.addEventListener("hashchange", alleWaarnemers);
         document.addEventListener("visibilitychange", zichtbaar);
       }
-      const iv = poll ? setInterval(() => { if (ookVerborgen || !document.hidden) w.run(); }, poll) : null;
+      const iv = w.iv = poll ? setInterval(() => { if (ookVerborgen || !document.hidden) w.run(); }, poll) : null;
       callback();
       return () => {
         waarnemers.delete(w); clearTimeout(w.timer); clearInterval(iv);

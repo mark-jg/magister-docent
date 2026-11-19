@@ -1,0 +1,1034 @@
+/* Thema, deel Apple: palet, designvariabelen en alle CSS van de thema's Apple en Apple Glass (licht en donker),
+ * de leerlingkaart, de shadow-DOM-variant en contrastInk. Gebruikt door theme.js. */
+/* ---------- Apple-look ----------
+ * Gebouwd op Magisters eigen selectors (op-shell, magister-lvs, op-detailkaarten) en op de
+ * CSS-variabelen van de dna-webcomponenten, naar de Human Interface Guidelines:
+ * één accent (systeemblauw), SF Pro, gegroepeerde grijze achtergrond met witte vlakken,
+ * hairlines in plaats van randen, 10px/14px hoeken, een lichte zijbalk met blauwe selectie,
+ * doorschijnende balken, een focusring van 3px in het accent en tabbladen als segmentknop. */
+function rgba(hex, a) { const { r, g, b } = hex2rgb(hex); return `rgba(${r}, ${g}, ${b}, ${a})`; }
+function hslParts(hex) { const { h, s, l } = toHsl(hex2rgb(hex)); return { h: Math.round(h), s: `${Math.round(s * 100)}%`, l: `${Math.round(l * 100)}%` }; }
+
+function applePalette(p, dark, accent) {
+  const basis = {
+    accent, dark,
+    bg: p.bg, surface: p.surface, surface2: p.surface2, fg: p.fg, muted: p.muted, border: p.border,
+    sep: dark ? "rgba(84, 84, 88, .65)" : "rgba(60, 60, 67, .29)",
+    sepSoft: dark ? "rgba(84, 84, 88, .45)" : "rgba(60, 60, 67, .16)",
+    line: dark ? "#3A3A3C" : "#E3E3E8",
+    sidebar: dark ? "#1C1C1E" : "#F2F2F7",
+    hover: dark ? "rgba(255,255,255,.06)" : "rgba(0,0,0,.045)",
+    tint: rgba(accent, dark ? .22 : .12),
+    tintStrong: rgba(accent, dark ? .32 : .18),
+    hair: `0 0 0 .5px ${dark ? "rgba(255,255,255,.09)" : "rgba(0,0,0,.07)"}`,
+    card: dark ? "0 0 0 .5px rgba(255,255,255,.09), 0 1px 3px rgba(0,0,0,.45)" : "0 0 0 .5px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.06)",
+    pop: dark ? "0 0 0 .5px rgba(255,255,255,.1), 0 16px 48px rgba(0,0,0,.6)" : "0 0 0 .5px rgba(0,0,0,.08), 0 16px 48px rgba(0,0,0,.16)",
+    material: dark ? "rgba(28, 28, 30, .75)" : "rgba(242, 242, 247, .78)",
+    gray6: dark ? "#3A3A3C" : "#E5E5EA",
+    red: dark ? "#FF453A" : "#FF3B30", orange: dark ? "#FF9F0A" : "#FF9500", green: dark ? "#30D158" : "#34C759",
+    focus: `0 0 0 3px ${rgba(accent, .35)}`,
+    font: FONTS[p.font] || FONTS.apple,
+    glass: Boolean(p.glass),
+    // Liquid Glass: doorschijnend materiaal met vervaging en een lichtrand bovenaan
+    glassBg: dark ? "rgba(44, 44, 46, .5)" : "rgba(255, 255, 255, .48)",
+    glassStrong: dark ? "rgba(44, 44, 46, .78)" : "rgba(255, 255, 255, .8)",
+    glassSide: dark ? "rgba(28, 28, 30, .5)" : "rgba(255, 255, 255, .36)",
+    glassEdge: dark ? "inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 0 .5px rgba(255,255,255,.1)" : "inset 0 1px 0 rgba(255,255,255,.85), inset 0 0 0 .5px rgba(255,255,255,.55)",
+    glassShadow: dark ? "0 18px 50px rgba(0,0,0,.5), 0 2px 6px rgba(0,0,0,.25)" : "0 18px 50px rgba(31, 41, 61, .14), 0 2px 6px rgba(31, 41, 61, .05)",
+    blur: "saturate(180%) blur(28px)"
+  };
+  /* Een thema kan lijnen, schaduwen en vlakken naar eigen karakter zetten (zie theme-themas.js). */
+  return p.stijl ? { ...basis, ...p.stijl(p, dark, accent) } : basis;
+}
+
+/* Variabelen van Magisters designsysteem (body) en van de dna-componenten (host). Deze regels
+ * worden zowel in het document als in elke shadow root gezet. */
+function appleTokens(t) {
+  const h = hslParts(t.accent);
+  const body = `
+    --dna-color-scheme: ${t.dark ? "dark" : "light"} !important;
+    --dna-primary-hue: ${h.h} !important; --dna-primary-sat: ${h.s} !important; --dna-primary-lum: ${h.l} !important;
+    --dna-primary: ${t.accent} !important; --dna-primary-text: #ffffff !important;
+    --dna-secondary: ${t.orange} !important; --dna-secondary-hue: 35 !important; --dna-secondary-sat: 100% !important; --dna-secondary-lum: 50% !important;
+    --dna-danger: ${t.red} !important; --dna-danger-hue: 3 !important; --dna-danger-sat: 100% !important; --dna-danger-lum: 59% !important;
+    --dna-success: ${t.green} !important; --dna-warning: ${t.orange} !important;
+    --dna-text-color: ${t.fg} !important; --dna-text-color-dark: ${t.fg} !important; --dna-text-color-light: #ffffff !important;
+    --dna-background: ${t.bg} !important; --dna-foreground: ${t.surface} !important;
+    --dna-control-background: ${t.surface} !important; --dna-control-border: ${t.border} !important; --dna-control-foreground: ${t.border} !important;
+    --dna-radius-small: 8px !important; --dna-button-border-radius: 10px !important; --dna-button-border-width: 1px !important;
+    --dna-font-family-base: ${t.font} !important; --dna-font-family-header: ${t.font} !important;
+    --dna-font-size-normal: .875rem !important; --dna-line-height-normal: 1.25rem !important;
+    --dna-badge-border-radius: 6px !important;
+    /* SL-ontwerpsysteem (aanwezigheid, leerlingenlijst, roosters) */
+    --sl-elevation-surface-base-default: ${t.glass ? "transparent" : t.bg} !important;
+    --sl-elevation-surface-raised-default: ${t.surface} !important; --sl-elevation-surface-raised-alternative: ${t.surface2} !important; --sl-elevation-surface-raised-sunken: ${t.surface2} !important;
+    --sl-elevation-surface-raised-primary: ${t.accent} !important; --sl-elevation-surface-raised-inverted: ${t.fg} !important;
+    --sl-elevation-shadow-sm: ${t.card} !important; --sl-elevation-shadow-md: ${t.card} !important; --sl-elevation-shadow-lg: ${t.pop} !important; --sl-elevation-shadow-overlay: ${t.pop} !important; --sl-elevation-shadow-overflow: ${t.pop} !important;
+    --sl-color-border-plain: ${t.line} !important; --sl-color-border-neutral-plain: ${t.line} !important; --sl-color-border-accent-grey-plain: ${t.line} !important; --sl-color-border-accent-grey-faint: ${t.line} !important;
+    --sl-opacity-interactive-plain-hover: ${t.dark ? ".08" : ".05"} !important; --sl-opacity-interactive-plain-active: ${t.dark ? ".14" : ".1"} !important;
+    --sl-text-new-typeset-fontWeight-semiBold: 600 !important;
+  `;
+  return `
+    :root, body { ${body} }
+  ` + withPrivateTwins(`
+    /* Omgekeerde (blauwe) paginakop en broodkruimels: rustig, zonder vlak */
+    dna-page-header, dna-page-header[invert] { --background-color: transparent !important; --inverted-background-color: transparent !important; --color: ${t.fg} !important; position: static !important; }
+    dna-breadcrumbs, dna-breadcrumb { --background: transparent !important; --border-color: transparent !important; --color: ${t.muted} !important; --link-color: ${t.muted} !important; --separator-color: ${t.border} !important; --box-shadow: none !important; --font-weight: 500 !important; }
+    /* Tegels (aanwezigheid e.d.) */
+    dna-link-card { --border-radius: 20px !important; --border-width: 0 !important; --border: 0 !important; --box-shadow: ${t.card} !important; background-color: ${t.surface} !important;
+      --arrow-background: ${t.tint} !important; --arrow-color: ${t.accent} !important; --arrow-size: 36px !important; --arrow-position: auto 1rem 1rem auto !important; --arrow-padding: 0 !important;
+      --heading-font: 600 1.0625rem/1.4 ${t.font} !important; --description-font: .8125rem/1.35 ${t.font} !important; --padding: 1.25rem 1.25rem 3.5rem !important; --heading-margin: .75rem 0 .25rem !important;
+      --image-primary: ${rgba(t.accent, .3)} !important; --image-secondary: ${t.accent} !important; }
+    dna-link-card p { color: ${t.muted}; }
+    dna-link-card { --image-size: 2.25rem !important; --_image-size: 2.25rem !important; --width: 17rem !important; --_width: 17rem !important; aspect-ratio: auto !important; min-block-size: 13.5rem; block-size: 100%; transition: transform .18s ease, box-shadow .18s ease; }
+    dna-link-card:hover { transform: translateY(-2px); --box-shadow: ${t.pop} !important; --_box-shadow: ${t.pop} !important; --arrow-background: ${t.accent} !important; --_arrow-background: ${t.accent} !important; --arrow-color: #fff !important; --_arrow-color: #fff !important; }
+    /* Icoon in een zacht afgerond vlak, zoals app-iconen in Apples instellingen */
+    dna-link-card > dna-icon { display: inline-grid !important; place-items: center; inline-size: 3.75rem !important; block-size: 3.75rem !important; padding: 0 !important; border-radius: 16px !important; background: ${t.tint} !important; --icon-size: 2.25rem !important; --_icon-size: 2.25rem !important; }
+    dna-link-card h1 { color: ${t.fg}; }
+    /* SL-rooster: geen grijze kop, geen celvlakken, lichte lijnen */
+    sl-grid { --_header-background: transparent !important; --_cell-background: transparent !important; --_border-radius: 12px !important; }
+    sl-grid::part(header) { color: ${t.muted}; font-weight: 600; font-size: .6875rem; letter-spacing: .04em; text-transform: uppercase; }
+    dna-card { --border-radius: 20px !important; --border-width: 0 !important; --border: 0 !important; --box-shadow: ${t.card} !important; --background: ${t.surface} !important; --color: ${t.fg} !important; --header-padding: 1rem 1.25rem .5rem !important; --body-padding: 0 1.25rem 1.25rem !important; --feature: ${t.accent} !important; }
+    dna-card-title, .dna-card-title { font-weight: 600 !important; font-size: 1.0625rem !important; letter-spacing: -.01em; color: ${t.fg} !important; }
+    dna-page-header { --title-color: ${t.fg} !important; --title-font-weight: 700 !important; --title-font-size: 1.75rem !important; --title-line-height: 2.125rem !important; --subtitle-color: ${t.muted} !important; --highlight: ${t.accent} !important; letter-spacing: -.02em; }
+    dna-button { --border-radius: 10px !important; --font-weight: 500 !important; --padding-v: .5rem !important; --padding-h: .875rem !important; --box-shadow-spread: 3px !important; }
+    dna-button-bar { --gap-h: .5rem !important; }
+    dna-tab-bar { background: ${t.gray6} !important; border-radius: 9px !important; padding: 2px !important; --padding-inline: 0 !important; --indicator-size: 0 !important; --border-width: 0 !important; --border: 0 !important; }
+    /* Alleen het oude dna-tab (de knop). In het nieuwe dna-tabs is dna-tab[slot="tab"] het paneel met de inhoud:
+     * dat kreeg hier een schaduw en een vlak, wat een extra kader om de hele pagina gaf (Te laat-balie). */
+    dna-tab:not([slot="tab"]) { --border-radius: 7px !important; --padding: .3rem .875rem !important; --active: ${t.hover} !important; --color: ${t.fg} !important; --spacing: .25rem !important; font-weight: 500; }
+    dna-tab[selected]:not([slot="tab"]) { --background: ${t.surface} !important; --color: ${t.fg} !important; box-shadow: 0 1px 3px rgba(0,0,0,.14), 0 0 0 .5px rgba(0,0,0,.04) !important; font-weight: 600; }
+    dna-select, dna-input, dna-list-box, dna-datepicker, dna-textarea { --border-radius: 8px !important; --box-shadow: ${t.pop} !important; --highlight: ${t.accent} !important; }
+    dna-menu, dna-overlay { --border-radius: 12px !important; --border: 0 !important; --box-shadow: ${t.pop} !important; --background: ${t.surface} !important; }
+    dna-menu-item { --padding: .4rem .75rem !important; --icon-width: 2.25rem !important; }
+    dna-dialog { --border-radius: 14px !important; --border-width: 0 !important; --border: 0 !important; --box-shadow: ${t.pop} !important; --heading-font: 600 1.0625rem/1.5rem ${t.font} !important; }
+    dna-accordion-item { --border-radius: 12px !important; --border-color: transparent !important; --background: ${t.surface} !important; --box-shadow: ${t.card} !important; }
+    dna-badge { --border-radius: 6px !important; }
+    sl-skeleton { border-radius: 20px !important; }
+  `);
+}
+
+/* Nieuwere dna-componenten (zoals die van de aanwezigheidsapp) lezen privévariabelen met een
+ * underscore (--_border-radius) in plaats van de publieke naam (--border-radius). Elke publieke
+ * variabele in de componentregels krijgt daarom een tweeling met underscore. */
+function withPrivateTwins(css) {
+  return css.replace(/(--)(?!dna-|sl-|_)([a-z0-9-]+)\s*:([^;{}]+);/g, (m, p, name, val) => `${m} --_${name}:${val};`);
+}
+
+function appleCss(p, dark, accent, top = (typeof window === "undefined" || window === window.top)) {
+  const t = applePalette(p, dark, accent);
+  /* Kaartstijl van het lesdashboard (kopkaart, lijst en zijpaneel) */
+  const ldCard = t.glass ? `linear-gradient(180deg, ${t.dark ? "rgba(255,255,255,.07)" : "rgba(255,255,255,.55)"}, transparent 60%), ${t.glassBg}` : t.surface;
+  const ldShadow = t.glass ? `${t.glassEdge}, ${t.dark ? "0 8px 28px rgba(0,0,0,.4), 0 1px 3px rgba(0,0,0,.25)" : "0 8px 28px rgba(31,41,61,.10), 0 1px 3px rgba(31,41,61,.05)"}` : t.card;
+  return appleTokens(t) + `
+    /* ---- Basis ---- */
+    html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+    body { background: ${t.bg} !important; color: ${t.fg} !important; }
+    a { color: ${t.accent}; text-decoration: none; }
+    ::selection { background: ${rgba(accent, .25)}; }
+    :focus-visible { outline: 3px solid ${rgba(accent, .35)} !important; outline-offset: 1px; }
+    h1, h2, h3 { letter-spacing: -.02em; }
+
+    /* ---- Zijbalk: iconenrail en menu als één licht materiaal ---- */
+    .appbar-host, .menu-host, nav.menu, .menu-host nav.menu, .container > nav.menu, .menu-container, .menu-footer, .appbar, mg-appbar { background: ${t.sidebar} !important; }
+    .menu-host { border-right: 1px solid ${t.sep} !important; }
+    .appbar-host { border-right: 1px solid ${t.sep} !important; }
+    nav.menu, .container > nav.menu { font: 500 .875rem/1.25rem ${t.font} !important; }
+    .appbar > div > a, .appbar .menu-button button, a.appbar-button { background: transparent !important; color: ${t.muted} !important; border-radius: 8px !important; transition: background .12s, color .12s; }
+    .appbar > div > a:hover, .appbar .menu-button button:hover, a.appbar-button:hover { background: ${t.hover} !important; color: ${t.fg} !important; }
+    .appbar-icon, .appbar > div > a i, .appbar .menu-button > button > i, .appbar dna-icon { color: inherit !important; font-size: 17px !important; }
+    .appbar .fa-layers-counter { background: ${t.red} !important; color: #fff !important; border-radius: 999px; font: 600 10px/14px ${t.font} !important; min-width: 14px; padding: 0 4px; }
+    .appbar > .gripper > i { background: ${t.muted} !important; opacity: .55; }
+    .appbar > .gripper > i:first-child { background: ${t.accent} !important; opacity: 1; }
+    .appbar .menu-button > a:hover > span, .appbar .menu-button > button:hover > span, .collapsed-menu li:hover span, .collapsed-menu #faux-label {
+      background: ${dark ? "#48484A" : "#1D1D1F"} !important; color: #fff !important; border: 0 !important; border-radius: 6px !important; box-shadow: 0 4px 12px rgba(0,0,0,.2) !important;
+      font: 500 12px/1 ${t.font} !important; text-transform: none !important; padding: 6px 8px !important;
+    }
+    .appbar .menu-button > a:hover > span:after, .appbar .menu-button > button:hover > span:after, .collapsed-menu li:hover span:after { border-right-color: ${dark ? "#48484A" : "#1D1D1F"} !important; }
+    /* Logo: Magisters witte svg vervangen door woordmerk in het systeemlettertype */
+    .menu-host .logo img { display: none !important; }
+    .menu-host .logo a::before { content: "Magister"; font: 700 1.5rem/1 ${t.font}; letter-spacing: -.03em; color: ${t.fg}; }
+    .menu-host .logo a::after { content: ""; width: .4rem; height: .4rem; border-radius: 50%; background: ${t.accent}; margin: .9rem 0 0 .2rem; }
+    .collapsed-menu .logo a::before { content: "M"; }
+    .collapsed-menu .logo a::after { display: none; }
+    /* Menu-items (specificiteit boven Magister en boven de basisregels van het thema) */
+    ul.main-menu { margin: 0 10px !important; }
+    ul.main-menu li a, ul.main-menu li span.caption { color: ${t.fg} !important; }
+    ul.main-menu li a { height: 34px !important; margin-bottom: 2px !important; padding-left: 10px !important; border-radius: 8px !important; background: transparent !important; transition: background .12s; }
+    ul.main-menu li a > dna-icon, ul.main-menu i { color: ${t.accent} !important; }
+    /* Menu-items met een afbeelding in plaats van een pictogram (Cijfers, Infomeester): het filter #dt-accent-filter
+     * (theme.js zet het in de pagina) kleurt elke zichtbare pixel in de accentkleur. */
+    ul.main-menu li a > img.far { filter: url(#dt-accent-filter); width: 20px; height: 20px; object-fit: contain; }
+    ul.main-menu > li.active > a > img.far { filter: brightness(0) invert(1); }
+    ul.main-menu > li > a:hover { background: ${t.hover} !important; }
+    ul.main-menu > li.active > a, ul.main-menu li[class*="active"] > a, ul.main-menu li a[class*="active"], ul.main-menu li[class*="selected"] > a { background: ${t.accent} !important; color: #fff !important; }
+    ul.main-menu > li.active > a > dna-icon, ul.main-menu > li.active > a i, ul.main-menu > li.active > a .expand-direction, ul.main-menu > li.active > a span.caption { color: #fff !important; }
+    ul.main-menu span.caption { margin-left: 10px !important; }
+    ul.main-menu .dot { background: ${t.red} !important; }
+    .menu-footer { border-top: 1px solid ${t.sep} !important; }
+    .menu-footer a, .menu-footer > a > dna-icon { color: ${t.muted} !important; background: transparent !important; }
+    .menu-footer a:hover { color: ${t.fg} !important; }
+    /* Uitklapmenu's en flyouts */
+    .collapsed-menu .popup-menu, .appbar .popup-menu, .appbar-flyout-menu, .collapsed-menu .main-menu > li.active > ul {
+      background: ${t.surface} !important; color: ${t.fg} !important; border: 0 !important; border-radius: 12px !important; box-shadow: ${t.pop} !important; padding: 4px !important;
+    }
+    ul.main-menu > li > .popup-menu { background: transparent !important; box-shadow: none !important; padding: 0 !important; border: 0 !important; }
+    ul.main-menu li.expanded ul { margin: 0 0 4px 30px !important; }
+    ul.main-menu li.expanded ul li a { height: 30px !important; font-size: .8125rem !important; color: ${t.muted} !important; }
+    ul.main-menu li.expanded ul li.active a { color: ${t.accent} !important; background: transparent !important; font-weight: 600; }
+    .popup-menu:after, .appbar .popup-menu:after, .collapsed-menu .popup-menu:after, .collapsed-menu .main-menu > li.active > ul:after { display: none !important; }
+    .appbar .popup-menu h3, .collapsed-menu .popup-menu h3 { color: ${t.muted} !important; font: 600 11px/28px ${t.font} !important; letter-spacing: .04em; }
+    .appbar .popup-menu ul li a, .collapsed-menu .popup-menu ul li a, .appbar .user-menu a, .collapsed-menu .main-menu > li.active > ul a { color: ${t.fg} !important; border-radius: 7px !important; font: 400 13px/32px ${t.font} !important; height: 32px !important; }
+    .appbar .popup-menu ul li a:hover, .collapsed-menu .popup-menu ul li a:hover, .collapsed-menu .main-menu > li.active > ul > li a:hover { background: ${t.accent} !important; color: #fff !important; }
+    .appbar .popup-menu footer { border-top: 1px solid ${t.sep} !important; }
+    .appbar .profile { border-bottom: 1px solid ${t.sep} !important; }
+
+    /* ---- Hoofdvlak ---- */
+    .container > ui-view, ui-view[name="main"], ui-view[name="main"] > *, .strip-padding { background: ${t.bg} !important; }
+    /* Het grote vlak onder de paginakop doorzichtig: kaarten liggen los op de gegroepeerde achtergrond */
+    section.main, section.dna-main-no-subheader, ui-view[name="main"] > * > section { background: transparent !important; box-shadow: none !important; border: 0 !important; }
+    .head-bar h1, ui-view[name="main"] h1 { color: ${t.fg} !important; font: 700 1.75rem/2.125rem ${t.font} !important; letter-spacing: -.02em; }
+    .head-bar h1:after { display: none !important; }
+    .head-bar h1 a, .head-bar h1 a span, .head-bar h1 > span { color: ${t.fg} !important; }
+    .head-bar h1 a i { color: ${t.accent} !important; }
+    /* "Les verantwoord" / "nog niet verantwoord" onder de lestitel als rustig label */
+    .verantwoord-container .verantwoord { height: 24px !important; align-items: center; gap: 5px; padding: 0 10px 0 8px !important; border-radius: 999px; font: 500 .75rem/24px ${t.font} !important; }
+    .verantwoord-container .verantwoord i { font-size: .75rem !important; padding: 0 !important; }
+    .verantwoord-container .verantwoord.wel { color: ${t.dark ? t.green : "#1E7B34"} !important; background: ${rgba(t.green, t.dark ? .2 : .13)} !important; }
+    .verantwoord-container .verantwoord.niet { color: ${t.dark ? t.red : "#C4271D"} !important; background: ${rgba(t.red, t.dark ? .2 : .11)} !important; }
+    /* Tabbladen van het lesdashboard (fotoboek, leerlinglijst, ...) als segmentknop */
+    ld-menu .page-nav, .page-nav:has(> ul.tabs) { background: transparent !important; border: 0 !important; box-shadow: none !important; height: auto !important; line-height: normal !important; padding: 0 !important; margin: 6px 0 12px !important; text-align: left !important; }
+    .page-nav > ul.tabs { display: inline-flex !important; flex-wrap: nowrap; gap: 2px; max-width: 100%; overflow-x: auto; scrollbar-width: none; box-sizing: border-box; height: auto !important; padding: 3px !important; border: 0 !important; border-radius: 999px !important; background: ${t.glass ? t.glassBg : t.gray6} !important; box-shadow: ${t.glass ? t.glassEdge : "none"} !important; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} }
+    .page-nav > ul.tabs::-webkit-scrollbar { display: none; }
+    .page-nav > ul.tabs > li { float: none !important; flex: none; height: auto !important; margin: 0 !important; border: 0 !important; background: transparent !important; }
+    .page-nav > ul.tabs > li > a { display: block !important; height: 30px !important; line-height: 30px !important; padding: 0 14px !important; border: 0 !important; border-radius: 999px !important; background: transparent !important; box-shadow: none !important; color: ${t.muted} !important; font: 500 .8125rem/30px ${t.font} !important; white-space: nowrap; transition: background .12s, color .12s; }
+    .page-nav > ul.tabs > li > a:hover { color: ${t.fg} !important; background: ${t.hover} !important; }
+    .page-nav > ul.tabs > li.active > a { height: 30px !important; border-top: 0 !important; background: ${t.dark ? "rgba(255,255,255,.14)" : t.surface} !important; color: ${t.fg} !important; font-weight: 600 !important; box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 0 0 .5px rgba(0,0,0,.04) !important; }
+    .page-nav > ul.tabs > li.active > a::after { display: none !important; }
+    .head-bar, .page-header, [class*="page-header"], header:not(#dt-panel *), .main-header, .detail-header, [class*="detail-header"] { box-shadow: none !important; border: 0 !important; background: transparent !important; color: ${t.fg} !important; }
+    .head-bar div a i.ico { background: ${t.tint} !important; color: ${t.accent} !important; transition: background .12s; }
+    .head-bar div a:hover i.ico { background: ${t.tintStrong} !important; }
+    /* Tekstknoppen en keuzemenu's in de kopbalk (lesdashboard: leerlingen, verantwoorden, registraties) */
+    .head-bar div a.text-menu, .head-bar div.sub > a { color: ${t.accent} !important; background: ${t.tint} !important; border-radius: 999px !important; height: 32px !important; line-height: 32px !important; margin: 5px 0 0 !important; padding: 0 !important; font: 500 .8125rem/32px ${t.font} !important; transition: background .12s; }
+    .head-bar div a.text-menu span, .head-bar div.sub > a span { color: inherit !important; line-height: 32px !important; padding: 0 14px !important; display: inline-block !important; }
+    .head-bar div a.text-menu:hover, .head-bar div.sub > a:hover { background: ${t.tintStrong} !important; color: ${t.accent} !important; }
+    .head-bar div a.text-menu.disabled, .head-bar div.sub.disabled > a, .head-bar div a.disabled.text-menu { color: ${t.muted} !important; background: ${t.gray6} !important; opacity: .8 !important; }
+    .head-bar div.sub > a { padding-right: 18px !important; }
+    .head-bar div.sub:after { color: ${t.accent} !important; line-height: 42px !important; right: 6px !important; }
+    .head-bar div.sub.disabled:after { color: ${t.muted} !important; }
+    .head-bar div.sub ul { background: ${t.surface} !important; border: 0 !important; border-radius: 12px !important; box-shadow: ${t.pop} !important; padding: 6px !important; top: 42px !important; }
+    .head-bar div.sub ul:after { display: none !important; }
+    .head-bar div.sub ul li { padding: 0 !important; }
+    .head-bar div.sub ul li a { color: ${t.fg} !important; background: transparent !important; border-radius: 8px !important; padding: 0 12px !important; height: 32px !important; line-height: 32px !important; font: 400 .8125rem/32px ${t.font} !important; margin: 0 !important; }
+    .head-bar div.sub ul li a:hover, .head-bar div.sub ul li.active a { background: ${t.tint} !important; color: ${t.accent} !important; }
+    .head-bar div.sub ul li a.disabled { color: ${t.muted} !important; }
+    /* Primaire knoppen (dialogen, voetbalken) */
+    a.primary, .btn.primary, .registeren-footer .primary, footer.endlink a.primary { background: ${t.accent} !important; border: 0 !important; color: #fff !important; border-radius: 10px !important; font: 600 .875rem/40px ${t.font} !important; height: 40px !important; }
+    a.primary:hover, .btn.primary:hover { background: ${mix(accent, dark ? "#ffffff" : "#000000", .08)} !important; color: #fff !important; }
+    a.primary.disabled, .btn.primary.disabled { background: ${t.gray6} !important; color: ${t.muted} !important; }
+    .head-bar .tabs li a { color: ${t.muted} !important; }
+
+    /* ---- Oude widgets (Tahoma 11px) ---- */
+    .widget { font-family: ${t.font} !important; font-size: .8125rem !important; }
+    .widget > .content-pane, .widget > .preview-pane { background: ${t.surface} !important; border: 0 !important; border-radius: 20px !important; box-shadow: ${t.card} !important; overflow: hidden; }
+    .widget > .content-pane h3, .widget > .preview-pane h3 { background: transparent !important; color: ${t.fg} !important; font: 600 .9375rem/44px ${t.font} !important; height: 44px !important; padding-left: 16px !important; border-bottom: 1px solid ${t.sep} !important; box-shadow: none !important; }
+    .widget > .content-pane h3 a, .widget > .preview-pane h3 a { color: ${t.accent} !important; }
+    .widget > .content-pane h3 a.fold-toggle, .widget > .preview-pane h3 a.fold-toggle { color: ${t.muted} !important; }
+    .widget > .content-pane h4, .widget > .preview-pane h4 { background: transparent !important; color: ${t.muted} !important; border-bottom: 1px solid ${t.sep} !important; font: 600 11px/32px ${t.font} !important; letter-spacing: .04em; text-transform: uppercase; }
+    .widget > .content-pane .content, .widget > .preview-pane .content, .widget > .content-pane > .content, .widget > .preview-pane > .content { background: ${t.surface} !important; font-family: ${t.font} !important; font-size: .8125rem !important; color: ${t.fg} !important; }
+    .widget .content-pane .filterbar ~ .content, .widget .preview-pane .filterbar ~ .content { box-shadow: none !important; }
+    .tight-fit .main .content-pane { border-radius: 0 !important; }
+    .dna-card { background: ${t.surface} !important; color: ${t.fg} !important; border-radius: 20px !important; box-shadow: ${t.card} !important; }
+    .dna-card-list, .dna-card-list-item { border-radius: 14px; box-shadow: none; }
+    .dna-card-list { box-shadow: ${t.card} !important; }
+    .dna-card-list-item { background: ${t.surface} !important; }
+    .dna-card-list-item + .dna-card-list-item { border-top: 1px solid ${t.sep} !important; }
+    .dna-card-list-selectable .dna-card-list-item:hover { background: ${t.hover} !important; }
+
+    /* ---- Lijsten (agenda, notificaties, berichten): de rustige inset-stijl van Apple ----
+       geen kader, dagkoppen als groepskopje met ruimte in plaats van een lijn, scheidingslijnen
+       die bij de tekst beginnen en niet tot de rand lopen, zachte markering van de lopende les */
+    uib-accordion, .panel, .panel-default, .panel-group, .panel-collapse, .panel-body { background: transparent !important; border: 0 !important; box-shadow: none !important; }
+    uib-accordion .panel-heading, .panel-heading { background: transparent !important; border: 0 !important; box-shadow: none !important; color: ${t.muted} !important; height: 36px !important; line-height: 36px !important; }
+    .panel-group + .panel-group .panel-heading, .panel-group ~ .panel-group .panel-heading { margin-top: .625rem !important; }
+    uib-accordion .panel-heading a, .panel-heading a { color: ${t.fg} !important; font: 600 .8125rem/36px ${t.font} !important; letter-spacing: -.005em; text-transform: none; padding-left: 14px !important; box-shadow: none !important; border: 0 !important; }
+    uib-accordion .panel-heading a span:not(:has(span)) { display: inline-block; }
+    uib-accordion .panel-heading a span:not(:has(span))::first-letter { text-transform: uppercase; }
+    .panel[data-dt-day="vandaag"] .panel-heading a span:not(:has(span))::before, [uib-accordion-group][data-dt-day="vandaag"] .panel-heading a span:not(:has(span))::before { content: "Vandaag · "; color: ${t.accent}; }
+    .panel[data-dt-day="morgen"] .panel-heading a span:not(:has(span))::before, [uib-accordion-group][data-dt-day="morgen"] .panel-heading a span:not(:has(span))::before { content: "Morgen · "; color: ${t.muted}; }
+    .panel[data-dt-day="vandaag"] + .panel .panel-heading, [uib-accordion-group][data-dt-day="vandaag"] + [uib-accordion-group] .panel-heading { margin-top: .625rem !important; }
+    uib-accordion .panel-heading a dna-icon { color: ${t.muted} !important; opacity: .7; }
+    uib-accordion .panel-title span { color: ${t.muted} !important; font-size: inherit !important; }
+    .agenda-widget-content { border: 0 !important; }
+    .list, ul.list { border: 0 !important; }
+    .list li { background: transparent !important; border: 0 !important; color: ${t.fg} !important; height: 44px !important; line-height: 44px !important; }
+    .list li::after { content: ""; position: absolute; left: 14px; right: 0; bottom: 0; height: 1px; background: ${t.sepSoft}; pointer-events: none; }
+    .list li:last-child::after { display: none; }
+    .list li.double-line { height: auto !important; min-height: 48px !important; line-height: 18px !important; }
+    .list li a { display: flex !important; align-items: center; gap: .5rem; padding: 0 12px 0 14px !important; }
+    .list li a > span { line-height: 1.25rem; }
+    .list li a, .list li.double-line > span { color: ${t.fg} !important; }
+    .list li span.list-head { color: ${t.fg} !important; }
+    .list li span.list-head ~ span { color: ${t.muted} !important; }
+    .list li:hover { background: ${t.hover} !important; }
+    .list li.active, .list li.selected, .list li.current-item { background: ${rgba(accent, .12)} !important; }
+    .list li.current { background: ${rgba(accent, .09)} !important; }
+    .list li.alert:before, .list li.alert-info:before, .list li.alert-danger:before { width: 3px !important; border-radius: 2px; top: 10px !important; bottom: 10px !important; left: 6px !important; }
+    .list li.alert-info:before, .list li.alert:before { background: ${t.accent} !important; }
+    .list li.alert-danger:before { background: ${t.red} !important; }
+    li.vandaag-agenda-list-item { height: 2.75rem !important; }
+    .vandaag-agenda-item-lesblok-tijd { color: ${t.muted} !important; font-variant-numeric: tabular-nums; margin-left: .875rem !important; }
+    span.nrblock { background: ${t.tint} !important; color: ${t.accent} !important; border-radius: 6px !important; font: 600 .75rem/20px ${t.font} !important; height: 20px !important; min-width: 20px !important; padding: 0 6px !important; }
+    ag-lesblok-wijziging > span { color: ${t.muted} !important; font: 500 .6875rem/20px ${t.font} !important; background: ${t.gray6}; border-radius: 999px; padding: 0 8px; margin: 0 !important; display: inline-block; height: 20px; line-height: 20px !important; vertical-align: middle; overflow: visible; }
+    .vandaag-agenda-item-iconen { display: flex; align-items: center; gap: 6px; height: 100%; overflow: visible; }
+    .vandaag-agenda-item-iconen .icons-block { display: flex; align-items: center; gap: 4px; }
+    .vandaag-agenda-item-iconen dna-icon.niet-verantwoord, .list li .icons-block .niet-verantwoord { width: 16px; height: 16px; border-radius: 50%; background: ${t.orange} !important; color: #fff !important; --icon-size: .5625rem !important; --_icon-size: .5625rem !important; --dna-icon-size: .5625rem !important; display: inline-grid !important; place-items: center; }
+    .vandaag-agenda-item-iconen dna-icon { color: var(--ev, ${t.accent}); --icon-size: .75rem; --_icon-size: .75rem; }
+    .list li.vandaag-agenda-list-item[data-dt-next] { background: ${rgba(accent, .06)} !important; }
+    .list li.vandaag-agenda-list-item[data-dt-next] .vandaag-agenda-item-lesblok-tijd { color: ${t.accent} !important; font-weight: 600; }
+    /* Samenvattingsregel onder de datum */
+    .dt-summary { display: flex; flex-wrap: wrap; gap: 8px; margin: -.25rem 0 1rem; }
+    .dt-summary .dt-chip { --k: ${t.muted}; display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 12px 0 10px; border-radius: 999px; background: ${t.surface}; box-shadow: ${t.card}; font: 500 .8125rem/1 ${t.font}; color: ${t.fg}; }
+    .dt-summary .dt-chip i { width: 8px; height: 8px; border-radius: 50%; background: var(--k); }
+    .dt-summary .dt-chip-lessen { --k: ${t.accent}; }
+    .dt-summary .dt-chip-next { --k: ${t.accent}; font-weight: 600; }
+    .dt-summary .dt-chip-done { --k: ${t.green}; }
+    .dt-summary .dt-chip-wijz { --k: ${t.orange}; }
+    /* Kaart Jarig */
+    #dt-jarig .dt-jarig-badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: #FF2D55; color: #fff; font: 600 .75rem/1 ${t.font}; margin-left: 6px; vertical-align: 2px; }
+    #dt-jarig .dt-jarig-list { list-style: none; margin: 0; padding: 0; }
+    #dt-jarig .dt-jarig-row { position: relative; }
+    #dt-jarig .dt-jarig-row::after { content: ""; position: absolute; left: 52px; right: 0; bottom: 0; height: 1px; background: ${t.sepSoft}; }
+    #dt-jarig .dt-jarig-row:last-child::after { display: none; }
+    #dt-jarig .dt-jarig-row a { display: flex; align-items: center; gap: 12px; padding: 8px 4px; text-decoration: none; color: ${t.fg}; border-radius: 10px; }
+    #dt-jarig .dt-jarig-row a:hover { background: ${t.hover}; }
+    #dt-jarig .dt-jarig-av { width: 36px; height: 36px; border-radius: 50%; display: inline-grid; place-items: center; background: color-mix(in srgb, var(--k) 16%, ${t.surface}); color: var(--k); font: 600 .8125rem/1 ${t.font}; flex: 0 0 auto; }
+    #dt-jarig .dt-jarig-today .dt-jarig-av { background: var(--k); color: #fff; }
+    #dt-jarig .dt-jarig-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+    #dt-jarig .dt-jarig-name { font: 500 .875rem/1.2 ${t.font}; color: ${t.fg}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #dt-jarig .dt-jarig-sub { font: 400 .75rem/1.2 ${t.font}; color: ${t.muted}; }
+    #dt-jarig .dt-jarig-when { font: 500 .75rem/1 ${t.font}; color: ${t.muted}; white-space: nowrap; }
+    #dt-jarig .dt-jarig-today .dt-jarig-when { color: #FF2D55; font-weight: 600; }
+    #dt-jarig .dt-jarig-empty { color: ${t.muted}; font: 400 .8125rem/1.3 ${t.font}; padding: 2px 4px 6px; }
+    ag-lesblok-wijziging > span:empty { display: none !important; }
+    /* Notificaties als widget-raster */
+    #vandaag-notificatie .list, sm-notificatie-widget2 .list { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 2px 0 4px; }
+    #vandaag-notificatie .list li.item, sm-notificatie-widget2 .list li.item { --k: ${t.muted}; height: auto !important; line-height: 1.2 !important; border: 0 !important; border-radius: 14px !important; background: ${t.dark ? "rgba(255,255,255,.05)" : "rgba(60,60,67,.05)"} !important; white-space: normal !important; overflow: hidden; transition: background .12s, transform .12s; }
+    #vandaag-notificatie .list li.item::after, sm-notificatie-widget2 .list li.item::after { display: none !important; }
+    #vandaag-notificatie .list li.item:hover, sm-notificatie-widget2 .list li.item:hover { background: ${t.dark ? "rgba(255,255,255,.09)" : "rgba(60,60,67,.09)"} !important; transform: translateY(-1px); }
+    #vandaag-notificatie .list li.item[data-dt-n="1"], sm-notificatie-widget2 .list li.item[data-dt-n="1"] { background: color-mix(in srgb, var(--k) ${t.dark ? "22%" : "12%"}, ${t.surface}) !important; }
+    #vandaag-notificatie .list li.item[data-dt-n="1"]:hover, sm-notificatie-widget2 .list li.item[data-dt-n="1"]:hover { background: color-mix(in srgb, var(--k) ${t.dark ? "30%" : "18%"}, ${t.surface}) !important; }
+    #vandaag-notificatie .list li.item a, sm-notificatie-widget2 .list li.item a { display: grid !important; grid-template-columns: 1fr auto; grid-template-areas: "ico num" "txt txt"; align-items: start; gap: 6px 8px; padding: 12px 14px 12px !important; height: auto !important; white-space: normal !important; }
+    #vandaag-notificatie .list li.item a::after, sm-notificatie-widget2 .list li.item a::after { display: none !important; }
+    #vandaag-notificatie .list li.item .dt-dash-ico, sm-notificatie-widget2 .list li.item .dt-dash-ico { grid-area: ico; width: 30px; height: 30px; border-radius: 50%; display: inline-grid; place-items: center; background: color-mix(in srgb, var(--k) 16%, ${t.surface}); color: var(--k); }
+    #vandaag-notificatie .list li.item[data-dt-n="1"] .dt-dash-ico, sm-notificatie-widget2 .list li.item[data-dt-n="1"] .dt-dash-ico { background: var(--k); color: #fff; }
+    #vandaag-notificatie .list li.item .special, sm-notificatie-widget2 .list li.item .special, #vandaag-notificatie .list li.item span.special { grid-area: num; background: transparent !important; color: ${t.muted} !important; font: 700 1.625rem/1 ${t.font} !important; letter-spacing: -.02em; height: auto !important; min-width: 0 !important; padding: 0 !important; margin: 0 !important; justify-self: end; align-self: start; }
+    #vandaag-notificatie .list li.item[data-dt-n="1"] .special, sm-notificatie-widget2 .list li.item[data-dt-n="1"] .special { color: var(--k) !important; }
+    #vandaag-notificatie .list li.item a > span:not(.special):not(.dt-dash-ico), sm-notificatie-widget2 .list li.item a > span:not(.special):not(.dt-dash-ico) { grid-area: txt; font: 500 .75rem/1.25 ${t.font} !important; color: ${t.muted} !important; white-space: normal !important; overflow: visible !important; line-height: 1.25 !important; }
+    #vandaag-notificatie .list li.item[data-dt-n="1"] a > span:not(.special):not(.dt-dash-ico), sm-notificatie-widget2 .list li.item[data-dt-n="1"] a > span:not(.special):not(.dt-dash-ico) { color: ${t.fg} !important; }
+    #vandaag-notificatie .list li.item a > span:not(.special):not(.dt-dash-ico)::first-letter, sm-notificatie-widget2 .list li.item a > span:not(.special):not(.dt-dash-ico)::first-letter { text-transform: uppercase; }
+    #vandaag-notificatie .list li a::after, vandaag-panel-content .list li a::after { content: ""; margin-left: auto; width: 7px; height: 7px; border-right: 1.5px solid ${t.border}; border-bottom: 1.5px solid ${t.border}; transform: rotate(-45deg); flex: 0 0 auto; }
+    #vandaag-notificatie .list li:hover a::after, vandaag-panel-content .list li:hover a::after { border-color: ${t.muted}; }
+    .list li .special, .list li span.special, ul.list div a .special { display: inline-flex !important; align-items: center; justify-content: center; float: none !important; width: auto !important; min-width: 1.5rem; height: 1.375rem !important; padding: 0 .5rem; margin: 0 .25rem 0 0 !important; border-radius: 999px; background: ${t.tint}; color: ${t.accent}; font-weight: 600; font-size: .75rem; line-height: 1 !important; text-align: center; }
+    .geen-afspraken-tekst, .geen-mededelingen-tekst { color: ${t.muted} !important; }
+
+    /* ---- Leerlinglijst van de les (lesdashboard, ui-grid) ---- */
+    #leerlinglijst .acl-collapse-header { background: transparent !important; border: 0 !important; height: 36px !important; line-height: 36px !important; padding: 0 6px !important; color: ${t.muted} !important; font: 600 .6875rem/36px ${t.font} !important; letter-spacing: .06em; text-transform: uppercase; }
+    #leerlinglijst .acl-collapse-caption { font-weight: 600 !important; color: ${t.muted} !important; }
+    #leerlinglijst .verantwoording-absent-container .acl-collapse-caption { color: ${t.red} !important; }
+    #leerlinglijst .verantwoording-grid-container { height: calc(100% - 36px) !important; }
+    #leerlinglijst .ui-grid { background: ${t.glass ? t.glassBg : t.surface} !important; border: 0 !important; border-radius: ${t.glass ? "22px" : "16px"} !important; box-shadow: ${ldShadow} !important; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} overflow: hidden; }
+    #leerlinglijst .ui-grid-top-panel::before, #leerlinglijst .ui-grid-top-panel::after, #leerlinglijst .ui-grid-vertical-bar, #leerlinglijst .ui-grid-pinned-container > .ui-grid-render-container::after, #leerlinglijst .ui-grid-resize-overlay { display: none !important; }
+    #leerlinglijst .ui-grid-header-cell, #leerlinglijst .ui-grid-pinned-container .ui-grid-cell, #leerlinglijst .ui-grid-row .highlight { border: 0 !important; }
+    #leerlinglijst .ui-grid-cell-focus { box-shadow: none !important; outline: 0 !important; }
+    #leerlinglijst .ui-grid-contents-wrapper, #leerlinglijst .ui-grid-render-container, #leerlinglijst .ui-grid-viewport, #leerlinglijst .ui-grid-canvas, #leerlinglijst .ui-grid-header, #leerlinglijst .ui-grid-top-panel, #leerlinglijst .ui-grid-header-viewport, #leerlinglijst .ui-grid-footer-panel, #leerlinglijst .ui-grid-footer-viewport { background: transparent !important; border: 0 !important; }
+    #leerlinglijst .ui-grid-header-cell, #leerlinglijst .ui-grid-header-cell-row { border: 0 !important; background: transparent !important; }
+    #leerlinglijst .ui-grid-header-cell .ui-grid-cell-contents, #leerlinglijst .ui-grid-header-cell-label { color: ${t.muted} !important; font: 600 .6875rem/32px ${t.font} !important; letter-spacing: .04em; text-transform: uppercase; }
+    #leerlinglijst .ui-grid-header-cell:hover { background: transparent !important; }
+    #leerlinglijst .ui-grid-header-cell .ui-grid-column-menu-button { display: none !important; }
+    #leerlinglijst .ui-grid-header { border-bottom: 1px solid ${t.sepSoft} !important; box-shadow: none !important; }
+    #leerlinglijst .ui-grid-header-cell .ui-grid-cell-contents { min-width: 0 !important; }
+    /* Rijen: geen eigen randen of schaduwen van Magister, één dunne scheidingslijn per rij.
+     * Cellen houden minstens 30px hoogte: een lege zwevende cel (de !-kolom) van 0px laat de volgende kolom eroverheen schuiven. */
+    #leerlinglijst .ui-grid-row { position: relative; overflow: hidden; border: 0 !important; box-shadow: none !important; background: transparent !important; }
+    #leerlinglijst .ui-grid-row::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: 0; height: 1px; background: ${t.sepSoft}; pointer-events: none; z-index: 1; }
+    #leerlinglijst .ui-grid-row:last-child::after { display: none; }
+    #leerlinglijst .ui-grid-row > div, #leerlinglijst .ui-grid-row td { background: transparent !important; box-shadow: none !important; }
+    #leerlinglijst .ui-grid-row .ui-grid-cell { height: 100% !important; min-height: 30px !important; background: transparent !important; border: 0 !important; box-shadow: none !important; color: ${t.fg} !important; transition: background .12s !important; }
+    #leerlinglijst .ui-grid-row .ui-grid-cell-contents, #leerlinglijst .ui-grid-row .mg-checkbox-cell, #leerlinglijst .leerlinglijst-presentie-cell, #leerlinglijst .leerlinglijst-presentie-cell > .mg-checkbox-cell { background: transparent !important; box-shadow: none !important; }
+    #leerlinglijst .ui-grid-row:hover .ui-grid-cell { background: ${t.glass ? (t.dark ? "rgba(255,255,255,.06)" : "rgba(255,255,255,.45)") : t.hover} !important; }
+    #leerlinglijst .ui-grid-row.ui-grid-row-selected > [ui-grid-row] > .ui-grid-cell { background: ${t.tint} !important; }
+    #leerlinglijst .ui-grid-cell-contents { font: 400 .8125rem/30px ${t.font} !important; padding: 0 8px !important; }
+    #leerlinglijst .leerlinglijst-naam-cell, #leerlinglijst .ui-grid-cell-contents.pointer-cursor { font-weight: 500 !important; }
+    #leerlinglijst .leerlinglijst-server-state-changed { font-weight: 600 !important; }
+    #leerlinglijst .leerlinglijst-presentie-cell-icon { color: ${t.green} !important; }
+    #leerlinglijst .mg-avatar-image, #leerlinglijst ccl-avatar .avatar { border-radius: 50% !important; }
+    #leerlinglijst .fa-gift { color: #FF2D55 !important; }
+    #leerlinglijst .ui-grid-row .error, #leerlinglijst .ui-grid-row .ui-grid-cell-contents.error { background: ${rgba(t.red, .12)} !important; }
+    #leerlinglijst .ui-grid-viewport::-webkit-scrollbar { width: 10px; height: 10px; }
+    #leerlinglijst .ui-grid-viewport::-webkit-scrollbar-track { background: transparent; }
+    #leerlinglijst .ui-grid-viewport::-webkit-scrollbar-thumb { background: ${t.dark ? "rgba(255,255,255,.22)" : "rgba(0,0,0,.18)"}; border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
+    /* Vinkjes: smalle kolommen (31px), dus geen celmarge en geen afsnijden; per registratietype een kleur */
+    #leerlinglijst .mg-checkbox-cell { background: transparent !important; box-shadow: none !important; padding: 0 !important; min-width: 0 !important; overflow: visible !important; text-align: center !important; }
+    #leerlinglijst .checkbox-input { height: 30px !important; line-height: 30px !important; margin: 0 !important; padding: 0 !important; width: 100% !important; display: flex !important; align-items: center; justify-content: center; }
+    #leerlinglijst .checkbox-input input[type=checkbox] + label { display: block !important; flex: none; width: 20px !important; height: 20px !important; padding: 0 !important; left: 0 !important; overflow: visible !important; }
+    #leerlinglijst .checkbox-input input[type=checkbox] + label span { display: block !important; width: 20px !important; height: 20px !important; margin: 0 !important; box-sizing: border-box; border-radius: 7px !important; border: 0 !important; background: ${t.dark ? "rgba(118,118,128,.28)" : "rgba(118,118,128,.14)"} !important; box-shadow: inset 0 0 0 .5px ${t.dark ? "rgba(255,255,255,.08)" : "rgba(0,0,0,.06)"} !important; position: relative; transition: background .12s, border-color .12s, transform .12s; }
+    #leerlinglijst .checkbox-input input[type=checkbox]:not([disabled]):not(:checked) + label span:hover { background: ${t.tint} !important; box-shadow: inset 0 0 0 1px ${rgba(accent, .45)} !important; }
+    #leerlinglijst .checkbox-input input[type=checkbox]:not([disabled]) + label:active span { transform: scale(.9); }
+    #leerlinglijst .checkbox-input input[type=checkbox] + label span:after { color: #fff !important; font-size: 11px !important; font-weight: 900 !important; width: 20px !important; height: 20px !important; line-height: 20px !important; left: 0 !important; top: 0 !important; }
+    #leerlinglijst .checkbox-input input[type=checkbox]:checked + label span { --dt-cb: ${t.accent}; background: var(--dt-cb) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 1px 3px color-mix(in srgb, var(--dt-cb) 45%, transparent) !important; }
+    #leerlinglijst .checkbox-input input[class*="leerlinglijst_present_"]:checked + label span { --dt-cb: ${t.green}; }
+    #leerlinglijst .checkbox-input input[class*="leerlinglijst_absent_"]:checked + label span { --dt-cb: ${t.red}; }
+    #leerlinglijst .checkbox-input input[class*="leerlinglijst_ziek_"]:checked + label span { --dt-cb: #AF52DE; }
+    #leerlinglijst .checkbox-input input[class*="leerlinglijst_teLaat_"]:checked + label span { --dt-cb: ${t.orange}; }
+    #leerlinglijst .checkbox-input input[class*="leerlinglijst_uitgestuurd_"]:checked + label span { --dt-cb: #A2845E; }
+    #leerlinglijst .checkbox-input input[class*="leerlinglijst_vrijstelling_"]:checked + label span { --dt-cb: #32ADE6; }
+    #leerlinglijst .checkbox-input input[class*="leerlinglijst_huiswerkVergeten_"]:checked + label span, #leerlinglijst .checkbox-input input[class*="leerlinglijst_boekenVergeten_"]:checked + label span, #leerlinglijst .checkbox-input input[class*="leerlinglijst_mobielInKlas_"]:checked + label span { --dt-cb: #8E8E93; }
+    #leerlinglijst .checkbox-input input[type=checkbox][disabled] + label span { background: ${t.dark ? "rgba(118,118,128,.12)" : "rgba(118,118,128,.07)"} !important; box-shadow: none !important; }
+    #leerlinglijst .checkbox-input input[type=checkbox][disabled] + label span:after, #leerlinglijst span.virtualChecked:after { color: ${t.muted} !important; opacity: .5; }
+    #leerlinglijst .checkbox-input input[type=checkbox][disabled]:checked + label span { opacity: .5; }
+    #leerlinglijst .suggestion .checkbox-input input[type=checkbox] + label span { border: 1.5px dashed ${t.accent} !important; background: ${t.tint} !important; }
+    #leerlinglijst .suggestion .checkbox-input input[type=checkbox] + label span:after { color: ${t.accent} !important; opacity: 1; }
+    #leerlinglijst .ui-grid-header .checkbox-input input[type=checkbox] + label { padding: 0 !important; }
+    #leerlinglijst .ui-grid-header-cell .leerlinglijst-header-icon, #leerlinglijst .ui-grid-header-cell:nth-child(6).centered:before { color: ${t.green} !important; }
+    /* Voet met aantallen */
+    #leerlinglijst ui-grid-footer .ui-grid-cell-contents, #leerlinglijst .ui-grid-footer-cell { color: ${t.muted} !important; font: 600 .75rem/30px ${t.font} !important; text-align: center; background: transparent !important; border: 0 !important; }
+    #leerlinglijst .ui-grid-footer-panel { border-top: 1px solid ${t.sepSoft} !important; }
+    #leerlinglijst .verantwoording-no-data { color: ${t.muted} !important; font: 400 .8125rem/1.3 ${t.font} !important; }
+    /* ---- Tabellen ---- */
+    table.datagrid-table { border-left: 0 !important; }
+    table.datagrid-table th, table.datagrid-table thead th, table.datagrid-table tfoot td { background: transparent !important; border: 0 !important; border-bottom: 1px solid ${t.sepSoft} !important; color: ${t.muted} !important; font: 600 .6875rem/36px ${t.font} !important; letter-spacing: .04em; text-transform: uppercase; height: 36px !important; }
+    table.datagrid-table td { background: transparent !important; border: 0 !important; border-bottom: 1px solid ${t.sepSoft} !important; color: ${t.fg} !important; font-size: .8125rem !important; height: 40px !important; }
+    table.datagrid-table tbody tr:last-child td { border-bottom: 0 !important; }
+    table.datagrid-table th:first-child, table.datagrid-table td:first-child { padding-left: 14px !important; }
+    table.datagrid-table thead + tbody tr:first-child td { box-shadow: none !important; }
+    table.datagrid-table tr:hover td, table.datagrid-table tr.hover td { background: ${t.hover} !important; }
+    table.datagrid-table tr.selected td, table.datagrid-table tr.selected:hover td { background: ${rgba(accent, .12)} !important; }
+    table.datagrid-table tr.current td, table.datagrid-table tr:hover.current td { background: ${rgba(accent, .09)} !important; }
+    th { color: ${t.muted}; }
+
+    /* ---- Leerlingenlijst (op-leerlingen, in een iframe): tabel zonder celranden, filterkaart zonder rand ---- */
+    .zoeken-page, .left-side, .result-container { background: transparent !important; }
+    .table-container, .scroll-viewport { background: ${t.surface} !important; }
+    .table-container { border-radius: 14px !important; box-shadow: ${t.card} !important; }
+    .table-container table, ll-result-table table { border: 0 !important; border-collapse: separate !important; border-spacing: 0 !important; }
+    .table-container th, ll-result-table th, .table-container .header-cell, ll-result-table .header-cell { background: ${t.surface} !important; height: 40px !important; border: 0 !important; border-bottom: 1px solid ${t.sepSoft} !important; color: ${t.muted} !important; font-weight: 600 !important; font-size: .6875rem !important; letter-spacing: .04em; text-transform: uppercase; }
+    .table-container td, ll-result-table td { background: transparent !important; border: 0 !important; border-bottom: 1px solid ${t.sepSoft} !important; color: ${t.fg} !important; font-size: .8125rem !important; }
+    .table-container tbody tr:hover td, ll-result-table tbody tr:hover td { background: ${t.hover} !important; }
+    .table-container tr, ll-result-table tr { height: 44px !important; }
+    .table-container tbody tr:last-child td, ll-result-table tbody tr:last-child td { border-bottom: 0 !important; }
+    .right-side ll-side-widget > dna-card, .filter-container dna-card, .filter-card { border: 0 !important; }
+    .filter-card::-webkit-scrollbar-thumb { background: ${t.dark ? "rgba(255,255,255,.22)" : "rgba(0,0,0,.2)"} !important; }
+    .dna-btn-link-primary, .dna-filter-group-toggle { background: transparent !important; color: ${t.accent} !important; box-shadow: none !important; padding-left: 0 !important; font-weight: 500 !important; }
+    .dna-filter-group-option { color: ${t.fg} !important; }
+    .filters-loading dna-spinner { color: ${t.accent} !important; }
+
+    /* ---- Agenda (FullCalendar) in de stijl van Apple Agenda ---- */
+    /* Geen kaart om het rooster: het ligt direct op de achtergrond, alleen de afspraken zijn vlakken */
+    #calendar { background: transparent !important; border-radius: 0; box-shadow: none; overflow: visible; }
+    #calendar .fc-agenda-view, #calendar .fc-view-container, #calendar .fc-basic-view, #calendar .fc-view > table, #calendar .fc-scroller, #calendar .fc-bg, #calendar .fc-slats, #calendar .fc-time-grid, #calendar .fc-day-grid, #calendar .fc-head-container, #calendar .fc-widget-content { background: transparent !important; }
+    #calendar .fc-toolbar { background: transparent !important; border: 0 !important; height: 40px !important; line-height: 40px !important; margin: 0 0 6px !important; padding: 0; display: flex !important; justify-content: flex-end; align-items: center; gap: 8px; }
+    #calendar .fc-toolbar:before, #calendar .fc-toolbar:after { display: none; }
+    .fc-toolbar .fc-left, .fc-toolbar .fc-right, .fc-toolbar .fc-center { float: none !important; display: flex; align-items: center; height: 40px; }
+    .fc-toolbar .fc-center { flex: 1; order: -1; }
+    .fc-toolbar button, .fc-toolbar .fc-button { color: ${t.accent} !important; font-size: 0 !important; width: 32px !important; height: 32px !important; line-height: 32px !important; padding: 0 !important; margin: 0 !important; border-radius: 50% !important; background: ${t.tint} !important; transition: background .12s; position: relative; float: none !important; }
+    .fc-toolbar button:hover { background: ${t.tintStrong} !important; }
+    .fc-toolbar button.fc-prev-button:before, .fc-toolbar button.fc-next-button:after { color: ${t.accent} !important; font-size: 13px !important; font-weight: 600 !important; height: 32px !important; line-height: 32px !important; top: 0; left: 0; right: 0 !important; width: 32px; text-align: center; position: absolute; }
+    #calendar .fc-toolbar h2 { color: ${t.fg}; font: 600 .9375rem/40px ${t.font}; margin: 0; }
+    .head-bar .fc-toolbar.dt-moved { float: right !important; height: 42px !important; line-height: 42px !important; margin: 0 10px 0 0 !important; padding: 0 !important; display: flex !important; align-items: center; gap: 8px; border: 0 !important; background: transparent !important; width: auto !important; }
+    .head-bar .fc-toolbar.dt-moved .fc-center { display: none; }
+    .head-bar .fc-toolbar.dt-moved .fc-left, .head-bar .fc-toolbar.dt-moved .fc-right { float: none !important; height: 42px; display: flex; align-items: center; margin: 0 !important; }
+    .head-bar .fc-toolbar.dt-moved button { color: ${t.accent} !important; font-size: 0 !important; width: 36px !important; height: 36px !important; line-height: 36px !important; padding: 0 !important; margin: 0 !important; border-radius: 50% !important; background: ${t.tint} !important; position: relative; float: none !important; }
+    .head-bar .fc-toolbar.dt-moved button:hover { background: ${t.tintStrong} !important; }
+    .head-bar .fc-toolbar.dt-moved button.fc-prev-button:before, .head-bar .fc-toolbar.dt-moved button.fc-next-button:after { color: ${t.accent} !important; font-size: 14px !important; font-weight: 600 !important; height: 36px !important; line-height: 36px !important; top: 0; left: 0; right: 0 !important; width: 36px; text-align: center; position: absolute; }
+    #calendar .fc-head .fc-widget-header { background: transparent !important; border: 0 !important; height: 40px !important; line-height: 40px !important; }
+    #calendar .fc-head td, #calendar .fc-head th { border-color: transparent !important; }
+    #calendar .fc-day-header { color: ${t.muted} !important; font: 600 .75rem/40px ${t.font} !important; letter-spacing: .02em; border: 0 !important; }
+    #calendar .fc-day-header.fc-today { color: ${t.accent} !important; }
+    #calendar .fc-divider, #calendar .fc-popover, #calendar .fc-row, #calendar tbody, #calendar td, #calendar th, #calendar thead, .fc-unthemed td, .fc-unthemed th { border-color: ${t.dark ? "rgba(84,84,88,.28)" : "rgba(60,60,67,.07)"} !important; font-size: .75rem; }
+    #calendar .fc-body > tr > td, #calendar .fc-view > table, #calendar .fc-head-container { border: 0 !important; }
+    #calendar .fc-bg td.fc-day { border-left-color: ${t.dark ? "rgba(84,84,88,.2)" : "rgba(60,60,67,.045)"} !important; border-right: 0 !important; }
+    #calendar .fc-day-grid, #calendar .fc-day-grid .fc-row, #calendar .fc-day-grid .fc-bg, #calendar .fc-day-grid .fc-bg td, #calendar .fc-day-grid .fc-content-skeleton td, #calendar .fc-day-grid td, #calendar .fc-day-grid table { border: 0 !important; }
+    #calendar .fc-day-grid .fc-bg td.fc-day { border-left: 1px solid ${t.dark ? "rgba(84,84,88,.2)" : "rgba(60,60,67,.045)"} !important; }
+    #calendar .fc-day-grid .fc-axis { border: 0 !important; }
+    #calendar .fc-day-grid { box-shadow: none !important; }
+    #calendar .fc-divider { display: none !important; }
+    #calendar .fc-day-grid .fc-row { min-height: 2rem; }
+    #calendar .fc-day-grid td.fc-axis, #calendar .fc-day-grid .fc-axis span { color: ${t.muted}; font: 500 .6875rem/1 ${t.font}; }
+    .fc-time-grid .fc-slats .fc-minor td { border-top: 0 !important; }
+    .fc-time-grid .fc-slats td { height: 2.25em !important; }
+    #calendar .fc-agenda-view .fc-time-grid .fc-slats .fc-minor td.fc-axis, #calendar .fc-slats td.fc-axis, #calendar td.fc-axis { border-right: 0 !important; border-top-color: transparent !important; }
+    #calendar .fc-axis { color: ${t.muted} !important; font: 500 .6875rem/1 ${t.font} !important; font-variant-numeric: tabular-nums; text-align: right !important; padding-right: 8px !important; border-left: 0 !important; }
+    #calendar .fc-today, #calendar .fc-unthemed .fc-today { background: ${rgba(accent, .04)} !important; }
+    #calendar .fc-time-grid .fc-slats td.fc-widget-content { border-top-color: ${t.dark ? "rgba(84,84,88,.28)" : "rgba(60,60,67,.07)"} !important; }
+    #calendar ::-webkit-scrollbar { width: 6px; height: 6px; }
+    #calendar ::-webkit-scrollbar-thumb { background: ${t.dark ? "rgba(255,255,255,.18)" : "rgba(0,0,0,.14)"}; }
+    #calendar .fc-nonbusiness, #calendar .fc-bgevent.fc-nonbusiness { display: none !important; }
+    .fc-now-indicator { border-color: ${t.red} !important; }
+    .fc-time-grid .fc-now-indicator-line { border-top-width: 2px !important; }
+    .fc-time-grid .fc-now-indicator-arrow { border-width: 0 !important; width: 10px; height: 10px; border-radius: 50%; background: ${t.red}; margin-top: -5px !important; margin-left: -5px; left: 100%; }
+    /* Afspraken: kleur per vak/klas (--ev, gezet door agendaColorPass; standaard het accent), zachte tint,
+       gekleurde linkerrand, tekst in de donkere variant van de kleur, voorbije afspraken gedimd */
+    #calendar .fc-event, #calendar .fc-time-grid-event, #calendar .fc-day-grid-event { --ev: ${t.accent}; background: color-mix(in srgb, var(--ev) ${t.dark ? "26%" : "14%"}, ${t.surface}) !important; border: 0 !important; border-radius: 8px !important; color: ${t.fg} !important; box-shadow: none !important; margin: 1px 4px 2px 1px !important; transition: opacity .15s, filter .15s; }
+    #calendar .fc-time-grid-event { margin-bottom: 2px !important; }
+    #calendar .fc-event .fc-bg { display: none; }
+    #calendar .fc-event .fc-content { padding: 7px 9px 7px 10px; }
+    #calendar .fc-time-grid-event .fc-title, #calendar .fc-time-grid-event .event-description, #calendar .fc-time-grid-event .event-description-content, #calendar .fc-time-grid-event .event-description-content-examen, #calendar .fc-h-event .fc-content { color: color-mix(in srgb, var(--ev) ${t.dark ? "45%, #ffffff" : "68%, #000000"}) !important; font: 500 .8125rem/1.3 ${t.font} !important; padding: 0 !important; letter-spacing: -.005em; }
+    #calendar .fc-time-grid-event .calendar-event .event-description-content, #calendar .fc-time-grid-event .calendar-event .event-description-content-examen { padding: 0 !important; margin: 0 !important; width: 100% !important; }
+    #calendar .fc-time-grid-event .calendar-event { display: block; }
+    #calendar .fc-time-grid-event .calendar-event:has(.nrblock) .event-description-content, #calendar .fc-time-grid-event .calendar-event:has(.nrblock) .event-description-content-examen { width: calc(100% - 44px) !important; }
+    #calendar .fc-time-grid-event .fc-time { color: ${t.muted} !important; font-size: .6875rem !important; }
+    #calendar .fc-time-grid-event .nrblock, #calendar .fc-time-grid-event .calendar-event .nrblock { background: color-mix(in srgb, var(--ev) ${t.dark ? "34%" : "18%"}, ${t.surface}) !important; color: color-mix(in srgb, var(--ev) ${t.dark ? "55%, #ffffff" : "62%, #000000"}) !important; box-shadow: none !important; border-radius: 6px !important; font: 600 .6875rem/18px ${t.font} !important; height: 18px !important; right: 7px !important; top: 6px !important; }
+    .fc-day-grid-event.current-event, .fc-time-grid-event.current-event { background: color-mix(in srgb, var(--ev) ${t.dark ? "40%" : "24%"}, ${t.surface}) !important; }
+    .fc-day-grid-event.active-event, .fc-time-grid-event.active-event { background: color-mix(in srgb, var(--ev) ${t.dark ? "36%" : "20%"}, ${t.surface}) !important; box-shadow: 0 0 0 2px var(--ev) !important; }
+    #calendar .fc-event[data-dt-past] { opacity: .55; }
+    #calendar .fc-event[data-dt-past]:hover { opacity: .85; }
+    #calendar .fc-time-grid-event.current-event .nrblock, #calendar .fc-time-grid-event.active-event .nrblock { box-shadow: none !important; }
+    #calendar .fc-event:has(.calendar-event.info) { --ev: ${t.red}; }
+    .calendar-event.info:before { display: none !important; }
+    #calendar .fc-event:hover { filter: brightness(.96); }
+    /* Markeringen in de afspraak: klein en rustig, rechtsonder; "niet verantwoord" als oranje stip */
+    #calendar .fc-time-grid-event .icons-block.week-view, #calendar .fc-time-grid-event ag-lesblok-iconen > .icons-block { position: absolute !important; right: 7px; bottom: 6px; display: flex !important; gap: 3px; align-items: center; margin: 0 !important; padding: 0 !important; text-align: right; }
+    #calendar .icons-block.week-view .dna-badge, #calendar .icons-block .dna-badge { font: 600 .625rem/16px ${t.font} !important; padding: 0 5px !important; border-radius: 5px !important; background: color-mix(in srgb, var(--ev) 18%, ${t.surface}) !important; color: color-mix(in srgb, var(--ev) 62%, #000000) !important; border: 0 !important; height: 16px; }
+    #calendar .icons-block.week-view dna-icon, #calendar .icons-block dna-icon { --icon-size: .75rem !important; --_icon-size: .75rem !important; --dna-icon-size: .75rem !important; color: var(--ev) !important; }
+    #calendar .icons-block dna-icon.niet-verantwoord, #calendar .icons-block .niet-verantwoord { width: 16px; height: 16px; border-radius: 50%; background: ${t.orange} !important; color: #fff !important; --icon-size: .5625rem !important; --_icon-size: .5625rem !important; --dna-icon-size: .5625rem !important; display: inline-grid !important; place-items: center; }
+    /* Startscherm-agenda: zelfde kleur per vak/klas op het balkje en de chip */
+    .list li.vandaag-agenda-list-item { --ev: ${t.accent}; transition: opacity .15s; }
+    .list li.vandaag-agenda-list-item:before { content: ""; position: absolute; left: 6px; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; background: var(--ev); z-index: 9; }
+    .list li.vandaag-agenda-list-item.alert-info:before, .list li.vandaag-agenda-list-item.alert:before { background: var(--ev) !important; }
+    .list li.vandaag-agenda-list-item.alert-danger:before { background: ${t.red} !important; }
+    .list li.vandaag-agenda-list-item.alert-danger .classroom { text-decoration: line-through; color: ${t.muted} !important; }
+    .list li.vandaag-agenda-list-item.current { background: color-mix(in srgb, var(--ev) ${t.dark ? "22%" : "10%"}, ${t.surface}) !important; }
+    .list li.vandaag-agenda-list-item[data-dt-past] { opacity: .5; }
+    .list li.vandaag-agenda-list-item[data-dt-past]:hover { opacity: .85; }
+    .vandaag-agenda-item-lesblok-info .classroom { color: ${t.fg}; font-weight: 500; }
+    .list li.vandaag-agenda-list-item span.nrblock { background: color-mix(in srgb, var(--ev) 14%, ${t.surface}) !important; color: color-mix(in srgb, var(--ev) 65%, #000000) !important; }
+    #calendar .fc-highlight { background: ${rgba(accent, .12)} !important; opacity: 1 !important; }
+    /* Rechterzijbalk: tabs als segmentknop, kaarten van 20px */
+    aside, aside > div, aside .content-container, aside .aside-toggle-slide { background: transparent !important; border: 0 !important; box-shadow: none !important; }
+    aside .head-bar { background: transparent !important; border: 0 !important; height: 40px !important; line-height: 40px !important; padding: 0 !important; display: flex; align-items: center; gap: 8px; }
+    aside .head-bar .toggle, aside .head-bar div.toggle { float: none !important; }
+    aside .head-bar div.toggle a, aside .head-bar .toggle a { width: 32px !important; height: 32px !important; border-radius: 50% !important; background: ${t.tint} !important; color: ${t.accent} !important; display: inline-grid !important; place-items: center; }
+    aside .head-bar .tabs { background: ${t.gray6} !important; border: 0 !important; border-radius: 999px !important; padding: 3px !important; height: 32px !important; display: flex !important; float: none !important; width: calc(100% - 44px) !important; box-sizing: border-box; }
+    aside .head-bar .tabs li { width: auto !important; flex: 1; height: 26px !important; }
+    aside .head-bar .tabs li a { height: 26px !important; line-height: 26px !important; border-radius: 999px !important; color: ${t.muted} !important; font: 500 .8125rem/26px ${t.font} !important; box-shadow: none !important; }
+    aside .head-bar .tabs li.active a, aside .head-bar .tabs li:hover a { color: ${t.fg} !important; }
+    aside .head-bar .tabs li.active { border: 0 !important; }
+    aside .head-bar .tabs li.active a { background: ${t.surface} !important; box-shadow: 0 1px 3px rgba(0,0,0,.14), 0 0 0 .5px rgba(0,0,0,.04) !important; font-weight: 600 !important; }
+    aside .widget { padding: 12px 0 0 !important; background: transparent !important; }
+    /* Inklapknop van het zijpaneel als ronde knop; ingeklapt blijft alleen die knop over */
+    aside .head-bar mg-sidebar-toggle-button { flex: none; display: block !important; }
+    aside .head-bar .toggle-button { width: 32px !important; height: 32px !important; padding: 0 !important; border: 0 !important; border-radius: 50% !important; background: ${t.tint} !important; color: ${t.accent} !important; display: grid !important; place-items: center; cursor: pointer; box-shadow: none !important; transition: background .12s, transform .2s; }
+    aside .head-bar .toggle-button:hover { background: ${t.tintStrong} !important; }
+    aside .head-bar .toggle-button i { font-size: 15px !important; line-height: 1 !important; color: inherit !important; }
+    .hide-sidebar-contents aside .head-bar .tabs, .collapse-sidebar aside .head-bar .tabs { display: none !important; }
+    .collapse-sidebar aside .head-bar { justify-content: center; background: transparent !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; border-radius: 0 !important; height: 52px !important; }
+    .collapse-sidebar aside .head-bar .toggle-button { width: 38px !important; height: 38px !important; background: ${t.glass ? t.glassStrong : t.surface} !important; box-shadow: ${t.glass ? `${t.glassEdge}, 0 4px 14px rgba(31,41,61,.12)` : t.card} !important; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} }
+    .collapse-sidebar aside .head-bar .toggle-button:hover { background: ${t.tintStrong} !important; }
+    .collapse-sidebar aside { overflow: visible !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .aside-toggle-slide { display: none !important; }
+    ld-hulpmiddelen.dt-ld-on { display: block !important; }
+    /* Lesdashboard: titel, tabbladen en werkbalk als één kaart (vlak .dt-ld-kop, maat via lesdashKopPass) */
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .dt-ld-kop { position: absolute; top: 28px; box-sizing: border-box; pointer-events: none; border-radius: ${t.glass ? "22px" : "16px"}; background: ${ldCard}; box-shadow: ${ldShadow}; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} transition: left .2s linear, right .2s linear; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar { top: 46px !important; height: 40px !important; line-height: 40px !important; left: calc(var(--dt-kop-l, 330px) + 18px) !important; right: calc(var(--dt-kop-r, 24px) + 16px) !important; margin: 0 !important; background: transparent !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; border-radius: 0 !important; transition: right .2s linear; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar h1, .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar h1 a { margin-left: 0 !important; padding-left: 0 !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar h1 { height: 40px !important; line-height: 40px !important; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    /* Eén knopmaat (30px) in de hele kaart: knoppen in de titelrij, tabbladen en werkbalk */
+    /* Knoppen rechts in de titelrij: één flexrij (Magister zet ze met float: right, vandaar row-reverse) */
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar .head-bar-links { float: right !important; margin: 0 0 0 16px !important; height: 40px; width: auto !important; display: flex !important; flex-direction: row-reverse; align-items: center; gap: 6px; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar .head-bar-links > :not(.ng-hide), .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar .head-bar-links :not(ul, li, .ng-hide) > :is(div, mg-headbar-button):not(.ng-hide) { float: none !important; height: 40px !important; margin: 0 !important; padding: 0 !important; display: flex !important; flex-direction: row-reverse; align-items: center; gap: 6px; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar .head-bar-links a.text-menu, .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar .head-bar-links div.sub > a { height: 30px !important; line-height: 30px !important; margin: 0 !important; padding: 0 !important; display: inline-flex !important; align-items: center; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar .head-bar-links div.sub > a { padding-right: 16px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar .head-bar-links a.text-menu span, .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar .head-bar-links div.sub > a span { line-height: 30px !important; padding: 0 14px !important; font: 500 .8125rem/30px ${t.font} !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar .head-bar-links a:has(> i.ico) { width: 30px !important; height: 30px !important; margin: 0 !important; padding: 0 !important; display: inline-grid !important; place-items: center; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar .head-bar-links a > i.ico { width: 30px !important; height: 30px !important; line-height: 30px !important; font-size: 13px !important; border-radius: 50% !important; padding: 0 !important; margin: 0 !important; text-align: center; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .head-bar .head-bar-links div.sub:after { line-height: 40px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > section.ld-section { padding-top: 66px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > section.ld-section > .verantwoord-container { margin-left: 16px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > section.ld-section > ld-menu .page-nav { margin: 0 16px 28px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > section.ld-section:has(#leerlinglijst > .dt-att-bar) > ld-menu .page-nav { margin-bottom: 10px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > section.ld-section > ld-menu .page-nav > ul.tabs { height: 30px !important; padding: 2px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > section.ld-section > ld-menu .page-nav > ul.tabs > li > a { height: 26px !important; line-height: 26px !important; padding: 0 14px !important; font-size: .8125rem !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > section.ld-section > ld-menu .page-nav > ul.tabs { width: fit-content !important; background: ${t.dark ? "rgba(118,118,128,.24)" : "rgba(118,118,128,.12)"} !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) #leerlinglijst > .dt-att-bar { padding: 0 16px !important; margin: 0 0 28px !important; gap: 6px !important; min-height: 30px; align-items: center; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) #leerlinglijst > .dt-att-bar .dt-btn { height: 30px !important; padding: 0 12px !important; gap: 5px !important; font: 500 .8125rem/1 ${t.font} !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) #leerlinglijst > .dt-att-bar .dt-btn svg { width: 12px; height: 12px; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) #leerlinglijst > .dt-att-bar .dt-att-shortcut { display: none !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) #leerlinglijst > .dt-att-bar .dt-att-search { height: 30px; align-items: center; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) #leerlinglijst > .dt-att-bar .dt-att-search .dt-att-input { margin: 0 !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) #leerlinglijst > .dt-att-bar .dt-att-input { width: 180px !important; height: 30px !important; font-size: .8125rem !important; line-height: 30px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) #leerlinglijst > .dt-att-bar .dt-att-legend { gap: 2px 10px !important; font-size: .6875rem !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) #leerlinglijst > .dt-att-bar .dt-att-legend kbd { min-width: 15px !important; height: 15px !important; line-height: 15px !important; padding: 0 4px !important; font-size: .625rem !important; border-radius: 4px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) #leerlinglijst > .dt-att-bar .dt-btn:not(.dt-btn-primary) { background: ${t.dark ? "rgba(118,118,128,.24)" : "rgba(118,118,128,.12)"} !important; box-shadow: none !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) #leerlinglijst > .dt-att-bar .dt-btn:not(.dt-btn-primary):hover { background: ${t.dark ? "rgba(118,118,128,.34)" : "rgba(118,118,128,.2)"} !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) #leerlinglijst > .dt-att-bar .dt-att-input { background: ${t.dark ? "rgba(118,118,128,.24)" : "rgba(118,118,128,.12)"} !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside { top: 28px !important; }
+    /* Zijpaneel naast de kaart: zelfde kaartstijl, 16px binnenmarge, 12px tussen kaarten, knoppen van 30px */
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn:not(.collapse-sidebar) aside .head-bar { height: 46px !important; line-height: normal !important; padding: 0 8px !important; margin: 0 !important; gap: 8px !important; box-sizing: border-box; border-radius: ${t.glass ? "22px" : "16px"} !important; background: ${ldCard} !important; box-shadow: ${ldShadow} !important; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn:not(.collapse-sidebar) aside .head-bar .tabs { flex: 1; width: auto !important; min-width: 0; height: 30px !important; padding: 2px !important; background: ${t.dark ? "rgba(118,118,128,.24)" : "rgba(118,118,128,.12)"} !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .head-bar .tabs li { height: 26px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .head-bar .tabs li a { height: 26px !important; line-height: 26px !important; font-size: .8125rem !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn:not(.collapse-sidebar) aside .head-bar .toggle-button { width: 30px !important; height: 30px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .head-bar .toggle-button { position: static !important; inset: auto !important; margin: 0 !important; flex: none; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .head-bar mg-aside-toggle:empty { display: none !important; }
+    aside .head-bar .toggle-button:focus { outline: 0 !important; }
+    aside .head-bar .toggle-button:focus-visible { outline: 2px solid ${t.accent} !important; outline-offset: 2px; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn:not(.collapse-sidebar) aside { overflow: visible !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn:not(.collapse-sidebar) aside .content-container { margin: 58px -16px 0 !important; padding: 0 16px 24px !important; width: calc(100% + 32px) !important; height: calc(100% - 58px) !important; box-sizing: border-box; scrollbar-width: none; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn:not(.collapse-sidebar) aside .content-container::-webkit-scrollbar { display: none; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget { padding: 0 0 12px !important; margin: 0 !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget > .content-pane { border-radius: ${t.glass ? "22px" : "16px"} !important; background: ${ldCard} !important; box-shadow: ${ldShadow} !important; overflow: hidden; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget > .content-pane > h3, .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget h3 { height: 44px !important; line-height: 44px !important; padding: 0 44px 0 16px !important; margin: 0 !important; font: 600 .9375rem/44px ${t.font} !important; color: ${t.fg} !important; letter-spacing: -.01em; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget h3 b, .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget h3 span { font: inherit !important; line-height: inherit !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget h3 .fold-toggle, .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget .fold-toggle { top: 0 !important; right: 4px !important; width: 40px !important; height: 44px !important; line-height: 44px !important; display: grid !important; place-items: center; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget .fold-toggle i { font-size: 12px !important; line-height: 1 !important; width: auto !important; height: auto !important; color: ${t.muted} !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget .content { padding: 0 16px 16px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget footer.endlink { padding: 0 16px 16px !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget .list li > a > span.value, .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget .list li .single-line > span.value:first-child { padding-left: 0 !important; }
+    .dt-ld-on:is(ui-view, ld-hulpmiddelen) > .sidecolumn aside .widget .list li.no-data { padding-left: 8px !important; padding-right: 8px !important; }
+    /* Frame van het leerlingenoverzicht tot de onderrand van het venster (Magister laat 24px marge plus 9px
+     * onder het inline-frame vrij); de marge van 24px zit daarna binnen het frame, zodat schaduwen zichtbaar blijven */
+    ui-view[name="main"]:has(#guest-app-frame[src*="/op-leerlingen/"]) { padding-top: 16px !important; padding-bottom: 0 !important; }
+    mg-guest-app .fill-viewport > #guest-app-frame[src*="/op-leerlingen/"] { display: block !important; height: 100% !important; }
+    /* ---- Leaderboard (aanwezigheid): kaarten zoals het lesdashboard ---- */
+    .dt-lb { --lb-card: ${ldCard}; --lb-shadow: ${ldShadow}; --lb-tint: ${t.tint}; }
+    ${t.glass ? `.dt-lb .dt-lb-card { -webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur}; }` : ""}
+    /* ---- Leerlingenoverzicht: zelfde kaartopbouw als het lesdashboard (vlak .dt-ll-kop, maat via leerlingenKopPass) ---- */
+    html.dt-ll-on body > .dt-ll-kop { position: absolute; top: 8px; z-index: 0; box-sizing: border-box; pointer-events: none; border-radius: ${t.glass ? "22px" : "16px"}; background: ${ldCard}; box-shadow: ${ldShadow}; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} }
+    html.dt-ll-on app-root > dna-breadcrumbs, html.dt-ll-on app-root > dna-page-header, html.dt-ll-on app-leerlingen-root > dna-tabs { position: relative !important; z-index: 1; margin-right: calc(var(--dt-ll-rm, 296px) + 16px) !important; }
+    html.dt-ll-on app-root > dna-breadcrumbs { margin-top: 14px !important; margin-left: 10px !important; }
+    html.dt-ll-on app-root > dna-page-header { margin-left: 16px !important; margin-top: -2px !important; }
+    html.dt-ll-on app-leerlingen-root > dna-tabs { margin-left: 16px !important; margin-top: 8px !important; margin-bottom: 0 !important; width: fit-content; max-width: calc(100% - var(--dt-ll-rm, 296px) - 32px); }
+    html.dt-ll-on app-leerlingen-root > dna-tabs dna-tab-bar { padding: 2px !important; background: ${t.dark ? "rgba(118,118,128,.24)" : "rgba(118,118,128,.12)"} !important; box-shadow: none !important; }
+    html.dt-ll-on app-leerlingen-root > dna-tabs dna-tab-button { height: 26px !important; --padding: 0 14px !important; --_padding: 0 14px !important; font-size: .8125rem !important; line-height: 26px !important; padding-block: 0 !important; }
+    html.dt-ll-on .zoeken-page { position: relative; z-index: 1; padding-top: 10px !important; }
+    html.dt-ll-on .zoeken-page > .left-side { margin-right: 16px !important; }
+    html.dt-ll-on .zoeken-page > .left-side > .tag-container { padding: 0 16px !important; height: auto !important; }
+    /* Werkbalk: Excel-knop en Magisters knoppenrij op één regel; filterlabels (als die er zijn) eronder */
+    html.dt-ll-on ll-top-bar { display: flex !important; flex-wrap: wrap; align-items: center; column-gap: 8px; row-gap: 8px; min-height: 30px; }
+    html.dt-ll-on ll-top-bar > .dt-llx { order: 0; margin: 0 !important; height: 30px !important; }
+    html.dt-ll-on ll-top-bar > ll-action-bar { order: 1; flex: 1 1 540px; min-width: 0; display: block !important; }
+    html.dt-ll-on ll-top-bar > ll-filter-tag-bar { order: 2; flex-basis: 100%; }
+    html.dt-ll-on ll-top-bar > ll-filter-tag-bar:empty { display: none !important; }
+    html.dt-ll-on ll-action-bar .header { margin: 0 !important; height: 30px; align-items: center; gap: 8px; flex-wrap: nowrap !important; }
+    html.dt-ll-on ll-action-bar .action-buttons { width: auto !important; flex: none !important; }
+    html.dt-ll-on ll-action-bar .action-buttons dna-button-bar { display: flex !important; flex-wrap: nowrap !important; gap: 6px; align-items: center; }
+    html.dt-ll-on ll-action-bar .student-count { flex: 1; text-align: center; white-space: nowrap; }
+    html.dt-ll-on ll-action-bar dna-button[has-icon] { width: 30px !important; height: 30px !important; --padding-v: 0 !important; --padding-h: 0 !important; --_padding-v: 0 !important; --_padding-h: 0 !important; --icon-size: 15px !important; --_icon-size: 15px !important; --border-radius: 999px !important; --_border-radius: 999px !important; --background: ${t.tint} !important; --_background: ${t.tint} !important; --color: ${t.accent} !important; --_color: ${t.accent} !important; border-radius: 999px; background: ${t.tint}; display: inline-grid !important; place-items: center; }
+    html.dt-ll-on ll-action-bar dna-button[has-icon]:hover { --background: ${t.tintStrong} !important; --_background: ${t.tintStrong} !important; background: ${t.tintStrong}; }
+    html.dt-ll-on ll-action-bar dna-overlay-trigger { display: inline-flex !important; align-items: center; height: 30px; margin: 0 !important; }
+    html.dt-ll-on ll-action-bar .student-count { font: 500 .8125rem/30px ${t.font} !important; color: ${t.muted} !important; }
+    html.dt-ll-on ll-action-bar .sorting { height: 30px; align-items: center; gap: 8px; flex-wrap: nowrap !important; white-space: nowrap; flex: none; }
+    html.dt-ll-on ll-action-bar .sorting .sort-label { font: 400 .8125rem/30px ${t.font} !important; color: ${t.muted} !important; }
+    html.dt-ll-on ll-action-bar .sorting dna-select { --height: 30px !important; --_height: 30px !important; height: 30px; margin: 0 !important; }
+    html.dt-ll-on .result-container { margin-top: 28px !important; }
+    html.dt-ll-on .table-container { border-radius: ${t.glass ? "22px" : "16px"} !important; box-shadow: ${ldShadow} !important; }
+    /* Filterpaneel: begint op de hoogte van de kaart, zelfde kaartstijl */
+    html.dt-ll-on .right-side .filter-container { padding: 0 !important; top: var(--dt-ll-ft, 8px) !important; height: var(--dt-ll-fh) !important; max-height: none !important; }
+    html.dt-ll-on .right-side .filter-container:not(.collapsed) { left: var(--dt-ll-fl) !important; width: var(--dt-ll-fw) !important; }
+    html.dt-ll-on .zoeken-page { height: var(--dt-ll-ph, auto) !important; box-sizing: border-box; }
+    html.dt-ll-on .zoeken-page > .left-side { height: 100% !important; min-height: 0; }
+    html.dt-ll-on .zoeken-page > .left-side > .result-container { flex: 1 1 auto; min-height: 0; height: auto !important; }
+    html.dt-ll-on .result-container > ll-result-table, html.dt-ll-on .result-container .table-container { height: 100% !important; max-height: none !important; }
+    html.dt-ll-on .right-side dna-card.filter-card { height: 100% !important; box-sizing: border-box; }
+    /* Ingeklapt: alleen een ronde glasknop met het pijltje (zoals het zijpaneel van het lesdashboard) */
+    html.dt-ll-on .right-side .filter-container.collapsed { width: 46px !important; height: 46px !important; }
+    html.dt-ll-on .right-side .filter-container.collapsed dna-card.filter-card { position: relative; width: 46px !important; height: 46px !important; --padding: 0 !important; --_padding: 0 !important; --border-radius: 999px !important; --_border-radius: 999px !important; border-radius: 999px !important; overflow: hidden; }
+    html.dt-ll-on .right-side .filter-container.collapsed dna-card-title { position: absolute !important; inset: 0; width: auto !important; margin: 0 !important; padding: 0 !important; display: block !important; }
+    html.dt-ll-on .right-side .filter-container.collapsed dna-card-title > span { display: none !important; }
+    html.dt-ll-on .right-side .filter-container.collapsed dna-card-title .collapse-icon { position: absolute !important; inset: 0; width: 46px !important; height: 46px !important; display: grid !important; place-items: center; cursor: pointer; margin: 0 !important; color: ${t.accent} !important; }
+    html.dt-ll-on .right-side dna-card.filter-card { --border-radius: ${t.glass ? "22px" : "16px"} !important; --_border-radius: ${t.glass ? "22px" : "16px"} !important; --background: ${ldCard} !important; --_background: ${ldCard} !important; --box-shadow: ${ldShadow} !important; --_box-shadow: ${ldShadow} !important; --padding: 16px !important; --_padding: 16px !important; border-radius: ${t.glass ? "22px" : "16px"} !important; }
+    html.dt-ll-on .right-side dna-card-title { --title-font-size: .9375rem !important; --_title-font-size: .9375rem !important; --title-line-height: 30px !important; --_title-line-height: 30px !important; font-size: .9375rem !important; font-weight: 600 !important; }
+    aside .widget > .content-pane { border-radius: 20px !important; box-shadow: ${t.card} !important; }
+    aside .widget > .content-pane h3 { height: 48px !important; line-height: 48px !important; padding-left: 20px !important; font-size: 1.0625rem !important; border-bottom: 0 !important; }
+    aside .widget > .content-pane > .content { padding: 0 20px 16px !important; }
+    aside .widget > .content-pane form { padding: 0 !important; }
+    aside .widget footer.endlink { padding: 6px 20px 14px !important; }
+    /* Zijbalk 'details' (lesdashboard): leerlingpas, registraties, extra informatie en agenda van de leerling */
+    aside .mg-panel .list, aside ag-list .list { margin: 0 -8px !important; background: transparent !important; }
+    aside .mg-panel .list li { border-radius: 10px; }
+    aside .mg-panel .list li::after { left: 8px; right: 8px; }
+    aside .mg-panel .list li a { padding: 0 8px !important; }
+    aside .mg-panel .list li.no-data { background: transparent !important; height: auto !important; line-height: 1.35 !important; padding: 2px 0 6px !important; }
+    aside .mg-panel .list li.no-data::after { display: none; }
+    aside .mg-panel .list li.no-data a, aside .mg-panel .list li.no-data > a { color: ${t.muted} !important; font: 400 .8125rem/1.35 ${t.font} !important; font-style: normal !important; padding: 0 8px !important; height: auto !important; }
+    aside .mg-panel .list li.no-data:hover { background: transparent !important; }
+    aside .mg-panel h3 .panel-icon { color: ${t.orange} !important; margin-right: 6px; vertical-align: -1px; }
+    aside .mg-panel h3 .fold-toggle { color: ${t.muted} !important; }
+    aside .mg-panel form.no-data { background: transparent !important; color: ${t.muted} !important; font-style: normal !important; padding: 0 !important; }
+    aside .mg-panel .input-value { padding: 0 0 12px !important; }
+    aside .mg-panel .input-value:last-child { padding-bottom: 0 !important; }
+    aside .mg-panel .input-value > span:not(.value) { display: block; color: ${t.muted}; font: 400 .8125rem/1.35 ${t.font}; }
+    aside .mg-panel .input-value label { color: ${t.muted} !important; font: 600 .6875rem/1.3 ${t.font} !important; text-transform: uppercase; letter-spacing: .04em; padding: 0 0 6px 2px !important; }
+    aside .mg-panel .input-value span.value { display: block; padding: 8px 12px; background: ${t.dark ? "rgba(255,255,255,.05)" : "rgba(60,60,67,.05)"}; color: ${t.fg}; font: 400 .8125rem/1.35 ${t.font}; }
+    aside .mg-panel .input-value span.value + span.value { box-shadow: inset 0 .5px 0 ${t.sepSoft}; }
+    aside .mg-panel .input-value span.value:first-of-type { border-radius: 10px 10px 0 0; }
+    aside .mg-panel .input-value span.value:last-of-type { border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; }
+    aside .mg-panel .input-value span.value:only-of-type { border-radius: 10px; }
+    aside li.agenda-item { height: auto !important; line-height: 1.3 !important; padding: 8px 0 !important; }
+    aside li.agenda-item > a { display: grid !important; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "time icons" "info info"; align-items: center; gap: 5px 8px; height: auto !important; line-height: 1.3 !important; padding: 0 8px !important; }
+    aside li.agenda-item > a::after { display: none !important; }
+    aside li.agenda-item a span { height: auto !important; line-height: 1.3 !important; }
+    aside li.agenda-item ag-lesblok-tijd { grid-area: time; }
+    aside li.agenda-item span.time { font: 600 .8125rem/1.3 ${t.font} !important; color: ${t.fg} !important; font-variant-numeric: tabular-nums; }
+    aside li.agenda-item .icons-block { grid-area: icons; justify-self: end; display: flex !important; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 4px; float: none !important; height: auto !important; line-height: 1 !important; }
+    aside li.agenda-item .icons-block > span { float: none !important; margin: 0 !important; }
+    aside li.agenda-item .icons-block > span.ng-hide { display: none !important; }
+    aside li.agenda-item .icons-block .dna-badge, aside li.agenda-item .icons-block .text-icon { display: inline-block !important; height: 18px !important; line-height: 18px !important; padding: 0 6px !important; border-radius: 6px !important; font: 600 .625rem/18px ${t.font} !important; letter-spacing: .02em; box-sizing: border-box; }
+    aside li.agenda-item .icons-block .dna-badge-outline { background: transparent !important; border: 1px solid ${rgba(accent, .55)} !important; color: ${t.accent} !important; line-height: 16px !important; }
+    aside li.agenda-item .icons-block .text-icon.permissible { background: ${rgba(t.green, t.dark ? .24 : .16)} !important; color: ${t.dark ? t.green : "#1E7B34"} !important; }
+    aside li.agenda-item .icons-block .text-icon.impermissible { background: ${rgba(t.red, t.dark ? .24 : .14)} !important; color: ${t.dark ? t.red : "#C4271D"} !important; }
+    aside li.agenda-item ag-lesblok-informatie { grid-area: info; display: flex; align-items: center; gap: 8px; min-width: 0; }
+    aside li.agenda-item span.nrblock { float: none !important; flex: none; margin: 0 !important; height: 20px !important; line-height: 20px !important; }
+    aside li.agenda-item ag-lesblok-informatie .classroom { display: flex !important; align-items: baseline; gap: 3px; min-width: 0; overflow: hidden; white-space: nowrap; color: ${t.muted} !important; font: 400 .75rem/1.3 ${t.font} !important; }
+    aside li.agenda-item ag-lesblok-informatie .classroom > span { display: block !important; flex: 0 0 auto; max-width: none !important; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    aside li.agenda-item ag-lesblok-informatie .classroom > span.vakOfAfspraak { flex: 0 1 auto; }
+    aside li.agenda-item ag-lesblok-informatie .vakOfAfspraak { color: ${t.fg} !important; font-weight: 500; }
+    aside .student-pass { display: grid !important; grid-template-columns: 64px minmax(0, 1fr); column-gap: 14px; align-content: start; background: transparent !important; border: 0 !important; box-shadow: none !important; min-height: 0 !important; padding: 16px !important; }
+    aside .student-pass::before, aside .student-pass::after { display: none !important; }
+    aside .student-pass > * { grid-column: 2; margin: 0 !important; padding: 0 !important; }
+    aside .student-pass > figure { grid-column: 1; grid-row: 1 / span 6; width: 64px !important; height: 84px !important; float: none !important; border: 0 !important; border-radius: 12px !important; box-shadow: none !important; overflow: hidden; position: relative; background: ${t.gray6} !important; }
+    aside .student-pass > figure::before { left: 0 !important; top: 0 !important; width: 64px !important; height: 84px !important; line-height: 84px !important; font-size: 30px !important; color: ${t.muted} !important; }
+    aside .student-pass > figure span.img { float: none !important; width: 100% !important; height: 100% !important; }
+    aside .student-pass > h2:first-of-type, aside .student-pass > strong { color: ${t.fg} !important; font: 600 1.0625rem/1.25 ${t.font} !important; letter-spacing: -.01em; }
+    aside .student-pass > p { font: 400 .75rem/1.4 ${t.font} !important; color: ${t.muted} !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    aside .student-pass > p[title="stamnummer"] { padding-top: 4px !important; font-variant-numeric: tabular-nums; }
+    aside .student-pass > p a { color: ${t.accent} !important; text-decoration: none !important; }
+    aside .student-pass > p a:hover { text-decoration: underline !important; }
+    aside .student-pass > h2:nth-of-type(2) { justify-self: start; margin-top: 8px !important; padding: 0 8px !important; border-radius: 999px; background: ${t.tint} !important; color: ${t.accent} !important; font: 600 .75rem/22px ${t.font} !important; }
+    aside .student-pass > p:nth-of-type(3) { white-space: normal; margin-top: 4px !important; }
+    aside .student-pass > div { grid-column: 1 / -1; margin-top: 12px !important; padding-top: 10px !important; border-top: .5px solid ${t.sepSoft}; }
+    aside .student-pass > div p { margin: 0 !important; padding: 0 !important; }
+    aside .student-pass > div a { color: ${t.accent} !important; text-decoration: none !important; font: 500 .8125rem/1.3 ${t.font} !important; }
+    aside .student-pass > div a::after { content: "›"; margin-left: 4px; }
+    aside .student-pass > h2:only-of-type { grid-row: 1; }
+    /* Zijbalk 'weergave': Deze les (label boven waarde, niets afgekapt) en vorige/volgende als knoppen */
+    aside ld-lesdetails-panel .list { margin: 0 -8px !important; background: transparent !important; }
+    aside .list li.double-line { height: auto !important; min-height: 0 !important; line-height: 1.3 !important; padding: 8px 0 !important; border-radius: 10px; background: transparent !important; }
+    aside .list li.double-line::after { left: 8px; right: 8px; }
+    aside .list li.double-line:hover { background: transparent !important; }
+    aside .list li.double-line > a { display: flex !important; flex-direction: column; align-items: flex-start !important; gap: 2px !important; height: auto !important; padding: 0 8px !important; white-space: normal !important; }
+    aside .list li.double-line > a::after { display: none !important; }
+    aside .list li.double-line strong, aside .list li.double-line .list-head { display: block; color: ${t.muted} !important; font: 500 .75rem/1.3 ${t.font} !important; }
+    aside .list li.double-line .value, aside .list li.double-line .single-line { color: ${t.fg} !important; font: 400 .875rem/1.35 ${t.font} !important; white-space: normal !important; overflow: visible !important; text-overflow: clip !important; max-width: none !important; width: auto !important; float: none !important; height: auto !important; }
+    aside .list li.double-line .single-line .value { display: inline !important; font-variant-numeric: tabular-nums; }
+    aside .widget footer.endlink { display: flex !important; justify-content: space-between; align-items: center; gap: 8px; position: static !important; height: auto !important; background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 4px 16px 16px !important; }
+    aside .widget footer.endlink a { float: none !important; position: static !important; display: inline-flex !important; align-items: center; gap: 4px; height: 30px !important; line-height: 30px !important; padding: 0 14px !important; border-radius: 999px !important; background: ${t.tint} !important; color: ${t.accent} !important; font: 500 .8125rem/30px ${t.font} !important; text-decoration: none !important; }
+    aside .widget footer.endlink a:hover { background: ${t.tintStrong} !important; }
+    aside .widget footer.endlink a.disabled { background: ${t.gray6} !important; color: ${t.muted} !important; opacity: .7; pointer-events: none; }
+    aside ld-lesdetails-panel footer.endlink a#lesdashboard-lesdetails-vorige::before { content: "‹"; font-size: 1rem; line-height: 1; }
+    aside ld-lesdetails-panel footer.endlink a#lesdashboard-lesdetails-volgende::after { content: "›"; font-size: 1rem; line-height: 1; }
+    /* Werkbalk snelle aanwezigheid boven de leerlinglijst */
+    #leerlinglijst .dt-att-bar { background: transparent !important; border: 0 !important; padding: 0 2px !important; margin: 0 0 10px !important; gap: 8px !important; font: 400 .75rem/1.3 ${t.font} !important; color: ${t.muted} !important; }
+    #leerlinglijst .dt-att-bar .dt-btn { height: 32px; padding: 0 14px !important; gap: 6px; border: 0 !important; border-radius: 999px !important; font: 500 .8125rem/1 ${t.font} !important; background: ${t.glass ? t.glassStrong : t.surface} !important; color: ${t.fg} !important; box-shadow: ${t.glass ? `${t.glassEdge}, 0 1px 3px rgba(0,0,0,.08)` : t.card} !important; transition: background .12s, transform .12s; }
+    #leerlinglijst .dt-att-bar .dt-btn:hover { background: ${t.glass ? (t.dark ? "rgba(72,72,74,.85)" : "rgba(255,255,255,.95)") : t.hover} !important; }
+    #leerlinglijst .dt-att-bar .dt-btn:active { transform: scale(.97); }
+    #leerlinglijst .dt-att-bar .dt-btn-primary { background: ${t.accent} !important; color: #fff !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 2px 8px ${rgba(accent, .3)} !important; }
+    #leerlinglijst .dt-att-bar .dt-btn-primary:hover { background: ${mix(accent, dark ? "#ffffff" : "#000000", .08)} !important; }
+    #leerlinglijst .dt-att-bar kbd { border: 0 !important; min-width: 18px; height: 18px; line-height: 18px !important; padding: 0 5px; border-radius: 5px; background: ${t.dark ? "rgba(118,118,128,.32)" : "rgba(118,118,128,.14)"} !important; color: ${t.fg} !important; font: 600 .6875rem/18px ${t.font} !important; box-shadow: none !important; }
+    #leerlinglijst .dt-att-bar .dt-att-shortcut kbd { color: ${t.muted} !important; }
+    #leerlinglijst .dt-att-search svg { left: 11px; color: ${t.muted}; }
+    #leerlinglijst .dt-att-input { width: 200px; height: 32px; padding: 0 12px 0 30px !important; border: 0 !important; border-radius: 999px !important; background: ${t.glass ? t.glassBg : (t.dark ? "rgba(118,118,128,.24)" : "rgba(118,118,128,.12)")} !important; box-shadow: ${t.glass ? t.glassEdge : "none"} !important; ${t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : ""} color: ${t.fg} !important; font: 400 .8125rem/32px ${t.font} !important; outline: 0 !important; }
+    #leerlinglijst .dt-att-input::placeholder { color: ${t.muted}; }
+    #leerlinglijst .dt-att-input:focus { box-shadow: ${t.focus} !important; }
+    #leerlinglijst .dt-att-legend { gap: 4px 12px; color: ${t.muted}; }
+    /* Minikalender (datepicker): geen celranden, vandaag in accent, keuze als gevulde cirkel */
+    div.calendar table, div[uib-datepicker] table, .content-pane div.calendar table { border: 0 !important; border-collapse: separate !important; border-spacing: 0 2px !important; }
+    div.calendar, div[uib-datepicker] { padding: 6px 8px 2px !important; max-width: none !important; }
+    div.calendar table td, div.calendar table th, div[uib-datepicker] table td, div[uib-datepicker] table th { border: 0 !important; height: 30px !important; line-height: 30px !important; background: transparent !important; font-size: .75rem !important; }
+    div.calendar table th, div[uib-datepicker] table th { color: ${t.muted} !important; font: 600 .6875rem/30px ${t.font} !important; text-transform: uppercase; letter-spacing: .04em; }
+    div.calendar table tr:first-child th, div[uib-datepicker] table tr:first-child th { background: transparent !important; border: 0 !important; height: 40px !important; line-height: 40px !important; color: ${t.fg} !important; font: 600 .875rem/40px ${t.font} !important; text-transform: none; letter-spacing: 0; }
+    div.calendar table td em, div[uib-datepicker] table td em { background: transparent !important; color: ${t.muted} !important; font-weight: 500 !important; font-size: .6875rem; }
+    div.calendar button, div[uib-datepicker] button { font: 500 .75rem/28px ${t.font} !important; color: ${t.fg} !important; transition: background .12s; }
+    div.calendar td button, div[uib-datepicker] td button { height: 28px !important; width: 28px !important; margin: 1px auto !important; border-radius: 50% !important; }
+    div.calendar th button, div[uib-datepicker] th button { height: 32px !important; line-height: 32px !important; width: 100% !important; border-radius: 8px !important; white-space: nowrap; }
+    div.calendar tr:first-child th button, div[uib-datepicker] tr:first-child th button { font: 600 .875rem/32px ${t.font} !important; color: ${t.fg} !important; }
+    div.calendar button:hover, div[uib-datepicker] button:hover { background: ${t.hover} !important; }
+    div.calendar button.active, div[uib-datepicker] button.active { background: ${t.accent} !important; color: #fff !important; font-weight: 600 !important; }
+    div.calendar button.active + td, div[uib-datepicker] button.active + td { background: transparent !important; }
+    div.calendar td.mg-today button, div[uib-datepicker] td.mg-today button { color: ${t.accent} !important; font-weight: 700 !important; }
+    div.calendar td.mg-today button.active, div[uib-datepicker] td.mg-today button.active { color: #fff !important; }
+    div.calendar .mg-date-range, div[uib-datepicker] .mg-date-range { background: ${rgba(accent, .12)} !important; }
+    div.calendar .text-muted, div[uib-datepicker] .text-muted, div.calendar button .text-muted { color: ${t.border} !important; }
+    div.calendar button.pull-left, div.calendar button.pull-right, div[uib-datepicker] button.pull-left, div[uib-datepicker] button.pull-right { width: 36px !important; border-radius: 8px !important; }
+    div.calendar i.glyphicon, div[uib-datepicker] i.glyphicon { background: transparent !important; border: 0 !important; color: ${t.accent} !important; }
+    div.calendar + footer a, div[uib-datepicker] + footer a, footer.endlink a.left { color: ${t.accent} !important; font-weight: 500; }
+    /* Keuzelijsten in het Overzicht-paneel */
+    .fancy-select > label { color: ${t.muted} !important; font: 600 .6875rem/1.25rem ${t.font} !important; letter-spacing: .04em; text-transform: uppercase; }
+    .fancy-select .select-label { border: 1px solid ${t.border} !important; border-radius: 10px !important; height: 34px !important; line-height: 34px !important; background: ${t.surface} !important; }
+    .fancy-select .select-label a { background: transparent !important; color: ${t.fg} !important; line-height: 34px !important; font-size: .8125rem; }
+    .fancy-select .select-label:after { color: ${t.muted}; }
+    .fancy-select ul.select ul { background: ${t.surface} !important; border: 0 !important; border-radius: 12px !important; box-shadow: ${t.pop} !important; padding: 4px !important; }
+    .fancy-select ul.select ul li { border-radius: 8px !important; height: 34px !important; line-height: 34px !important; font-size: .8125rem; color: ${t.fg} !important; }
+    .fancy-select ul.select ul li:hover { background: ${t.accent} !important; color: #fff !important; }
+    .fancy-select ul.select ul li.current { background: ${t.tint} !important; color: ${t.accent} !important; font-weight: 600; }
+
+    /* ---- Velden en knoppen (oude schermen) ---- */
+    .container input[type=email], .container input[type=number], .container input[type=password], .container input[type=search], .container input[type=tel], .container input[type=text], .container textarea, .container select, .dna-text-input, .dna-input-group {
+      background: ${t.surface} !important; border: 1px solid ${t.border} !important; border-radius: 8px !important; color: ${t.fg} !important; font: 400 .8125rem/1.25rem ${t.font} !important; padding: 0 10px !important; transition: box-shadow .12s, border-color .12s;
+    }
+    .container input:hover { background: ${t.surface} !important; }
+    .container input:focus, .container textarea:focus, .container select:focus, .dna-text-input:focus, .dna-input-group:focus-within { background: ${t.surface} !important; border-color: ${t.accent} !important; box-shadow: ${t.focus} !important; outline: none !important; }
+    .container input[disabled] { background: ${t.surface2} !important; color: ${t.muted} !important; }
+    .container .search input, .search input { background: ${t.gray6} !important; border: 0 !important; border-radius: 8px !important; color: ${t.fg} !important; }
+    input[type=checkbox], input[type=radio] { accent-color: ${t.accent}; }
+    .dna-btn { border-radius: 10px !important; font: 500 .8125rem/1rem ${t.font} !important; }
+    .dna-btn-primary { background: ${t.accent} !important; color: #fff !important; }
+    .dna-btn-primary:hover { background: ${mix(accent, dark ? "#ffffff" : "#000000", .08)} !important; }
+    .dna-btn-primary:focus { box-shadow: ${t.focus} !important; }
+    button[class*="primary"], .btn-primary, [class*="button--primary"], input[type="submit"] { border: 0 !important; border-radius: 10px !important; font-weight: 600 !important; }
+    .dna-badge-outline { border-color: ${t.accent} !important; color: ${t.accent} !important; }
+    .dna-badge-primary { background: ${t.accent} !important; }
+
+    /* ---- Kopbalk en tabbladen van detailkaarten ---- */
+    dna-head-bar, .dna-head-bar { background: ${t.surface} !important; color: ${t.fg} !important; border-bottom: 1px solid ${t.sep} !important; }
+    .dna-head-bar-title { font: 600 1rem/1.5rem ${t.font} !important; }
+    .dna-head-bar-item { color: ${t.muted} !important; font: 500 .875rem/1.5rem ${t.font} !important; border-radius: 8px !important; transition: background .12s, color .12s; }
+    a.dna-head-bar-item:hover:not(:disabled), button.dna-head-bar-item:hover:not(:disabled), a.dna-head-bar-item:focus, button.dna-head-bar-item:focus { background: ${t.hover} !important; color: ${t.fg} !important; }
+    .dna-head-bar-item-active, .dna-head-bar-aside .dna-head-bar-item-active { background: transparent !important; color: ${t.accent} !important; box-shadow: inset 0 -2px 0 ${t.accent} !important; border-radius: 0 !important; }
+    .dna-head-bar-aside { background: transparent !important; }
+    .dna-head-bar-aside .dna-head-bar-item:after { background: ${t.accent} !important; height: 2px !important; }
+    .tabs, ul.tabs, .page-nav, [role=tablist] { background: transparent !important; border: 0 !important; border-bottom: 1px solid ${t.sep} !important; }
+    .tabs li a, ul.tabs li a, [role=tablist] > [role=tab]:not(.panel-heading):not(dna-tab-button) { border: 0 !important; color: ${t.muted} !important; }
+    .tabs li.active a, ul.tabs li.active a, [role=tablist] > [role=tab][aria-selected=true]:not(.panel-heading):not(dna-tab-button) { color: ${t.accent} !important; box-shadow: inset 0 -2px 0 ${t.accent} !important; font-weight: 600; }
+
+    /* ---- Meldingen en dialogen ---- */
+    .dna-snack-bar { background: ${dark ? "#3A3A3C" : "#1D1D1F"} !important; color: #fff !important; border-radius: 12px !important; box-shadow: ${t.pop} !important; }
+    .dialog, .modal-content, mg-dialog .dialog { background: ${t.surface} !important; color: ${t.fg} !important; border: 0 !important; border-radius: 14px !important; box-shadow: ${t.pop} !important; }
+
+    /* ---- Schuifbalken en de eigen UI van de extensie ---- */
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: ${dark ? "rgba(255,255,255,.22)" : "rgba(0,0,0,.2)"}; border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    :root { --dt-shadow: ${t.pop}; --dt-radius: 12px; }
+  ` + (t.glass ? glassCss(t, top) : "") + leerlingkaartCss(t);
+}
+
+/* Leerlingkaart (de detailkaarten-app in het frame): kop zonder vlak met grote naam, tabbladen
+ * als capsules, kaarten in een gelijkmatig raster, gegevens als rustige rijen. Komt ná de
+ * glaslaag zodat de geneste kaarten (adres, contact) als groepen in de kaart vallen. */
+function leerlingkaartCss(t) {
+  const group = t.dark ? "rgba(255,255,255,.06)" : "rgba(120,120,128,.08)";
+  return `
+    /* ---- Leerlingkaart ---- */
+    dk-basisgegevens-page dna-breadcrumbs { padding: .875rem 1.5rem 0 !important; margin: 0 !important; }
+    dk-basisgegevens-page dna-page-header { background: transparent !important; margin: .25rem 1.5rem .5rem !important; --padding-block: .25rem !important; --_padding-block: .25rem !important; }
+    dk-basisgegevens-page dna-page-header dna-button { margin-right: 0 !important; }
+    dk-basisgegevens-page dna-tab-bar, :is(#dt-cbp, #dt-lrp) dna-tab-bar { background: transparent !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 1.5rem .5rem !important; --padding-inline: 0 !important; --_padding-inline: 0 !important; --margin: 0 !important; --_margin: 0 !important; --indicator-size: 0 !important; --_indicator-size: 0 !important; --spacing: .375rem !important; --_spacing: .375rem !important; --gap: .375rem !important; --_gap: .375rem !important; --border-width: 0 !important; --_border-width: 0 !important; --border: 0 !important; --_border: 0 !important; }
+    /* Eigen pagina's (Te laat-balie, Lesregistraties): tabbalk op dezelfde 2rem als de kop, panelen zonder eigen vlak */
+    :is(#dt-cbp, #dt-lrp) dna-tab-bar { padding: 0 2rem .5rem !important; }
+    :is(#dt-cbp, #dt-lrp) dna-tab[slot="tab"] { background: transparent !important; box-shadow: none !important; border-radius: 0 !important; --background: transparent !important; }
+    dna-tab-button { --border-radius: 999px !important; --_border-radius: 999px !important; --padding: .375rem .875rem !important; --_padding: .375rem .875rem !important; --background: transparent !important; --_background: transparent !important; --active: ${t.tint} !important; --_active: ${t.tint} !important; --color: ${t.muted} !important; --_color: ${t.muted} !important; --indicator-size: 0 !important; --_indicator-size: 0 !important; --border-width: 0 !important; --_border-width: 0 !important; --border: 0 !important; --_border: 0 !important; --width: auto !important; --_width: auto !important; --margin: 0 !important; --_margin: 0 !important; font: 500 .875rem/1.25 ${t.font} !important; letter-spacing: -.005em; }
+    dna-tab-button:focus-visible, dna-tab-button[selected]:focus-visible { box-shadow: none !important; --border-color: transparent !important; --_border-color: transparent !important; --box-shadow-spread: 0 !important; --_box-shadow-spread: 0 !important; }
+    dna-tab-button:hover { --background: ${t.hover} !important; --_background: ${t.hover} !important; --color: ${t.fg} !important; --_color: ${t.fg} !important; }
+    dna-tab-button[selected], dna-tab-button[aria-selected="true"] { --background: ${t.tint} !important; --_background: ${t.tint} !important; --color: ${t.accent} !important; --_color: ${t.accent} !important; font-weight: 600 !important; box-shadow: none !important; border-radius: 999px !important; }
+    dna-tab-button { box-shadow: none !important; }
+    dk-basisgegevens-page .container:not(.employee) { grid-template-columns: minmax(0, 1fr) !important; }
+    dk-basisgegevens-page .container:not(.employee) > .wrapper, dk-basisgegevens-page .tab-content { min-width: 0; max-width: 100%; }
+    /* Raster van kaarten, gelijk hoog per rij */
+    dk-basisgegevens-page .page { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)) !important; gap: 1rem !important; padding: .25rem 1.5rem 1.5rem !important; align-items: stretch !important; max-width: 1480px; box-sizing: border-box; }
+    dk-algemene-gegevens .page:has(> #dt-ll-dash) { grid-template-columns: 17rem repeat(2, minmax(0, 1fr)) !important; }
+    @media (max-width: 1100px) { dk-algemene-gegevens .page:has(> #dt-ll-dash) { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+    #dt-ll-dash .dt-ll-delta.is-up { color: ${t.dark ? t.green : "#1E7B34"} !important; background: ${rgba(t.green, t.dark ? .22 : .15)} !important; }
+    #dt-ll-dash .dt-ll-delta.is-down { color: ${t.dark ? t.red : "#C4271D"} !important; background: ${rgba(t.red, t.dark ? .22 : .12)} !important; }
+    #dt-ll-dash .dt-ll-toest dna-card { --background: transparent !important; --_background: transparent !important; --box-shadow: none !important; --_box-shadow: none !important; --body-padding: 0 !important; --_body-padding: 0 !important; --header-padding: 0 !important; --_header-padding: 0 !important; min-height: 0 !important; height: auto !important; }
+    #dt-ll-dash .dt-ll-toest .answer-entry, #dt-ll-dash .dt-ll-toest .permission-type { font-size: .75rem !important; color: ${t.fg}; border-bottom: 0 !important; }
+    #dt-ll-dash .dt-ll-toest .last-modified-message { color: ${t.muted} !important; font-size: .6875rem !important; margin: 4px 0 0 !important; }
+    dk-basisgegevens-page .page > .leerling-block, dk-basisgegevens-page .page > .contact-block, dk-basisgegevens-page .page > dk-medewerker { width: auto !important; margin: 0 !important; min-width: 0; }
+    dk-basisgegevens-page .page dna-card { min-height: 0 !important; height: 100% !important; box-sizing: border-box; --body-padding: .25rem 1.25rem 1.25rem !important; --_body-padding: .25rem 1.25rem 1.25rem !important; --header-padding: 1.125rem 1.25rem .5rem !important; --_header-padding: 1.125rem 1.25rem .5rem !important; }
+    dk-basisgegevens-page dna-card-title.button-placement dna-button { --padding-v: .2rem !important; --_padding-v: .2rem !important; --padding-h: .45rem !important; --_padding-h: .45rem !important; --border-radius: 999px !important; --_border-radius: 999px !important; }
+    /* Profielkaart */
+    dk-leerling dna-card { --body-padding: 1rem 1.25rem 1.25rem !important; --_body-padding: 1rem 1.25rem 1.25rem !important; text-align: center; }
+    dk-leerling .avatar { padding: .5rem 0 .25rem !important; height: auto !important; width: 100% !important; margin: 0 !important; position: relative !important; }
+    dk-leerling .avatar dna-avatar { position: static !important; display: block; width: 100% !important; }
+    dk-leerling dna-avatar.leerling-avatar { --font-size: 3rem !important; --_font-size: 3rem !important; --font-weight: 600 !important; --_font-weight: 600 !important; --background: ${t.dark ? t.tintStrong : t.tint} !important; --_background: ${t.dark ? t.tintStrong : t.tint} !important; --color: ${t.accent} !important; --_color: ${t.accent} !important; }
+    dk-leerling .upload-button { --border-radius: 999px !important; --_border-radius: 999px !important; --padding-v: .45rem !important; --_padding-v: .45rem !important; --padding-h: .45rem !important; --_padding-h: .45rem !important; margin-top: 0 !important; top: calc(.5rem + 118px) !important; left: calc(50% + 42px) !important; right: auto !important; background: ${t.accent} !important; color: #fff !important; --color: #fff !important; --_color: #fff !important; border-radius: 999px !important; outline: 3px solid ${t.surface} !important; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+    dk-leerling .upload-button dna-icon { color: #fff !important; --icon-size: 1rem; --_icon-size: 1rem; }
+    dk-leerling .klas-studie { margin: .25rem 0 1rem !important; }
+    dk-leerling .klasnaam { display: inline-block; padding: .25rem .8rem; border-radius: 999px; background: ${t.tint}; color: ${t.accent}; font: 600 .8125rem/1.25 ${t.font}; margin-bottom: .5rem; }
+    dk-leerling .studieprofiel { color: ${t.muted}; font: 400 .8125rem/1.35 ${t.font}; }
+    dk-leerling .mentoren { margin: 0 0 1rem !important; padding-top: .875rem; border-top: 1px solid ${t.sepSoft}; text-align: left; }
+    dk-leerling .mentoren dt { font: 600 .6875rem/1 ${t.font} !important; letter-spacing: .06em; text-transform: uppercase; color: ${t.muted} !important; margin-bottom: .5rem; }
+    dk-leerling .mentoren dd { display: flex; flex-wrap: wrap; gap: .375rem; }
+    dk-leerling dna-button.mentor { --padding-v: .25rem !important; --_padding-v: .25rem !important; --padding-h: .7rem !important; --_padding-h: .7rem !important; --border-radius: 999px !important; --_border-radius: 999px !important; background: ${group}; border-radius: 999px; --font-weight: 500 !important; --_font-weight: 500 !important; }
+    dk-leerling .comma { display: none; }
+    dk-leerling dna-button-bar { justify-content: center !important; --gap-h: .75rem !important; --_gap-h: .75rem !important; padding-top: .25rem; }
+    dk-leerling dna-button-bar dna-button { --border-radius: 999px !important; --_border-radius: 999px !important; --padding-v: .6rem !important; --_padding-v: .6rem !important; --padding-h: .6rem !important; --_padding-h: .6rem !important; background: ${t.tint}; border-radius: 999px; color: ${t.accent}; --color: ${t.accent} !important; --_color: ${t.accent} !important; }
+    /* Gegevens als rijen met inzet-scheidingslijn */
+    dk-basisgegevens-page .gegevens-container { margin: 0 !important; padding: .55rem 0 !important; border-bottom: 1px solid ${t.sepSoft}; display: flex; flex-direction: column; gap: .1rem; }
+    dk-basisgegevens-page .gegevens-container:last-child { border-bottom: 0; }
+    dk-basisgegevens-page .gegevens-container > .bold { font: 500 .75rem/1.3 ${t.font} !important; color: ${t.muted} !important; }
+    dk-basisgegevens-page .gegevens-container > :not(.bold) { font: 400 .9375rem/1.35 ${t.font}; color: ${t.fg}; }
+    dk-basisgegevens-page .gegevens-container .birthday { align-items: center; gap: .25rem; color: ${t.fg}; }
+    dk-basisgegevens-page .gegevens-container .birthday dna-icon { color: #FF2D55; }
+    dk-basisgegevens-page .address-container { flex-direction: row !important; justify-content: space-between !important; align-items: center !important; }
+    dk-basisgegevens-page .address-container > div:first-child > div { font: 400 .9375rem/1.4 ${t.font}; }
+    dk-basisgegevens-page .address-container .bold { font-weight: 600 !important; color: ${t.fg} !important; font-size: .9375rem !important; }
+    dk-basisgegevens-page .button-container dna-button { --border-radius: 999px !important; --_border-radius: 999px !important; }
+    /* Geneste kaarten (adres, contact) als groepen in de kaart */
+    dk-basisgegevens-page dna-card > dna-card { --box-shadow: none !important; --_box-shadow: none !important; --background: ${group} !important; --_background: ${group} !important; --border-radius: 14px !important; --_border-radius: 14px !important; --body-padding: 0 1rem .5rem !important; --_body-padding: 0 1rem .5rem !important; --header-padding: .75rem 1rem .25rem !important; --_header-padding: .75rem 1rem .25rem !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; height: auto !important; margin-bottom: .75rem; }
+    dk-basisgegevens-page dna-card > dna-card:last-child { margin-bottom: 0; }
+    dk-basisgegevens-page dna-card > dna-card dna-card-title { font-size: .9375rem !important; }
+    dk-basisgegevens-page dna-card > dna-card .gegevens-container { padding: .45rem 0 !important; }
+    dk-basisgegevens-page dna-card > dna-card .gegevens-container:last-child { border-bottom: 0; }
+    /* Leerlingoverzicht (module leerlingdash) in themakleuren */
+    #dt-ll-dash .dt-ll-tile { background: ${group} !important; color: ${t.fg}; }
+    #dt-ll-dash .dt-ll-lb { background: ${t.dark ? "rgba(255,255,255,.06)" : "rgba(60,60,67,.06)"} !important; }
+    #dt-ll-dash .dt-ll-hero .dt-ll-label { color: ${t.fg} !important; }
+    #dt-ll-dash a.dt-ll-tile:hover { background: ${t.dark ? "rgba(255,255,255,.1)" : "rgba(60,60,67,.09)"} !important; transform: translateY(-1px); transition: background .12s, transform .12s; }
+    #dt-ll-dash .dt-ll-tile.is-hot { background: color-mix(in srgb, var(--k) ${t.dark ? "22%" : "12%"}, ${t.surface}) !important; }
+    #dt-ll-dash .dt-ll-tile.is-hot:hover { background: color-mix(in srgb, var(--k) ${t.dark ? "30%" : "18%"}, ${t.surface}) !important; }
+    #dt-ll-dash .dt-ll-ico { background: color-mix(in srgb, var(--k) 16%, ${t.surface}); }
+    #dt-ll-dash .dt-ll-num, #dt-ll-dash .dt-ll-label, #dt-ll-dash .dt-ll-sub, #dt-ll-dash .dt-ll-sec h4, #dt-ll-dash .dt-ll-tijd small, #dt-ll-dash .dt-ll-meta, #dt-ll-dash .dt-ll-lb-date, #dt-ll-dash .dt-ll-lb-text, #dt-ll-dash .dt-ll-empty, #dt-ll-dash .dt-ll-loading { color: ${t.muted}; font-family: ${t.font}; }
+    #dt-ll-dash .dt-ll-tile.is-hot .dt-ll-label, #dt-ll-dash .dt-ll-vak, #dt-ll-dash .dt-ll-tijd, #dt-ll-dash .dt-ll-lb-type { color: ${t.fg}; font-family: ${t.font}; }
+    #dt-ll-dash .dt-ll-tile.is-hot .dt-ll-num { color: var(--k); }
+    #dt-ll-dash .dt-ll-les.is-current { background: ${t.tint}; }
+    #dt-ll-dash .dt-ll-ringwrap { color: ${t.muted}; } #dt-ll-dash .dt-ll-ringnum { color: ${t.fg}; font-family: ${t.font}; }
+    #dt-ll-dash .dt-ll-hbar { background: ${t.dark ? "rgba(255,255,255,.08)" : "rgba(60,60,67,.07)"}; }
+    #dt-ll-dash .dt-ll-hseg + .dt-ll-hseg { border-left-color: ${t.dark ? "rgba(0,0,0,.45)" : "rgba(255,255,255,.7)"}; }
+    #dt-ll-dash .dt-ll-hlabel, #dt-ll-dash .dt-ll-hpct, #dt-ll-dash .dt-ll-legend { color: ${t.muted}; font-family: ${t.font}; }
+    #dt-ll-dash .dt-ll-tile[data-kind="aanwezig"] { --k: ${t.green}; }
+    #dt-ll-dash .dt-ll-tile[data-kind="rooster"] { --k: ${t.accent}; } #dt-ll-dash .dt-ll-tile[data-kind="taken"] { --k: ${t.orange}; } #dt-ll-dash .dt-ll-tile[data-kind="terugkom"] { --k: ${t.red}; }
+    /* Toestemmingen */
+    dk-toestemmings-antwoorden .answer-entry { margin: 0 !important; padding: .5rem 0 !important; border-bottom: 1px solid ${t.sepSoft}; align-items: center !important; line-height: 1.3 !important; }
+    dk-toestemmings-antwoorden .answer-entry:last-child { border-bottom: 0; }
+    dk-toestemmings-antwoorden .answer-entry .granted { color: ${t.green} !important; }
+    dk-toestemmings-antwoorden .answer-entry .denied { color: ${t.red} !important; }
+    dk-toestemmings-antwoorden .answer-entry .indeterminate { color: ${t.muted} !important; }
+    dk-toestemmings-antwoorden .answer-entry .info { color: ${t.muted} !important; }
+    dk-toestemmings-antwoorden .permission-type { font: 400 .9375rem/1.35 ${t.font}; color: ${t.fg}; }
+    dk-toestemmings-antwoorden .last-modified-message { color: ${t.muted} !important; font: 400 .75rem/1.3 ${t.font} !important; margin: .75rem 0 0 !important; }
+  `;
+}
+
+/* Binnen elke shadow root: dezelfde componentvariabelen (voor dna-knoppen en tabs die in de
+ * schaduw van een ander component zitten) plus de weinige klassen die daar vast zijn. */
+function appleShadowCss(p, dark, accent) {
+  const t = applePalette(p, dark, accent);
+  return appleTokens(t).replace(":root, body {", ":host {") + `
+    :host(dna-page-header) .title { letter-spacing: -.02em; }
+    :host(dna-link-card) a, :host(dna-link-card) .wrapper { align-items: flex-start !important; justify-content: flex-start !important; text-align: start !important; }
+    :host(dna-link-card) h1 { text-align: start !important; color: ${t.fg} !important; letter-spacing: -.01em; }
+    :host(dna-link-card) p { text-align: start !important; color: ${t.muted} !important; }
+    :host(dna-link-card) .arrow { display: inline-grid !important; place-items: center !important; padding: 0 !important; box-sizing: border-box; }
+    :host(dna-link-card) .arrow > * { margin: 0 !important; }
+    :host(att-attendance-dashboard) .wrapper { grid-template-rows: none !important; grid-auto-rows: 1fr !important; block-size: max-content !important; align-content: start !important; align-items: stretch !important; gap: 1.25rem !important; padding-block: 1.25rem !important; }
+    .dna-card, .card { background: ${t.surface}; color: ${t.fg}; }
+    /* Leerlingkiezer in de kop van de leerlingkaart: grote naam, klas eronder */
+    :host(att-dk-student-selector) .selector { gap: .875rem !important; align-items: center !important; }
+    :host(att-dk-student-selector) .selector > .right > .name { font: 700 1.5rem/1.2 ${t.font} !important; letter-spacing: -.02em; color: ${t.fg} !important; }
+    :host(att-dk-student-selector) .selector > .right > .subtext { font: 400 .875rem/1.3 ${t.font} !important; color: ${t.muted} !important; }
+    :host(att-dk-student-selector) .selector > dna-avatar { --size: 48px !important; --_size: 48px !important; --background: ${t.tint} !important; --_background: ${t.tint} !important; --color: ${t.accent} !important; --_color: ${t.accent} !important; --font-weight: 600 !important; --_font-weight: 600 !important; }
+    :host(dna-tab-bar) .fade { background: transparent !important; box-shadow: none !important; }
+    :host(dna-tab-bar) .indicator { display: none !important; }
+    /* Tabblad Inzicht (verzuiminzicht) als capsule, zoals de andere tabbladen in de Apple-thema's */
+    .dt-vz-tabbtn { font: 500 .875rem/1.25 ${t.font} !important; padding: .375rem .875rem !important; border-radius: 999px !important; color: ${t.muted} !important; margin-left: .25rem !important; }
+    .dt-vz-tabbtn:hover { background: ${t.hover} !important; color: ${t.fg} !important; }
+    .dt-vz-tabbtn.is-active { background: ${t.tint} !important; color: ${t.accent} !important; font-weight: 600 !important; }
+    .dt-vz-tabbtn.is-active::after { display: none !important; }
+    .dt-vz-delta.is-up { color: ${t.dark ? t.green : "#1E7B34"} !important; background: ${rgba(t.green, t.dark ? .22 : .14)} !important; }
+    .dt-vz-delta.is-down { color: ${t.dark ? t.red : "#C4271D"} !important; background: ${rgba(t.red, t.dark ? .22 : .12)} !important; }
+    .dt-vz-ziek:not(.is-nul) { color: ${t.dark ? "#DA8FFF" : "#8E3BB8"} !important; background: ${rgba("#AF52DE", t.dark ? .26 : .13)} !important; }
+    :host(dna-tab-bar) .wrapper { padding-block-end: var(--_spacing, 2px) !important; }
+    :host(dna-button.upload-button) button, :host(dna-button.upload-button) .button, :host(dna-button.upload-button) a { border: 0 !important; background: transparent !important; color: #fff !important; padding: 0 !important; }
+    /* Avatar met naam en hint eronder (profielkaart) */
+    :host(dna-avatar[size="xl"]) .outer .inner { font: 600 1.125rem/1.3 ${t.font} !important; color: ${t.fg} !important; letter-spacing: -.01em; }
+    :host(dna-avatar[size="xl"]) .outer .content { font: 400 .8125rem/1.3 ${t.font} !important; color: ${t.muted} !important; }
+    :host(dna-avatar) .picture { box-shadow: 0 0 0 .5px rgba(0,0,0,.06); }
+  `;
+}
+
+/* Liquid Glass-laag: komt ná de basisregels in de cascade en overschrijft die met !important.
+ * De achtergrond krijgt een zachte kleurwas zodat het glas iets te laten doorschijnen heeft;
+ * in iframes is de body doorzichtig, zodat de was van de hoofdpagina doorloopt. */
+function glassCss(t, top) {
+  const a = t.accent;
+  const wash = t.dark
+    ? `radial-gradient(70% 55% at 12% 0%, ${rgba(a, .28)} 0%, transparent 60%), radial-gradient(55% 45% at 95% 100%, rgba(191, 90, 242, .20) 0%, transparent 60%), radial-gradient(40% 35% at 70% 25%, rgba(48, 209, 88, .08) 0%, transparent 60%), linear-gradient(160deg, #15151b 0%, #1b1b22 100%)`
+    : `radial-gradient(60% 50% at 8% 0%, ${rgba(a, .34)} 0%, transparent 62%), radial-gradient(50% 45% at 96% 100%, rgba(175, 82, 222, .26) 0%, transparent 62%), radial-gradient(40% 38% at 72% 18%, rgba(255, 149, 0, .13) 0%, transparent 60%), radial-gradient(38% 34% at 38% 92%, rgba(48, 209, 88, .13) 0%, transparent 60%), radial-gradient(30% 30% at 55% 55%, rgba(90, 200, 250, .14) 0%, transparent 60%), linear-gradient(160deg, #e6ecfa 0%, #efeaf8 55%, #e4eff3 100%)`;
+  const glass = `background: ${t.glassBg} !important; -webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur}; box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; border: 0 !important;`;
+  return `
+    /* Achtergrond: kleurwas (hoofdpagina) of doorzichtig (iframe) */
+    ${top ? `html, body { background: ${wash} !important; background-attachment: fixed !important; }` : `html, body { background: transparent !important; }`}
+    .container > ui-view, ui-view[name="main"], ui-view[name="main"] > *, .strip-padding, section.main, .container, #guest-app-frame, mg-guest-app, mg-guest-app .fill-viewport { background: transparent !important; }
+    /* Zijbalk en iconenrail als glas */
+    .appbar-host, .menu-host { ${glass} border-right: 1px solid ${t.dark ? "rgba(255,255,255,.08)" : "rgba(255,255,255,.6)"} !important; background: ${t.glassSide} !important; }
+    nav.menu, .menu-host nav.menu, .container > nav.menu, .menu-container, .menu-footer, .appbar, mg-appbar, .menu-footer a { background: transparent !important; }
+    ul.main-menu > li.active > a, ul.main-menu li[class*="active"] > a, ul.main-menu li a[class*="active"], ul.main-menu li[class*="selected"] > a {
+      background: linear-gradient(180deg, ${rgba(a, .92)}, ${rgba(a, 1)}) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 6px 16px ${rgba(a, .35)} !important;
+    }
+    ul.main-menu > li > a:hover { background: ${t.dark ? "rgba(255,255,255,.08)" : "rgba(255,255,255,.55)"} !important; }
+    /* Kaarten en vlakken */
+    dna-card { --background: linear-gradient(180deg, ${t.dark ? "rgba(255,255,255,.07)" : "rgba(255,255,255,.55)"}, transparent 40%), ${t.glassBg} !important; --border-radius: 20px !important; --box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; -webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur}; }
+    .widget > .content-pane, .widget > .preview-pane, .dna-card, .dna-card-list, dna-accordion-item { ${glass} background: linear-gradient(180deg, ${t.dark ? "rgba(255,255,255,.07)" : "rgba(255,255,255,.55)"}, transparent 40%), ${t.glassBg} !important; border-radius: 20px !important; }
+    dna-accordion-item { --background: ${t.glassBg} !important; --border-radius: 20px !important; --box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; }
+    dna-link-card { background-color: ${t.glassBg} !important; --box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; --_box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; -webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur}; }
+    dna-link-card:hover { --box-shadow: ${t.glassEdge}, 0 24px 60px rgba(31,41,61,.18) !important; --_box-shadow: ${t.glassEdge}, 0 24px 60px rgba(31,41,61,.18) !important; }
+    .table-container th, ll-result-table th, .table-container .header-cell, ll-result-table .header-cell { background: ${t.glassStrong} !important; -webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur}; }
+    sl-grid { --_header-background: ${t.glassStrong} !important; }
+    .table-container, .scroll-viewport { background: ${t.glassBg} !important; }
+    .table-container { ${glass} border-radius: 20px !important; }
+    .widget > .content-pane .content, .widget > .preview-pane .content, .widget > .content-pane > .content, .widget > .preview-pane > .content, .widget > .content-pane h3, uib-accordion, .list li, .dna-card-list-item,
+    table.datagrid-table th, table.datagrid-table thead th, table.datagrid-table tfoot td, table.datagrid-table td { background: transparent !important; }
+    .list li:hover, table.datagrid-table tr:hover td { background: ${t.dark ? "rgba(255,255,255,.06)" : "rgba(255,255,255,.5)"} !important; }
+    .list li.current, table.datagrid-table tr.current td { background: ${rgba(a, .10)} !important; }
+    .list li.active, .list li.selected, .list li.current-item, table.datagrid-table tr.selected td { background: ${rgba(a, .14)} !important; }
+    /* Kopbalk van detailkaarten en popovers als glas */
+    dna-head-bar, .dna-head-bar, .head-bar { ${glass} border-radius: 16px !important; margin-bottom: .5rem; }
+    .collapsed-menu .popup-menu, .appbar .popup-menu, .appbar-flyout-menu, .collapsed-menu .main-menu > li.active > ul, .dialog, .modal-content, mg-dialog .dialog {
+      background: ${t.glassStrong} !important; -webkit-backdrop-filter: saturate(180%) blur(40px); backdrop-filter: saturate(180%) blur(40px); box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; border-radius: 18px !important;
+    }
+    dna-menu, dna-overlay, dna-dialog { --background: ${t.glassStrong} !important; --box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; --border-radius: 18px !important; -webkit-backdrop-filter: saturate(180%) blur(40px); backdrop-filter: saturate(180%) blur(40px); }
+    dna-select, dna-list-box, dna-input { --background: ${t.glassStrong} !important; --box-shadow: ${t.glassEdge}, ${t.glassShadow} !important; }
+    /* Capsules: knoppen, tabbladen, chips, velden */
+    dna-button { --border-radius: 999px !important; --padding-h: 1rem !important; }
+    .dna-btn, button[class*="primary"], .btn-primary, input[type="submit"] { border-radius: 999px !important; }
+    .dna-btn-primary, button[class*="primary"], .btn-primary, input[type="submit"] { background: linear-gradient(180deg, ${rgba(a, .9)}, ${a}) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 6px 16px ${rgba(a, .35)} !important; }
+    .dna-btn:not(.dna-btn-primary) { background: ${t.dark ? "rgba(255,255,255,.1)" : "rgba(255,255,255,.65)"} !important; box-shadow: ${t.glassEdge} !important; color: ${t.fg} !important; }
+    dna-tab-bar { background: ${t.dark ? "rgba(255,255,255,.08)" : "rgba(120,120,128,.14)"} !important; border-radius: 999px !important; padding: 3px !important; box-shadow: ${t.glassEdge} !important; }
+    dna-tab:not([slot="tab"]) { --border-radius: 999px !important; }
+    dna-tab[selected]:not([slot="tab"]) { --background: ${t.dark ? "rgba(90,90,96,.85)" : "rgba(255,255,255,.92)"} !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 2px 8px rgba(0,0,0,.14) !important; }
+    span.nrblock, .list li .special, .list li span.special { border-radius: 999px !important; }
+    .container input[type=email], .container input[type=number], .container input[type=password], .container input[type=search], .container input[type=tel], .container input[type=text], .container textarea, .container select, .dna-text-input, .dna-input-group {
+      background: ${t.dark ? "rgba(255,255,255,.07)" : "rgba(255,255,255,.6)"} !important; border-color: ${t.dark ? "rgba(255,255,255,.12)" : "rgba(255,255,255,.8)"} !important; border-radius: 12px !important; box-shadow: ${t.glassEdge} !important;
+    }
+    .container .search input, .search input { background: ${t.dark ? "rgba(255,255,255,.1)" : "rgba(120,120,128,.14)"} !important; border-radius: 999px !important; }
+    .dna-snack-bar { background: ${t.dark ? "rgba(58,58,60,.85)" : "rgba(29,29,31,.85)"} !important; -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border-radius: 18px !important; }
+    /* Eigen UI van de extensie */
+    :root { --dt-radius: 16px; }
+  `;
+}
+
+/* De schil (iconenrail, zijbalk, menu) als allerlaatste in de cascade: wint van Magister, van de
+ * basisregels van het thema en van eigen aanvullingen uit de Inspector. */
+function appleShellCss(p, dark, accent) {
+  const t = applePalette(p, dark, accent);
+  const bg = t.glass ? t.glassSide : t.sidebar;
+  const blur = t.glass ? `-webkit-backdrop-filter: ${t.blur}; backdrop-filter: ${t.blur};` : "";
+  return `
+
+    /* Stapeling: zijbalk en iconenrail boven het hoofdvlak, zodat hun schaduw doorloopt en de
+     * popups en tooltips van het ingeklapte menu niet achter het frame verdwijnen. */
+    .container > .appbar-host { position: relative !important; z-index: 1210 !important; }
+    .container > .menu-host { position: relative !important; z-index: 1200 !important; }
+    .container > ui-view[name="main"] { position: relative; z-index: 1; }
+    /* Magisters schermvullende vensters (Groepjes, Timer, Wie heeft de beurt?, menu's) boven de zijbalk. */
+    dna-overlay-container { z-index: 1300 !important; }
+    .collapsed-menu .popup-menu, .collapsed-menu li:hover span, .collapsed-menu .main-menu > li.active > ul, .collapsed-menu #faux-label { z-index: 1205 !important; }    html body .container > .appbar-host, html body .container > .menu-host { background: ${bg} !important; background-color: ${bg} !important; background-image: none !important; ${blur} }
+    html body .appbar-host mg-appbar, html body .appbar-host .appbar, html body .menu-host nav.menu, html body .menu-host .menu-container, html body .menu-host .menu-footer, html body .menu-host .menu-footer a { background: transparent !important; background-color: transparent !important; background-image: none !important; }
+    html body .appbar > div > a, html body .appbar .menu-button button, html body a.appbar-button { background: transparent !important; background-color: transparent !important; color: ${t.muted} !important; }
+    html body .appbar > div > a:hover, html body .appbar .menu-button button:hover { background: ${t.hover} !important; background-color: ${t.hover} !important; color: ${t.fg} !important; }
+    html body .appbar-icon, html body .appbar > div > a i, html body .appbar .menu-button > button > i, html body .appbar dna-icon { color: inherit !important; }
+  `;
+}
+
+function contrastInk(hex) {
+  const h = (hex || "#000").replace("#", "");
+  const n = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const r = parseInt(n.slice(0, 2), 16), g = parseInt(n.slice(2, 4), 16), b = parseInt(n.slice(4, 6), 16);
+  /* De inktkleur met het hoogste contrast volgens WCAG (relatieve luminantie), niet een vaste grens op de
+   * helderheid: op middentinten zoals roze of oranje gaf die witte tekst met te weinig contrast. */
+  const lin = (c) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
+  const L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  return (L + 0.05) / (0.0056 + 0.05) >= 1.05 / (L + 0.05) ? "#111111" : "#ffffff";   // 0.0056 = luminantie van #111111
+}

@@ -133,7 +133,7 @@ if (typeof document !== "undefined" && typeof chrome !== "undefined" && chrome.s
       progress(`Map gekozen (${picked.name}, versie ${m.version}).`);
     } catch (e) {
       if (e?.name === "AbortError") { /* geannuleerd */ }
-      else if (!$("updates")) { progress("Kies de map via de instellingenpagina, die opent nu…"); chrome.tabs.create({ url: chrome.runtime.getURL("options/options.html#update") }); }
+      else if (!$("updates") || document.documentElement.classList.contains("kolom")) { /* in de zijkolom kan de browser geen map laten kiezen */ progress("Kies de map via de instellingenpagina, die opent nu…"); chrome.tabs.create({ url: chrome.runtime.getURL("options/options.html#update") }); }
       else progress(`Map niet gebruikt: ${e.message || e}.`);
     }
     refreshUi();

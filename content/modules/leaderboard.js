@@ -52,36 +52,11 @@ DT.register({
     const wrap = dash?.shadowRoot?.querySelector(".wrapper");
     if (this._view && !this._view.isConnected) this.sluit();
     if (this._view && !document.querySelector("mg-att-tiles")) this.sluit();
-    const oud = wrap?.querySelector("#dt-lb-tegel");
-    /* Zelfde als bij de lestools: de kaartkop alleen vanuit de pagina laten zetten. */
-    if (oud && oud.shadowRoot?.querySelector("h1")?.textContent.trim() !== "Leaderboard") window.postMessage({ type: "dt:attr:opnieuw", selector: "#dt-lb-tegel", attr: "heading" }, "*");
-    if (!wrap || oud) return;
-    const c = document.createElement("dna-link-card");
-    c.id = "dt-lb-tegel";
-    c.setAttribute("heading", "Leaderboard");
-    c.setAttribute("tabindex", "0");
-    c.setAttribute("role", "link");
-    c.style.cursor = "pointer";
-    const oms = document.createElement("div");
-    oms.slot = "description"; oms.textContent = "Wie was er per week het meest aanwezig in een klas";
-    /* Magisters iconenset heeft geen beker: een bestaand duotone-icoon met onze eigen paden erin. */
-    const ic = document.createElement("dna-icon");
-    ic.slot = "icon"; ic.setAttribute("name", "fad-traffic-light");
-    c.append(oms, ic);
-    const open = (e) => { e.preventDefault(); e.stopPropagation(); this.open(DT); };
-    c.addEventListener("click", open);
-    c.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") open(e); });
-    wrap.append(c);
-    this.beker(ic);
-  },
-
-  beker(ic, poging = 0) {
-    const svg = ic.shadowRoot?.querySelector("svg");
-    if (!svg) { if (poging < 20) setTimeout(() => this.beker(ic, poging + 1), 150); return; }
-    svg.setAttribute("viewBox", "0 0 512 512");
-    svg.innerHTML =
-      `<path d="M144 40h224v120c0 61.9-50.1 112-112 112S144 221.9 144 160V40z"></path>` +
-      `<path d="M136 24h240a16 16 0 0 1 16 16v16h72a16 16 0 0 1 16 16v32c0 61-46.6 111.2-106.2 116.5A136.6 136.6 0 0 1 288 284.4V352h48a40 40 0 0 1 40 40v64a16 16 0 0 1-16 16H152a16 16 0 0 1-16-16v-64a40 40 0 0 1 40-40h48v-67.6a136.6 136.6 0 0 1-85.8-63.9C78.6 215.2 32 165 32 104V72a16 16 0 0 1 16-16h72V40a16 16 0 0 1 16-16zM80 104c0 30.4 19.6 56.3 46.9 65.7A135.4 135.4 0 0 1 120 128v-24H80zm312 24c0 14.4-2.4 28.3-6.9 41.7 27.3-9.4 46.9-35.3 46.9-65.7h-40v24zM256 72l-14.4 29.2-32.2 4.7 23.3 22.7-5.5 32.1L256 145.6l28.8 15.1-5.5-32.1 23.3-22.7-32.2-4.7L256 72z"></path>`;
+    DT.navTegel(wrap, {
+      id: "dt-lb-tegel", titel: "Leaderboard", tekst: "Wie was er per week het meest aanwezig in een klas",
+      icoon: `<path fill="var(--sl-icon-fill-accent)" d="M144 40h224v120c0 61.9-50.1 112-112 112S144 221.9 144 160V40z"/><path fill="var(--sl-icon-fill-default)" fill-rule="evenodd" d="M136 24h240a16 16 0 0 1 16 16v16h72a16 16 0 0 1 16 16v32c0 61-46.6 111.2-106.2 116.5A136.6 136.6 0 0 1 288 284.4V352h48a40 40 0 0 1 40 40v64a16 16 0 0 1-16 16H152a16 16 0 0 1-16-16v-64a40 40 0 0 1 40-40h48v-67.6a136.6 136.6 0 0 1-85.8-63.9C78.6 215.2 32 165 32 104V72a16 16 0 0 1 16-16h72V40a16 16 0 0 1 16-16zM80 104c0 30.4 19.6 56.3 46.9 65.7A135.4 135.4 0 0 1 120 128v-24H80zm312 24c0 14.4-2.4 28.3-6.9 41.7 27.3-9.4 46.9-35.3 46.9-65.7h-40v24zM256 72l-14.4 29.2-32.2 4.7 23.3 22.7-5.5 32.1L256 145.6l28.8 15.1-5.5-32.1 23.3-22.7-32.2-4.7L256 72z"/>`,
+      open: () => this.open(DT)
+    });
   },
 
   /* ---------- eigen pagina ---------- */

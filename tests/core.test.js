@@ -45,22 +45,34 @@ test("eigen periodes: gesorteerd, einde om 23:59:59, ongeldige regels vallen weg
   assert.deepStrictEqual([p[0].einde.getHours(), p[0].einde.getMinutes(), p[0].einde.getDate()], [23, 59, 8]);
 });
 
-test("zijpaneel: het weeknummer is een getal, ook met verzuiminzicht.js erna geladen", () => {
+test("zijkolom: het weeknummer is een getal, ook naast de isoWeek van verzuiminzicht.js", () => {
   const { modules, DT } = metRegister();
-  const ctx = laad(["content/modules/panel.js", "content/modules/verzuiminzicht.js"], { DT, window: {}, document: {} }, ["dtWeekNummer", "isoWeek"]);
+  let tekst = "";
+  const document = { getElementById: (id) => (id === "kolomDatum" ? { set textContent(v) { tekst = v; } } : null) };
+  const ctx = laad(["sidepanel/paneel.js", "content/modules/verzuiminzicht.js"], { DT, DtKolom: {}, window: {}, document }, ["dtWeekNummer", "isoWeek"]);
   assert.strictEqual(ctx.uit.dtWeekNummer(new Date(2026, 10, 19)), 47);
   assert.strictEqual(ctx.uit.dtWeekNummer(new Date(2027, 0, 1)), 53, "1 januari 2027 valt in week 53 van 2026");
   assert.deepStrictEqual({ ...ctx.uit.isoWeek(new Date(2027, 0, 1)) }, { y: 2026, w: 53 });
-  let tekst = "";
-  modules.panel._panel = { querySelector: () => ({ firstChild: {}, querySelector: () => ({ set textContent(v) { tekst = v; } }) }) };
   modules.panel.tick();
   assert.match(tekst, /week \d+$/);
 });
 
-test("zijpaneel: wisselen zonder paneel (in een iframe, of met Escape) geeft geen fout", () => {
+test("handvat: de kolom openen gaat als bericht naar de achtergrond; Escape op de pagina sluit hem niet", () => {
+  const berichten = [];
   const { modules, DT } = metRegister({ isTop: true });
-  laad("content/modules/panel.js", { DT, window: {}, document: {} });
-  modules.panel.toggle(false); modules.panel.toggle();
+  laad("content/modules/panel.js", { DT, window: {}, document: {}, location: { origin: "https://h" }, chrome: { runtime: { sendMessage: (m) => { berichten.push(m); return Promise.resolve(); } } } });
+  modules.panel.toggle(false);
+  assert.strictEqual(berichten.length, 0);
+  modules.panel.toggle(); modules.panel.toggle(true);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(berichten)), [{ type: "zijkolom", alleenOpenen: false }, { type: "zijkolom", alleenOpenen: true }]);
+});
+
+test("handvat in een iframe: de vraag gaat door naar het hoofdvenster", () => {
+  const gepost = [];
+  const { modules, DT } = metRegister({ isTop: false });
+  laad("content/modules/panel.js", { DT, window: { top: { postMessage: (m, o) => gepost.push([m, o]) } }, document: {}, location: { origin: "https://h" }, chrome: { runtime: { sendMessage() { throw new Error("mag niet"); } } } });
+  modules.panel.toggle();
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(gepost)), [[{ type: "dt:cmd", command: "toggle-panel" }, "https://h"]]);
 });
 
 /* ---------- DT.observe en DT.apiRetry, met nagebootste tijd ---------- */
@@ -72,10 +84,10 @@ function kernMetPagina(t) {
   const document = { hidden: false, body: { append() {} }, getElementById: () => null, createElement: () => ({}),
     addEventListener: (n, f) => { luisteraars[n] = f; }, removeEventListener: (n) => { delete luisteraars[n]; } };
   function MutationObserver(cb) { this.cb = cb; this.observe = () => waarnemers.push(this); this.disconnect = () => waarnemers.splice(waarnemers.indexOf(this), 1); }
-  const chrome = { runtime: { getManifest: () => ({ version: "test" }) }, storage: { sync: { get: async () => ({}), set: async () => {} } } };
+  const chrome = { runtime: { id: "test", getManifest: () => ({ version: "test" }) }, storage: { sync: { get: async () => ({}), set: async () => {} } } };
   const ctx = laad(["content/defaults.js", "content/core.js"], { window: "zelf", chrome, document, MutationObserver, location: { host: "h", origin: "https://h" }, addEventListener() {}, removeEventListener() {}, postMessage() {}, navigator: {}, console: { warn() {}, info() {} },
     setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout, setInterval: globalThis.setInterval, clearInterval: globalThis.clearInterval, Date: globalThis.Date });
-  return { DT: ctx.DT, document, waarnemers, luisteraars, muteer: () => waarnemers.forEach((w) => w.cb()), tijd: (ms) => t.mock.timers.tick(ms) };
+  return { DT: ctx.DT, chrome, document, waarnemers, luisteraars, muteer: () => waarnemers.forEach((w) => w.cb()), tijd: (ms) => t.mock.timers.tick(ms) };
 }
 
 test("waarnemer: alle modules delen één MutationObserver, die verdwijnt als de laatste stopt", (t) => {
@@ -126,4 +138,17 @@ test("apiRetry: wacht bij 429 en 503 en probeert opnieuw; andere antwoorden gaan
   assert.strictEqual(p.DT.lijst({ status: 404 }), null);
   p.DT.api = async () => ({ status: 404 });
   assert.strictEqual((await p.DT.apiRetry("/api/x")).status, 404);
+});
+
+test("waarnemer: na herladen van de extensie stopt het oude script, in plaats van elke ronde een fout te geven", (t) => {
+  const p = kernMetPagina(t); let n = 0;
+  p.DT.observe(() => { n++; }, { debounce: 100, poll: 1000 });
+  p.DT.observe(async () => { await p.chrome.storage.sync.get(); }, { debounce: 100, poll: 1000 });
+  p.tijd(1000); p.tijd(150); assert.strictEqual(n, 2);
+  delete p.chrome.runtime.id;   // zo ziet een verlopen koppeling eruit
+  for (let i = 0; i < 50; i++) p.tijd(1000);
+  assert.strictEqual(n, 2, "geen rondes meer");
+  assert.strictEqual(p.waarnemers.length, 0, "MutationObserver losgekoppeld");
+  let later = 0; p.DT.observe(() => { later++; });
+  assert.strictEqual(later, 0, "nieuwe waarnemers starten niet meer");
 });

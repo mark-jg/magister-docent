@@ -66,16 +66,16 @@ DT.register({
 
   actions(DT) {
     return [
-      { label: "Paneel openen", hint: "Alt+D", go: () => DT.module("panel")?.toggle(true) },
+      { label: "Zijkolom openen", hint: "Alt+D", go: () => DT.module("panel")?.toggle(true) },
       { label: "Thema wisselen", hint: "Alt+T", go: () => DT.module("theme")?.toggle(DT) },
       { label: "Tabellen naar Excel", hint: "Alt+E", go: () => DT.module("tables")?.exportAll(DT) },
       { label: "Zoeken (leerling, groep, stamnummer)", hint: "Alt+S", go: () => this.focusSearch(DT) },
       { label: "Naar AI-assistent", hint: "", go: () => DT.module("ai")?.open(DT) },
       ...(DT.settings.developer?.enabled ? [{ label: "Inspector", hint: "Alt+I", go: () => DT.module("inspector")?.start(DT) }] : []),
       { label: "Instellingen", hint: "", go: () => chrome.runtime.sendMessage({ type: "openOptions" }) },
-      ...Object.entries(DT.module("theme")?.presets || {}).map(([id, p]) => ({
-        label: `Thema: ${p.label}`, hint: p.dark === null ? "" : (p.dark ? "donker" : "licht"),
-        go: () => DT.saveSettings({ theme: { preset: id, [p.dark ? "darkPreset" : "lightPreset"]: id } })
+      ...(globalThis.DT_THEMAS_LIST || []).map(([id, label, sub]) => ({
+        label: `Thema: ${label}`, hint: sub,
+        go: () => DT.saveSettings({ theme: { preset: id } })
       }))
     ];
   },

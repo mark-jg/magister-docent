@@ -9,13 +9,13 @@ Chrome-extensie voor Magister (docenten/personeel). Alles draait lokaal in je br
 3. Open Chrome en ga naar `chrome://extensions`.
 4. Zet rechtsboven **Ontwikkelaarsmodus** aan.
 5. Klik op **Uitgepakte extensie laden** en kies de map met `manifest.json`.
-6. Open (of herlaad) Magister. Rechts verschijnt een handvat "Docent Tools".
+6. Open (of herlaad) Magister. Klik op het icoon van Docent Tools in de werkbalk (of druk op Alt+D): de zijkolom opent naast Magister. Aan de rand van de pagina staat ook een handvat "Docent Tools".
 
 Werkt ook in Edge (`edge://extensions`).
 
 ## Bijwerken
 
-De extensie kijkt om de 6 uur op GitHub of er een nieuwere release is (alleen versienummer en downloadlink, er gaat niets over jou mee; uit te zetten bij Instellingen > Updates). Is er een nieuwe versie, dan krijgt het extensie-icoon een gele badge en staat bovenin het menu een blok met:
+De extensie kijkt om de 6 uur op GitHub of er een nieuwere release is (alleen versienummer en downloadlink, er gaat niets over jou mee; uit te zetten bij Instellingen > Updates). Is er een nieuwe versie, dan krijgt het extensie-icoon een gele badge en staat bovenin de zijkolom een melding met de knop Bijwerken:
 
 1. **Nu bijwerken**: opent Instellingen > Updates. De eerste keer kies je daar de map waarin je de extensie hebt uitgepakt (de map met `manifest.json`); die keuze wordt onthouden.
 2. Klik op **Nu bijwerken naar X**. Chrome vraagt om toestemming voor de map (één klik). De extensie haalt de zip op van GitHub, schrijft de bestanden in de map en herlaadt zichzelf. Herlaad daarna open Magister-tabbladen.
@@ -44,9 +44,9 @@ Bij elke release staat naast de zip een bestand `.sha256`; de updater vergelijkt
 | Functie | Hoe |
 |---|---|
 | Jarig: kaart op Vandaag met (aankomende) jarige leerlingen, klikbaar naar de leerlingkaart | automatisch op het startscherm; Instellingen > Jarig voor hoe ver vooruit |
-| Thema's: 20 presets (van Magister-standaard tot Krant, Terminal, Synthwave, Apple en Apple Glass) of een eigen accentkleur; lettertype, lettergrootte, hoeken en dichtheid apart instelbaar | in het zijpaneel (Alt+D), Alt+T wisselt tussen je lichte en donkere thema |
-| Docentenpaneel: klok en weeknummer, snelle links, notities, exportknoppen | Alt+D, of klik op het handvat |
-| Tabellen: zwevend knopje "Exporteren" bij hover over een datatabel (kalenders en roosters worden overgeslagen), en een overzicht van alle tabellen in het zijpaneel. Naar Excel, CSV of klembord (plakt als cellen), sorteerbare koppen; per soort tabel instelbaar welke kolommen meegaan, kopregel, namen maskeren, lege rijen en kolommen weglaten | knoppen boven elke tabel, "Instellen" voor de opties; Alt+E exporteert alle tabellen op de pagina |
+| Thema's: Magister (het origineel), Minimal, Glass, Paper, Soft en Contrast. Elk thema behalve Magister heeft een lichte en een donkere variant (of volgt je computer), met een accentkleur als tweede keuze; lettertype, lettergrootte, hoeken en dichtheid zijn apart instelbaar | in de zijkolom (Alt+D), Alt+T wisselt tussen licht en donker |
+| Zijkolom: thema, modules, acties, periodes, klok en weeknummer, snelle links, notities, de tabellen van de pagina, updates en alle instellingen. Staat naast Magister in de zijkolom van de browser, valt dus niet over de pagina en is in breedte te verstellen | Alt+D, het icoon van Docent Tools in de werkbalk, of het handvat aan de rand van de pagina |
+| Tabellen: zwevend knopje "Exporteren" bij hover over een datatabel (kalenders en roosters worden overgeslagen), en een overzicht van alle tabellen in de zijkolom. Naar Excel, CSV of klembord (plakt als cellen), sorteerbare koppen; per soort tabel instelbaar welke kolommen meegaan, kopregel, namen maskeren, lege rijen en kolommen weglaten | knoppen boven elke tabel, "Instellen" voor de opties; Alt+E exporteert alle tabellen op de pagina |
 | Sneller invoeren: Enter springt naar de volgende rij, Ctrl+Shift+V plakt een kolom uit Excel in opeenvolgende velden | automatisch in invoertabellen |
 | AI-hulp: prompt uit tabel of selectie, met sjablonen en knop "Namen maskeren" | knop "Naar AI" boven een tabel of in het paneel |
 | Opgeruimde interface: verberg elementen die je niet gebruikt | Inspector (Alt+I), beweeg over een element en druk op H |
@@ -54,9 +54,10 @@ Bij elke release staat naast de zip een bestand `.sha256`; de updater vergelijkt
 | Navigatie: commandopalet met alle menu-onderdelen en acties | Ctrl+K (of Alt+K); Alt+1 t/m 9 springt naar hoofdmenu-items; Alt+S naar het zoekveld |
 | Thema bijwerken: elementen die niet meekleuren zelf toevoegen | Alt+I, beweeg over het element, C, kies achtergrond/vlak/accent/tekst |
 | Mail bij Melding Expertisecentrum: controlescherm met naam, studentnummer, klas, "aangemeld voor" en samenvatting, daarna een concept-mail in Outlook naar de begeleidingscoach (niets wordt automatisch verzonden) | knop "Mail coach" naast "Volgende" bij een nieuwe melding, ✉ in de knoppenbalk van een bestaande melding in het logboek, of Alt+M; coaches (naam en e-mail) in de instellingen, in het controlescherm kies je aan wie |
+| Opleidingen: overzicht per opleiding › leerjaar › klas (uitklapbaar) met het aantal ingeschreven studenten, het verloop over de schooljaren als grafiek (per maand, met de teldatum 1 oktober), de aanwezigheid per niveau (aanwezig, te laat, ziek, absent geoorloofd en ongeoorloofd, uitgestuurd, vrijstelling; per week en weekdag, en hoeveel studenten onder de norm zitten), aandachtspunten en een export naar Excel. Alleen aantallen, geen namen | menu-item "Opleidingen" onderaan Magisters hoofdmenu; aanwezigheid haal je op per regel of voor alle klassen |
 | Inspector: selectors vinden, paginarapport (R, nu ook met bovenliggende frames en koppen van de hoofdpagina) en netwerkrapport (N, welke API-calls en velden, zonder waarden) | Alt+I |
 
-Instellingen: klik op het extensie-icoon > Instellingen, of in het paneel.
+Instellingen: het tabblad Instellingen in de zijkolom.
 
 ## Verfijnen op jullie Magister-omgeving
 
@@ -81,7 +82,7 @@ content/core.js          Modulesysteem, instellingen, helpers
 content/base.css         Stijl van de eigen UI (paneel, knoppen, toasts)
 content/modules/*.js     Eén bestand per functie
 options/                 Instellingenpagina en zelf-updater (updater.js)
-popup/                   Menu onder het extensie-icoon
+sidepanel/               De zijkolom van de browser (paneel, updates, instellingen)
 lib/xlsx.full.min.js     SheetJS (Excel-export), Apache 2.0
 scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 .github/workflows/       Bouwt bij elke tag v* de zip en publiceert de release

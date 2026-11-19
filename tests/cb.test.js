@@ -1,8 +1,10 @@
 /* Te laat-balie (content/modules/cb.js): wie de periodes in het gedeelde bestand mag wijzigen, en de vensters
  * van de wettelijke termijnen. */
 const { test } = require("node:test"), assert = require("node:assert");
-const { laad, metRegister, kaal } = require("./hulp");
+const { laad, lees, metRegister, kaal } = require("./hulp");
 
+/* De balie bestaat uit cb.js en de delen cb-*.js (zonder de gegenereerde kern), in manifestvolgorde. */
+const CB_DELEN = JSON.parse(lees("manifest.json")).content_scripts[0].js.filter((f) => /modules\/cb(\.js|-(?!kern))/.test(f));
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const P = (naam, b, e) => ({ id: b, naam, begin: new Date(b + "T00:00"), einde: new Date(e + "T23:59:59") });
 
@@ -12,7 +14,7 @@ function balie(mijnPeriodes) {
     plusDagen: (s, n) => { const d = new Date(s + "T12:00"); d.setDate(d.getDate() + n); return ymd(d); },
     periodeById: (id) => (K.S.instellingen.periodes || []).find((p) => p.id === id) };
   const { modules, DT } = metRegister({ periodes: () => staat.mijn });
-  laad("content/modules/cb.js", { DT, TardyKern: K, window: {}, document: {}, setTimeout: () => 0, clearTimeout() {},
+  laad(CB_DELEN, { DT, TardyKern: K, window: {}, document: {}, setTimeout: () => 0, clearTimeout() {},
     localStorage: { getItem: (k) => (k in opslag ? opslag[k] : null), setItem: (k, v) => { opslag[k] = String(v); } } });
   const cb = modules.cb;
   cb.bewaar = () => { staat.bewaard++; }; cb.opnieuwOphalen = () => {}; cb.melding = () => {}; cb._map = {}; cb._kijkt = false;
@@ -79,4 +81,20 @@ test("wettelijke termijnen: met de optie aan tellen de 4 en 8 weken door over he
   const K = metVerzuim(); K.S.instellingen.vensterOverGrens = true;
   assert.strictEqual(K.TELLERS.klokuren4w.waarde("1", "p2"), 18); assert.strictEqual(K.TELLERS.ziek8w.waarde("1", "p2"), 3);
   assert.strictEqual(K.TELLERS.klokuren4w.waarde("1", "p1"), 10, "een afgelopen periode eindigt op zijn eigen einddatum");
+});
+
+test("opmaak van de balie: geen regel staat per ongeluk binnen een andere regel", () => {
+  /* Een niet-afgesloten regel maakt van alles wat volgt een geneste regel die nergens op past (zo bleef de
+   * zoektekst onder het vergrootglas staan). Alleen @-regels mogen andere regels bevatten. */
+  const bron = require("node:fs").readFileSync(require("node:path").join(__dirname, "../content/modules/cb-css.js"), "utf8");
+  const css = bron.match(/st\.textContent = `([\s\S]*?)`;/)[1].replace(/\/\*[\s\S]*?\*\//g, "").replace(/\$\{[^}]*\}/g, "0").replace(/url\("[^"]*"\)/g, "url()");
+  const stapel = [], fout = [];
+  let kop = "";
+  for (const ch of css) {
+    if (ch === "{") { const sel = kop.trim().split(";").pop().trim(); if (stapel.length && !stapel.every((s) => s.startsWith("@"))) fout.push(sel); stapel.push(sel); kop = ""; }
+    else if (ch === "}") { stapel.pop(); kop = ""; }
+    else kop += ch;
+  }
+  assert.deepStrictEqual(fout, []);
+  assert.strictEqual(stapel.length, 0);
 });
