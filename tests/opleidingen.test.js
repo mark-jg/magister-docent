@@ -234,3 +234,8 @@ test("mutaties: instroom uit de aanmelding, overstap met de nieuwe klas, en extr
   const s = R.voegSamen(o, { studenten: { 1: { naam: "Blijver", nu: true, w: {} }, 3: { naam: "Overstapper", nu: false } } }, "2026-09-21").studenten;
   assert.strictEqual(s[1].b, "2026-08-01"); assert.strictEqual(s[3].naar, "B"); assert.strictEqual(s[2].nu, false); assert.strictEqual(s[2].b, "2026-09-14");
 });
+
+test("keuze vooraf: klassen groeperen op het begin van de klasnaam", () => {
+  assert.strictEqual(R.groep("MIP1A"), "MIP"); assert.strictEqual(R.groep("sdv2b"), "SDV"); assert.strictEqual(R.groep("1A"), "1A");
+  assert.deepStrictEqual(kaal(R.groepen({ MIP1A: 20, MIP2A: 18, SDV1A: null, "1A": 5 })), [{ groep: "1A", klassen: 1, studenten: 5 }, { groep: "MIP", klassen: 2, studenten: 38 }, { groep: "SDV", klassen: 1, studenten: 0 }]);
+});
