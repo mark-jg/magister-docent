@@ -13,6 +13,48 @@
  * de laatst bijgewerkte versie, zodat een andere computer met dezelfde map verder kan waar deze ophield.
  * Let op: de jaaropslag en de back-up bevatten namen van studenten met hun lessen per week. */
 Object.assign(DT.module("opleidingen"), {
+  /* ---------- welke opleidingen doen mee ---------- */
+  /* Wie veel klassen mag zien, vraagt bij het laden veel van Magister (per student drie aanvragen, per klas tientallen
+   * lessen). Daarom kun je vooraf kiezen welke opleidingen meedoen: alleen die worden opgehaald en getoond. De keuze
+   * gaat op het begin van de klasnaam (MIP1A → MIP); dat is bekend na één aanvraag. Bij meer dan DREMPEL klassen
+   * vraagt de pagina het vóór er iets wordt opgehaald. _kies: de gekozen groepen, of null voor alles. */
+  DREMPEL: 30,
+  async keuzeLaden(telling) {
+    const k = await this.opslag("keuze"), alle = OplReken.groepen(telling), bestaat = new Set(alle.map((g) => g.groep));
+    const gekozen = Array.isArray(k.groepen) ? k.groepen.filter((g) => bestaat.has(g)) : [];
+    this._groepen = alle;
+    this._kies = gekozen.length && gekozen.length < alle.length ? new Set(gekozen) : null;
+    return !k.gezien && Object.keys(telling).length > this.DREMPEL;   // true: eerst kiezen
+  },
+  kiesFilter(telling) {
+    if (!this._kies) return { ...telling };
+    return Object.fromEntries(Object.entries(telling).filter(([k]) => this._kies.has(OplReken.groep(k))));
+  },
+  keuzeTotaal() {
+    const aan = [...this._pagina.querySelectorAll("input[data-groep]:checked")], el = this._pagina.querySelector(".dt-opl-kiestotaal"); if (!el) return;
+    const n = aan.reduce((s, x) => s + (+x.dataset.n || 0), 0), kl = aan.reduce((s, x) => s + (+x.dataset.k || 0), 0);
+    el.textContent = aan.length ? `${aan.length} gekozen: ${this.getal(kl)} klassen, ${this.getal(n)} studenten. De eerste keer zijn dat ongeveer ${this.getal(3 * n + 30 * kl)} aanvragen aan Magister; daarna per dag ongeveer ${this.getal(2 * n + 6 * kl)}.` : "Kies minstens één opleiding.";
+  },
+  async keuzeBewaar(DT) {
+    const vakjes = [...this._pagina.querySelectorAll("input[data-groep]")], aan = vakjes.filter((x) => x.checked).map((x) => x.dataset.groep);
+    if (!aan.length) return DT.toast("Kies minstens één opleiding.", "err", 3500);
+    if (this._aanwBezig) { this._stopAanw = true; while (this._aanwBezig) await this.wacht(150); }
+    await this.bewaar("keuze", { gezien: true, groepen: aan.length === vakjes.length ? null : aan });
+    this._autoUit = false; this._tab = "overzicht"; this._zoom = null;
+    this.laad(DT);
+  },
+  /* eerst: de pagina heeft nog niets opgehaald en wacht op de keuze. */
+  keuzeKaart(eerst = false) {
+    const E = (s) => this.esc(s), alle = this._groepen || [];
+    if (!eerst && alle.length < 2) return "";
+    const aan = (g) => (eerst ? false : !this._kies || this._kies.has(g.groep));
+    return `<dna-card class="dt-opl-kaart"><h2>${eerst ? "Kies eerst welke opleidingen je wilt zien" : "Welke opleidingen doen mee"}</h2>
+      <p class="dt-opl-zacht">${eerst ? `Je mag ${alle.reduce((n, g) => n + g.klassen, 0)} klassen zien. Alles ophalen vraagt veel van Magister, dus er is nog niets opgehaald. ` : ""}Alleen de gekozen opleidingen worden opgehaald, bijgewerkt en getoond. De indeling gaat op het begin van de klasnaam. Wat al is opgehaald blijft bewaard als je een opleiding uitzet.</p>
+      <div class="dt-opl-kies">${alle.map((g) => `<label><input type="checkbox" data-groep="${E(g.groep)}" data-n="${g.studenten}" data-k="${g.klassen}"${aan(g) ? " checked" : ""}><b>${E(g.groep)}</b><small>${g.klassen} ${g.klassen === 1 ? "klas" : "klassen"} · ${this.getal(g.studenten)}</small></label>`).join("")}</div>
+      <p class="dt-opl-zacht dt-opl-kiestotaal">${eerst ? "Kies minstens één opleiding." : ""}</p>
+      <p><button type="button" class="dt-opl-knop" data-act="keuze-ok">${eerst ? "Ophalen" : "Keuze opslaan en opnieuw laden"}</button><button type="button" class="dt-opl-knop is-stil" data-act="keuze-alles">Alles aan</button><button type="button" class="dt-opl-knop is-stil" data-act="keuze-niets">Alles uit</button></p></dna-card>`;
+  },
+
   /* ---------- uit de opslag naar de pagina ---------- */
   async gegevensLaden() {
     const d = this._d; if (!d) return;

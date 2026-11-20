@@ -69,6 +69,15 @@ var OplReken = {
     for (const n of namen) while (p && !String(n).toUpperCase().startsWith(p.toUpperCase())) p = p.slice(0, -1);
     return (/^[A-Za-z]+/.exec(p) || [""])[0];
   },
+  /* De groep van een klas voor de keuze vooraf: de letters waarmee de klasnaam begint (MIP1A → MIP). Dat kost
+   * geen aanvraag: de klasnamen komen mee met de telling. */
+  groep(klas) { return ((/^[A-Za-z]+/.exec(String(klas || "")) || [""])[0] || String(klas || "")).toUpperCase(); },
+  /* Alle groepen uit een telling { klas: aantal }: [{ groep, klassen, studenten }], op naam. */
+  groepen(telling) {
+    const uit = {};
+    for (const [k, n] of Object.entries(telling || {})) { const g = (uit[this.groep(k)] ||= { groep: this.groep(k), klassen: 0, studenten: 0 }); g.klassen++; g.studenten += n || 0; }
+    return Object.values(uit).sort((a, b) => a.groep.localeCompare(b.groep, "nl", { numeric: true }));
+  },
   /* Geen leerjaar uit Magister: het eerste cijfer in de klasnaam (MV2A → 2). */
   leerjaarUitKlas(klas) { const m = /[1-9]/.exec(String(klas || "")); return m ? +m[0] : null; },
   /* De aanmelding die op de peildatum loopt (de hoofdaanmelding eerst); anders de laatste. */
