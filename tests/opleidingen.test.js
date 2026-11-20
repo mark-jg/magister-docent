@@ -201,7 +201,7 @@ test("jaaropslag: aanwezigheid over een periode van hele weken, alleen wie nu in
 test("jaaropslag: studenten per week tellen ook wie inmiddels weg is, en de mutaties volgen uit de lessen", () => {
   const o = OPSLAG();
   assert.deepStrictEqual(kaal(Object.fromEntries(Object.entries(R.lesWekenUit(o)).map(([w, x]) => [w, x.actief]))), { "2026-10-26": 3, "2026-11-02": 2, "2026-11-09": 2, "2026-11-16": 2 });
-  assert.deepStrictEqual(kaal(R.mutaties(o).map((m) => [m.naam, m.soort, m.week])), [["Instromer", "in", "2026-11-09"], ["Vertrekker", "uit", "2026-11-02"], ["Stil", "stil", "2026-10-26"]]);
+  assert.deepStrictEqual(kaal(R.mutaties(o).map((m) => [m.naam, m.soort, m.week])), [["Instromer", "in", "2026-11-09"], ["Vertrekker", "uit", "2026-11-02"]], "wie nog in de klas staat maar geen lessen meer heeft (stage), is geen mutatie");
   assert.deepStrictEqual(kaal(R.mutaties({ studenten: {}, mom: {} })), []);
 });
 
