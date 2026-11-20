@@ -7,6 +7,9 @@
  * (/api/leerlingen/zoeken/filters), leerlingen via /api/leerlingen/zoeken?klassen=...
  * Per leerling dezelfde berekening als Inzicht en de Excel-export (vzStats in verzuiminzicht.js):
  * afwezig = absent, ziek of uitgestuurd; te laat telt als aanwezig; vrijgestelde lessen tellen niet mee.
+ * Met de knop "Ziek telt niet mee" (instelling leaderboard.zonderGeoorloofd, standaard uit) vallen lessen waarin een
+ * leerling ziek of geoorloofd afwezig was buiten de telling, net als vrijgestelde lessen: ziek zijn kost dan geen
+ * plaats. Alleen ongeoorloofd afwezig en uitgestuurd tellen dan nog als gemist.
  * Volgorde: aanwezig %, dan minder vaak te laat, dan meer lessen aanwezig. Gelijke cijfers delen een
  * plaats en de plaatsen lopen door zonder gaten (1, 1, 2), zodat er altijd een 1, 2 en 3 op het podium staan.
  * Per leerling wordt ook de week ervoor opgehaald (in dezelfde aanvragen), voor de pijl omhoog/omlaag/gelijk
@@ -49,36 +52,11 @@ DT.register({
     const wrap = dash?.shadowRoot?.querySelector(".wrapper");
     if (this._view && !this._view.isConnected) this.sluit();
     if (this._view && !document.querySelector("mg-att-tiles")) this.sluit();
-    const oud = wrap?.querySelector("#dt-lb-tegel");
-    /* Zelfde als bij de lestools: de kaartkop alleen vanuit de pagina laten zetten. */
-    if (oud && oud.shadowRoot?.querySelector("h1")?.textContent.trim() !== "Leaderboard") window.postMessage({ type: "dt:attr:opnieuw", selector: "#dt-lb-tegel", attr: "heading" }, "*");
-    if (!wrap || oud) return;
-    const c = document.createElement("dna-link-card");
-    c.id = "dt-lb-tegel";
-    c.setAttribute("heading", "Leaderboard");
-    c.setAttribute("tabindex", "0");
-    c.setAttribute("role", "link");
-    c.style.cursor = "pointer";
-    const oms = document.createElement("div");
-    oms.slot = "description"; oms.textContent = "Wie was er per week het meest aanwezig in een klas";
-    /* Magisters iconenset heeft geen beker: een bestaand duotone-icoon met onze eigen paden erin. */
-    const ic = document.createElement("dna-icon");
-    ic.slot = "icon"; ic.setAttribute("name", "fad-traffic-light");
-    c.append(oms, ic);
-    const open = (e) => { e.preventDefault(); e.stopPropagation(); this.open(DT); };
-    c.addEventListener("click", open);
-    c.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") open(e); });
-    wrap.append(c);
-    this.beker(ic);
-  },
-
-  beker(ic, poging = 0) {
-    const svg = ic.shadowRoot?.querySelector("svg");
-    if (!svg) { if (poging < 20) setTimeout(() => this.beker(ic, poging + 1), 150); return; }
-    svg.setAttribute("viewBox", "0 0 512 512");
-    svg.innerHTML =
-      `<path d="M144 40h224v120c0 61.9-50.1 112-112 112S144 221.9 144 160V40z"></path>` +
-      `<path d="M136 24h240a16 16 0 0 1 16 16v16h72a16 16 0 0 1 16 16v32c0 61-46.6 111.2-106.2 116.5A136.6 136.6 0 0 1 288 284.4V352h48a40 40 0 0 1 40 40v64a16 16 0 0 1-16 16H152a16 16 0 0 1-16-16v-64a40 40 0 0 1 40-40h48v-67.6a136.6 136.6 0 0 1-85.8-63.9C78.6 215.2 32 165 32 104V72a16 16 0 0 1 16-16h72V40a16 16 0 0 1 16-16zM80 104c0 30.4 19.6 56.3 46.9 65.7A135.4 135.4 0 0 1 120 128v-24H80zm312 24c0 14.4-2.4 28.3-6.9 41.7 27.3-9.4 46.9-35.3 46.9-65.7h-40v24zM256 72l-14.4 29.2-32.2 4.7 23.3 22.7-5.5 32.1L256 145.6l28.8 15.1-5.5-32.1 23.3-22.7-32.2-4.7L256 72z"></path>`;
+    DT.navTegel(wrap, {
+      id: "dt-lb-tegel", titel: "Leaderboard", tekst: "Wie was er per week het meest aanwezig in een klas",
+      icoon: `<path fill="var(--sl-icon-fill-accent)" d="M144 40h224v120c0 61.9-50.1 112-112 112S144 221.9 144 160V40z"/><path fill="var(--sl-icon-fill-default)" fill-rule="evenodd" d="M136 24h240a16 16 0 0 1 16 16v16h72a16 16 0 0 1 16 16v32c0 61-46.6 111.2-106.2 116.5A136.6 136.6 0 0 1 288 284.4V352h48a40 40 0 0 1 40 40v64a16 16 0 0 1-16 16H152a16 16 0 0 1-16-16v-64a40 40 0 0 1 40-40h48v-67.6a136.6 136.6 0 0 1-85.8-63.9C78.6 215.2 32 165 32 104V72a16 16 0 0 1 16-16h72V40a16 16 0 0 1 16-16zM80 104c0 30.4 19.6 56.3 46.9 65.7A135.4 135.4 0 0 1 120 128v-24H80zm312 24c0 14.4-2.4 28.3-6.9 41.7 27.3-9.4 46.9-35.3 46.9-65.7h-40v24zM256 72l-14.4 29.2-32.2 4.7 23.3 22.7-5.5 32.1L256 145.6l28.8 15.1-5.5-32.1 23.3-22.7-32.2-4.7L256 72z"/>`,
+      open: () => this.open(DT)
+    });
   },
 
   /* ---------- eigen pagina ---------- */
@@ -101,6 +79,16 @@ DT.register({
       title: "Pasfoto's uit Magister tonen in plaats van initialen. Houd je aan de afspraken van je school over beeldmateriaal, zeker op het digibord.",
       html: `<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="6.3" r="2.3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3.8 13.5c.8-2 2.4-3 4.2-3s3.4 1 4.2 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>Foto's</span>` });
     this._fotoKnop.addEventListener("click", () => this.fotos(DT, !this._fotosAan));
+    this._zonderGeoorloofd = DT.settings.leaderboard?.zonderGeoorloofd === true;
+    this._ziekKnop = DT.el("button", { class: "dt-lb-nu dt-lb-fotoknop dt-lb-ziekknop", type: "button", "aria-pressed": String(this._zonderGeoorloofd), text: "Ziek telt niet mee",
+      title: "Aan: lessen waarin een leerling ziek of geoorloofd afwezig was vallen buiten de ranglijst, zodat ziek zijn geen plaats kost. Uit: elke gemiste les telt." });
+    this._ziekKnop.addEventListener("click", async () => {
+      this._zonderGeoorloofd = !this._zonderGeoorloofd;
+      this._ziekKnop.setAttribute("aria-pressed", String(this._zonderGeoorloofd));
+      const c = this._cache.get(`${this._klas}|${this.ymd(this._ma)}`);
+      if (c) this.teken(c);
+      await DT.saveSettings({ leaderboard: { zonderGeoorloofd: this._zonderGeoorloofd } });
+    });
     this._vorige = DT.el("button", { class: "dt-lb-pijl", type: "button", "aria-label": "Vorige week", html: `<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>` });
     this._volgende = DT.el("button", { class: "dt-lb-pijl", type: "button", "aria-label": "Volgende week", html: `<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>` });
     this._vorige.addEventListener("click", () => this.kies(DT, { week: this.plus(this._ma, -7) }));
@@ -113,7 +101,7 @@ DT.register({
       DT.el("div", { class: "dt-lb-kop dt-lb-card" }, [
         DT.el("nav", { class: "dt-lb-crumbs", "aria-label": "Kruimelpad" }, [terug, DT.el("span", { "aria-hidden": "true", text: "›" }), DT.el("span", { text: "Leaderboard" })]),
         DT.el("h1", { html: `Leaderboard<span class="dt-lb-punt">.</span>` }),
-        DT.el("div", { class: "dt-lb-bediening" }, [this._klassen, DT.el("div", { class: "dt-lb-weeknav" }, [this._nu, this._vorige, this._week, this._volgende, this._fotoKnop, this._bordKnop])]),
+        DT.el("div", { class: "dt-lb-bediening" }, [this._klassen, DT.el("div", { class: "dt-lb-weeknav" }, [this._nu, this._vorige, this._week, this._volgende, this._fotoKnop, this._ziekKnop, this._bordKnop])]),
       ]),
       this._status, this._podium,
       DT.el("div", { class: "dt-lb-card dt-lb-tabel" }, [
@@ -174,7 +162,7 @@ DT.register({
     if (!c || !c.bezig) {
       c = { lln: null, rijen: [], klaar: false, bezig: true };
       this._cache.set(key, c);
-      this.vul(DT, c, klas, ma).finally(() => { c.bezig = false; });
+      this.vul(DT, c, klas, ma).catch((e) => { c.fout ||= `Ophalen lukte niet: ${e?.message || e}`; }).finally(() => { c.bezig = false; });
     }
     /* Tekent mee zolang deze klas en week gekozen zijn. */
     while (gen === this._gen && this._view) {
@@ -187,15 +175,7 @@ DT.register({
   async vul(DT, c, klas, ma) {
     const wacht = (ms) => new Promise((r) => setTimeout(r, ms));
     /* Magister begrenst het aantal aanvragen (429): na elkaar, met korte pauzes, en bij 429/503 langer wachten. */
-    const api = async (url) => {
-      let r;
-      for (let poging = 0; poging < 6; poging++) {
-        r = await DT.api(url, { full: true, timeout: 25000 });
-        if (r.status !== 429 && r.status !== 503) return r;
-        await wacht(1500 * 2 ** poging);
-      }
-      return r;
-    };
+    const api = (url) => DT.apiRetry(url);
     const lijst = (r) => (r && r.status === 200 && r.json) ? (Array.isArray(r.json) ? r.json : r.json.items || []) : null;
     const r = await api(`/api/leerlingen/zoeken?q=**&top=250&skip=0&orderby=roepnaam%20asc&peildatum=${this.ymd(new Date())}&Rol=Docent&klassen=${encodeURIComponent(klas)}&velden=stamnummer&velden=naam&velden=klassen`);
     const items = lijst(r);
@@ -231,7 +211,10 @@ DT.register({
     const met = [], zonder = [];
     for (const x of rijen) {
       const T = x[veld];
-      if (T && T.telt > 0) met.push({ ...x, T, aanw: T.telt - T.afwezig, pct: (T.telt - T.afwezig) / T.telt });
+      /* Ziek en geoorloofd afwezig buiten de telling laten (zoals vrijstelling), als dat is gekozen. */
+      const buiten = T && this._zonderGeoorloofd ? (T.per?.ZK || 0) + (T.per?.AB_OK || 0) : 0;
+      const telt = T ? T.telt - buiten : 0, gemist = T ? T.afwezig - buiten : 0;
+      if (telt > 0) met.push({ ...x, T, telt, aanw: telt - gemist, pct: (telt - gemist) / telt });
       else zonder.push(x);
     }
     met.sort((a, b) => b.pct - a.pct || a.T.teLaat - b.T.teLaat || b.aanw - a.aanw || a.l.naam.localeCompare(b.l.naam, "nl"));
@@ -252,7 +235,7 @@ DT.register({
     else this.status(n ? "" : "Deze klas heeft geen leerlingen.");
     const { met, zonder } = this.rangschik(c.rijen);
     const pct = (r) => `${Math.floor(r.pct * 100)}%`;
-    const lessen = (r) => `${r.aanw} van ${r.T.telt}`;
+    const lessen = (r) => `${r.aanw} van ${r.telt}`;
     const open = (r) => () => typeof openLeerling === "function" && openLeerling(r.l.id);
 
     /* Vergeleken met vorige week (alleen als alles binnen is). */

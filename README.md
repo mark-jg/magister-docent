@@ -4,18 +4,18 @@ Chrome-extensie voor Magister (docenten/personeel). Alles draait lokaal in je br
 
 ## Installeren (lokaal laden)
 
-1. Download de nieuwste `magister-docent-tools-vX.Y.Z.zip` van de [Releases-pagina](https://github.com/mark-jg/magister-docent/releases/latest). De repo is privé: je moet bij GitHub ingelogd zijn met een account dat toegang heeft.
+1. Download de nieuwste `magister-docent-tools-vX.Y.Z.zip` van de [Releases-pagina](https://github.com/mark-jg/magister-docent/releases/latest).
 2. Pak de zip uit in een map die je laat staan (bijvoorbeeld `Documenten/magister-docent-tools`).
 3. Open Chrome en ga naar `chrome://extensions`.
 4. Zet rechtsboven **Ontwikkelaarsmodus** aan.
 5. Klik op **Uitgepakte extensie laden** en kies de map met `manifest.json`.
-6. Open (of herlaad) Magister. Rechts verschijnt een handvat "Docent Tools".
+6. Open (of herlaad) Magister. Klik op het icoon van Docent Tools in de werkbalk (of druk op Alt+D): de zijkolom opent naast Magister. Aan de rand van de pagina staat ook een handvat "Docent Tools".
 
 Werkt ook in Edge (`edge://extensions`).
 
 ## Bijwerken
 
-De extensie kijkt om de 6 uur op GitHub of er een nieuwere release is (alleen versienummer en downloadlink, er gaat niets over jou mee; uit te zetten bij Instellingen > Updates). Is er een nieuwe versie, dan krijgt het extensie-icoon een gele badge en staat bovenin het menu een blok met:
+De extensie kijkt om de 6 uur op GitHub of er een nieuwere release is (alleen versienummer en downloadlink, er gaat niets over jou mee; uit te zetten bij Instellingen > Updates). Is er een nieuwe versie, dan krijgt het extensie-icoon een gele badge en staat bovenin de zijkolom een melding met de knop Bijwerken:
 
 1. **Nu bijwerken**: opent Instellingen > Updates. De eerste keer kies je daar de map waarin je de extensie hebt uitgepakt (de map met `manifest.json`); die keuze wordt onthouden.
 2. Klik op **Nu bijwerken naar X**. Chrome vraagt om toestemming voor de map (één klik). De extensie haalt de zip op van GitHub, schrijft de bestanden in de map en herlaadt zichzelf. Herlaad daarna open Magister-tabbladen.
@@ -29,14 +29,24 @@ De repo is openbaar, dus controleren en bijwerken werkt zonder token. GitHub bep
 
 Chrome laat een uitgepakte extensie zijn eigen map alleen beschrijven als de gebruiker die map zelf aanwijst (File System Access API); daarom die eenmalige keuze en de toestemmingsvraag per update. Wie liever met git werkt: `git clone https://github.com/mark-jg/magister-docent`, die map als uitgepakte extensie laden, en bijwerken met `git pull` plus Herladen.
 
+## Ontwikkelen en testen
+
+De extensie zelf heeft geen buildstap. Voor de linter en de tests is Node nodig (eenmalig `npm install`):
+
+- `npm test` draait de tests in `tests/` (rekenfuncties, de brug naar Magister, de Te laat-balie, de updater);
+- `npm run lint` controleert alle scripts op onbekende namen en dubbele sleutels;
+- `npm run check` doet allebei. GitHub Actions draait dit bij elke push, en er komt geen release als het faalt.
+
+Bij elke release staat naast de zip een bestand `.sha256`; de updater vergelijkt de download daarmee voordat er iets wordt overschreven.
+
 ## Wat zit erin
 
 | Functie | Hoe |
 |---|---|
 | Jarig: kaart op Vandaag met (aankomende) jarige leerlingen, klikbaar naar de leerlingkaart | automatisch op het startscherm; Instellingen > Jarig voor hoe ver vooruit |
-| Thema's: 20 presets (van Magister-standaard tot Krant, Terminal, Synthwave, Apple en Apple Glass) of een eigen accentkleur; lettertype, lettergrootte, hoeken en dichtheid apart instelbaar | in het zijpaneel (Alt+D), Alt+T wisselt tussen je lichte en donkere thema |
-| Docentenpaneel: klok en weeknummer, snelle links, notities, exportknoppen | Alt+D, of klik op het handvat |
-| Tabellen: zwevend knopje "Exporteren" bij hover over een datatabel (kalenders en roosters worden overgeslagen), en een overzicht van alle tabellen in het zijpaneel. Naar Excel, CSV of klembord (plakt als cellen), sorteerbare koppen; per soort tabel instelbaar welke kolommen meegaan, kopregel, namen maskeren, lege rijen en kolommen weglaten | knoppen boven elke tabel, "Instellen" voor de opties; Alt+E exporteert alle tabellen op de pagina |
+| Thema's: Magister (het origineel), Minimal, Glass, Paper, Soft en Contrast. Elk thema behalve Magister heeft een lichte en een donkere variant (of volgt je computer), met een accentkleur als tweede keuze; lettertype, lettergrootte, hoeken en dichtheid zijn apart instelbaar | in de zijkolom (Alt+D), Alt+T wisselt tussen licht en donker |
+| Zijkolom: thema, modules, acties, periodes, klok en weeknummer, snelle links, notities, de tabellen van de pagina, updates en alle instellingen. Staat naast Magister in de zijkolom van de browser, valt dus niet over de pagina en is in breedte te verstellen | Alt+D, het icoon van Docent Tools in de werkbalk, of het handvat aan de rand van de pagina |
+| Tabellen: zwevend knopje "Exporteren" bij hover over een datatabel (kalenders en roosters worden overgeslagen), en een overzicht van alle tabellen in de zijkolom. Naar Excel, CSV of klembord (plakt als cellen), sorteerbare koppen; per soort tabel instelbaar welke kolommen meegaan, kopregel, namen maskeren, lege rijen en kolommen weglaten | knoppen boven elke tabel, "Instellen" voor de opties; Alt+E exporteert alle tabellen op de pagina |
 | Sneller invoeren: Enter springt naar de volgende rij, Ctrl+Shift+V plakt een kolom uit Excel in opeenvolgende velden | automatisch in invoertabellen |
 | AI-hulp: prompt uit tabel of selectie, met sjablonen en knop "Namen maskeren" | knop "Naar AI" boven een tabel of in het paneel |
 | Opgeruimde interface: verberg elementen die je niet gebruikt | Inspector (Alt+I), beweeg over een element en druk op H |
@@ -44,9 +54,10 @@ Chrome laat een uitgepakte extensie zijn eigen map alleen beschrijven als de geb
 | Navigatie: commandopalet met alle menu-onderdelen en acties | Ctrl+K (of Alt+K); Alt+1 t/m 9 springt naar hoofdmenu-items; Alt+S naar het zoekveld |
 | Thema bijwerken: elementen die niet meekleuren zelf toevoegen | Alt+I, beweeg over het element, C, kies achtergrond/vlak/accent/tekst |
 | Mail bij Melding Expertisecentrum: controlescherm met naam, studentnummer, klas, "aangemeld voor" en samenvatting, daarna een concept-mail in Outlook naar de begeleidingscoach (niets wordt automatisch verzonden) | knop "Mail coach" naast "Volgende" bij een nieuwe melding, ✉ in de knoppenbalk van een bestaande melding in het logboek, of Alt+M; coaches (naam en e-mail) in de instellingen, in het controlescherm kies je aan wie |
+| Opleidingen: overzicht per opleiding › leerjaar › klas (uitklapbaar) met het aantal ingeschreven studenten, het verloop over de schooljaren als grafiek (per maand, met de teldatum 1 oktober), de aanwezigheid per niveau (aanwezig, te laat, ziek, absent geoorloofd en ongeoorloofd, uitgestuurd, vrijstelling; per week en weekdag, en hoeveel studenten onder de norm zitten), aandachtspunten en een export naar Excel. Alleen aantallen, geen namen | menu-item "Opleidingen" onderaan Magisters hoofdmenu; aanwezigheid haal je op per regel of voor alle klassen |
 | Inspector: selectors vinden, paginarapport (R, nu ook met bovenliggende frames en koppen van de hoofdpagina) en netwerkrapport (N, welke API-calls en velden, zonder waarden) | Alt+I |
 
-Instellingen: klik op het extensie-icoon > Instellingen, of in het paneel.
+Instellingen: het tabblad Instellingen in de zijkolom.
 
 ## Verfijnen op jullie Magister-omgeving
 
@@ -71,7 +82,7 @@ content/core.js          Modulesysteem, instellingen, helpers
 content/base.css         Stijl van de eigen UI (paneel, knoppen, toasts)
 content/modules/*.js     Eén bestand per functie
 options/                 Instellingenpagina en zelf-updater (updater.js)
-popup/                   Menu onder het extensie-icoon
+sidepanel/               De zijkolom van de browser (paneel, updates, instellingen)
 lib/xlsx.full.min.js     SheetJS (Excel-export), Apache 2.0
 scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 .github/workflows/       Bouwt bij elke tag v* de zip en publiceert de release
@@ -142,6 +153,7 @@ scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
 - 0.51.0: Te laat-balie, meldafspraken volgens het protocol: op de signaalregel staat "meldt zich <datum>" als er een meldafspraak is, of een klokje om hem te maken als de stap om een meldafspraak vraagt (ook bij signalen uit Magister-gegevens); uitgeklapt staat de meldafspraak met zijn knoppen. In Meldafspraken heeft elke afspraak Notitie in dossier, Mail (de uitnodiging aan de student plus de mails van de protocolstap: ouders, mentor) en Afspraak in Magister, met vinkjes en ↺. Na niet verschenen: de stap in het protocol (notitie, mail, afspraak) en de nieuwe meldafspraak met zijn eigen notitie, mail en agenda. Teksten van de notitie en de agenda-afspraak bij een meldafspraak zijn aan te passen bij Instellingen › Berichten en mails ({naam}, {datum}, {tijd}, {aanleiding}, {stap}, {vorige} …).
 - 0.52.0: Nieuwe module Lesregistraties (zijpaneel › Acties › Lesregistraties): kies één of meer klassen en een periode (dit schooljaar, laatste week/4/8 weken, eigen periodes of eigen datums); per student worden rooster en registraties opgehaald. Filter daarna op vak en/of docent en bekijk per student (lessen, aanwezig, te laat, gemist, ziek, absent geoorloofd/ongeoorloofd, uitgestuurd, %), per les (elk lesmoment met wie te laat of afwezig was en waarom), per vak of per docent. Naar Excel met tabbladen Toelichting, Per student, Per les, Alle lessen, Per vak en Per docent.
 - 0.53.0: Lesregistraties staat nu als tegel op de pagina Aanwezigheid (naast Leaderboard en Te laat-balie) en opent als eigen subpagina met kruimelpad Aanwezigheid › Lesregistraties, in de kleuren van het gekozen thema. De knop in het zijpaneel gaat naar dezelfde pagina.
+- 0.61.0: Opleidingen: nieuw menu-item onderaan Magisters hoofdmenu met een overzicht per opleiding › leerjaar › klas (uitklapbaar). Aantal ingeschreven studenten, het verloop per maand binnen het schooljaar (met de teldatum 1 oktober) en "Studenten per cohort" uit de studiecode (MI-25881-25 is opleiding, crebo en cohort; het leerjaar volgt uit het cohort). Aanwezigheid per niveau (aanwezig, te laat, ziek, absent geoorloofd en ongeoorloofd, uitgestuurd, vrijstelling), per week en weekdag, met het aantal studenten onder de norm; op te halen per regel of voor alle klassen. Aandachtspunten (in- en uitstroom, kleinste en grootste klassen, laagste aanwezigheid) en export naar Excel. Magister geeft alleen het lopende schooljaar terug; de pagina legt daarom bij elk bezoek de stand van die dag vast (alleen aantallen, geen namen), zodat het verloop aangroeit. Daarnaast: de zijkolom van de browser vervangt het menu onder het icoon en het paneel in de pagina (Alt+D of het icoon in de werkbalk); de thema's zijn teruggebracht tot zes (Magister, Minimal, Glass, Paper, Soft, Contrast), elk met licht en donker en een accentkleur, en een eerder gekozen thema wordt omgezet naar het dichtstbijzijnde nieuwe; verder bugfixes, een zuinigere pagina-scanner, en tests en een linter die bij elke push draaien.
 - 0.60.0: Te laat-balie: nieuw tabblad Overzicht. "Waar is de student?": zoek een student en zie meteen of die aanwezig is, de les en het lokaal van nu (of de volgende les), het rooster van vandaag met de registraties uit Magister (live opgehaald) en wat er bij de balie is gemeld, met een eventuele meldafspraak. Daaronder "Registraties vandaag": alle meldingen bij de balie en de meldafspraken van een dag (met en zonder meldafspraak), met een teller per soort, bladeren per dag, filteren op soort en op naam of klas, en per regel een knop "Waar is…?".
 - 0.59.1: Te laat-balie: ongeoorloofd telt nu Magister plús de eigen meldingen op dagen waarop Magister (nog) niets ongeoorloofd heeft, in plaats van het hoogste van de twee. Een handmatige melding geeft zo altijd een nieuw signaal, ook als de vorige stap al is afgehandeld ("6× ongeoorloofd verzuim (waarvan 2 alleen bij de balie)"). Na het wijzigen van de periodes, en eenmalig bij gegevens van vóór de telling per les, haalt de balie het verzuim op de achtergrond opnieuw op uit Magister.
 - 0.59.0: Te laat-balie volgt de periodes van de plugin (zijpaneel › Periodes) zodra die daar ingesteld zijn; een periode houdt zijn bestaande code (zelfde begindatum of naam), zodat afgehandelde signalen en acties blijven staan. Verwijder je een periode in de plugin, dan verdwijnt die ook uit de balie; de meldingen zelf blijven bewaard. "16 klokuren in 4 weken" en "ziek in 8 weken" kijken niet meer terug over het begin van de periode, dus verzuim uit de vorige periode geeft geen signalen meer in de nieuwe. De melding "Je bekijkt …" bij Signalen verschijnt nu ook echt bij een andere periode dan de huidige.

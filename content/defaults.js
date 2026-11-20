@@ -1,7 +1,9 @@
 /* Standaardinstellingen, gedeeld door core.js (content), background.js en de instellingenpagina.
  * Eén plek bewerken is genoeg. */
 globalThis.DT_DEFAULTS = {
-  theme: { enabled: true, preset: "magister", lightPreset: "magister", darkPreset: "nacht", mode: "auto", darkStyle: "invert", accent: "#1B3A5C", density: "normal", font: "thema", fontScale: 1, radius: "thema", extra: [], recolor: true, agendaKleur: "vak" },
+  /* preset: magister | minimal | glass | paper | soft | contrast. mode: auto | light | dark (niet voor Magister).
+   * kleur: thema | blauw | mca | groen | paars | roze | oranje | rood | grafiet | eigen (dan geldt accent). */
+  theme: { enabled: true, preset: "magister", mode: "auto", kleur: "thema", accent: "#1B3A5C", density: "normal", font: "thema", fontScale: 1, radius: "thema", extra: [], agendaKleur: "vak" },
   compact: { enabled: false, hideSelectors: [] },
   panel: { enabled: true, position: "right", handle: true, widgets: ["klok", "links", "notities", "export"] },
   tables: { enabled: true, alwaysAsk: false, mode: "hover" },
@@ -20,7 +22,10 @@ globalThis.DT_DEFAULTS = {
   aanwezigexport: { enabled: true },
   /* Lesregistraties: aanwezigheid van klassen per vak/docent over een periode (zijpaneel › Acties). */
   lesreg: { enabled: true },
-  leaderboard: { enabled: true },
+  /* zonderGeoorloofd: ziek en geoorloofd afwezig tellen niet mee in de ranglijst (knop op het leaderboard). */
+  leaderboard: { enabled: true, zonderGeoorloofd: false },
+  /* Opleidingen: menu-item met inschrijvingen en aanwezigheid per opleiding, leerjaar en klas. */
+  opleidingen: { enabled: true },
   lestools: { enabled: true },
   /* Plan van aanpak bij Begeleiding › Logboek van een student (SLB). Concepten blijven in deze browser. */
   pva: { enabled: true },
@@ -33,16 +38,45 @@ globalThis.DT_DEFAULTS = {
   ]
 };
 
-/* Thema's voor keuzelijsten (popup en instellingen); de definities zelf staan in theme.js. */
-globalThis.DT_PRESETS_LIST = [
-  ["magister", "Magister (standaard)", false], ["mca", "MCA blauw", false], ["zand", "Zand (warm licht)", false], ["mint", "Mint (rustig licht)", false],
-  ["contrast", "Hoog contrast licht", false], ["krant", "Krant (serif, scherp)", false], ["pastel", "Pastel (zacht, rond)", false], ["retro", "Retro (jaren 70)", false],
-  ["oceaan", "Oceaan (fris blauw)", false], ["apple", "Apple (licht)", false], ["appleGlass", "Apple Glass (licht, doorschijnend)", false],
-  ["nacht", "Nacht (donkergrijs)", true], ["marine", "Marine (donkerblauw)", true], ["bos", "Bos (donkergroen)", true], ["oled", "Zwart (OLED)", true],
-  ["sepia", "Sepia (avondlezen)", true], ["terminal", "Terminal (groen op zwart)", true], ["synthwave", "Synthwave (paars/roze)", true],
-  ["appleDonker", "Apple (donker)", true], ["appleGlassDonker", "Apple Glass (donker, doorschijnend)", true],
-  ["custom", "Eigen accentkleur", null]
+/* Thema's en accentkleuren voor de keuzelijsten (zijpaneel en instellingen); de definities zelf staan in
+ * content/modules/theme-themas.js. */
+globalThis.DT_THEMAS_LIST = [
+  ["magister", "Magister", "Het origineel, zonder aanpassingen"],
+  ["minimal", "Minimal", "Rustig en strak"],
+  ["glass", "Glass", "Doorschijnende vlakken"],
+  ["paper", "Paper", "Papier en inkt, schreefletter"],
+  ["soft", "Soft", "Zacht, rond en speels"],
+  ["contrast", "Contrast", "Maximaal contrast"]
 ];
+globalThis.DT_KLEUREN_LIST = [
+  ["thema", "Volgens thema", null], ["blauw", "Blauw", "#007AFF"], ["mca", "MCA-blauw", "#1B3A5C"], ["groen", "Groen", "#248A3D"], ["paars", "Paars", "#8944AB"],
+  ["roze", "Roze", "#D12A7C"], ["oranje", "Oranje", "#C4520A"], ["rood", "Rood", "#D70015"], ["grafiet", "Grafiet", "#515154"], ["eigen", "Eigen kleur", null]
+];
+
+/* Tot en met 0.60 waren er twintig losse thema's. Een bewaarde keuze verhuist naar het dichtstbijzijnde nieuwe
+ * thema: [thema, licht of donker, accentkleur]. Het veld versie voorkomt dat dit twee keer gebeurt (het oude
+ * "contrast" en het nieuwe thema Contrast heten hetzelfde). Verandert het meegegeven object en geeft het terug. */
+globalThis.DT_THEMA_MIGRATIE = (t) => {
+  if (!t || t.versie >= 2) return t;
+  const OUD = {
+    magister: ["magister"], apple: ["minimal", "light"], appleDonker: ["minimal", "dark"], appleGlass: ["glass", "light"], appleGlassDonker: ["glass", "dark"],
+    mca: ["minimal", "light", "mca"], mint: ["minimal", "light", "groen"], oceaan: ["minimal", "light", "blauw"],
+    nacht: ["minimal", "dark"], marine: ["minimal", "dark", "blauw"], bos: ["minimal", "dark", "groen"], terminal: ["minimal", "dark", "groen"],
+    zand: ["paper", "light"], krant: ["paper", "light"], retro: ["paper", "light", "oranje"], sepia: ["paper", "dark"],
+    pastel: ["soft", "light"], synthwave: ["soft", "dark"], contrast: ["contrast", "light"], oled: ["contrast", "dark"],
+    custom: ["minimal", t.mode || "auto", "eigen"]
+  };
+  /* Een keuze die al een nieuw thema is (bewaard zonder versie) blijft staan. */
+  const nieuw = (globalThis.DT_THEMAS_LIST || []).some((x) => x[0] === t.preset) && t.preset !== "contrast";
+  const [preset, mode, kleur] = nieuw ? [t.preset, null, t.kleur] : (OUD[t.preset] || ["magister"]);
+  t.preset = preset;
+  if (mode) t.mode = mode;
+  t.kleur = kleur || "thema";
+  for (const k of ["lightPreset", "darkPreset", "darkStyle", "recolor"]) delete t[k];
+  t.versie = 2;
+  return t;
+};
+
 /* Modules met een aan/uit-schakelaar in het bedieningspaneel (popup). */
 globalThis.DT_MODULES_LIST = [
   ["compact", "Opgeruimd", "Verbergt gekozen elementen", "#8E8E93"],
@@ -59,5 +93,9 @@ globalThis.DT_MODULES_LIST = [
   ["pva", "Plan van aanpak", "Bij Begeleiding van een student", "#FF9500"],
   ["melding", "Mail bij melding", "Concept naar de coach", "#FF3B30"],
   ["ai", "AI-hulp", "Prompt uit tabel of selectie", "#A2845E"],
-  ["panel", "Zijpaneel", "Klok, notities, links (Alt+D)", "#636366"]
+  ["opleidingen", "Opleidingen", "Inschrijvingen en aanwezigheid per opleiding", "#5856D6"],
+  ["leaderboard", "Leaderboard", "Meest aanwezig per week", "#FF9500"],
+  ["lestools", "Hulpmiddelen in de les", "Stille safari, kaartenpakje, lesbord", "#30B0C7"],
+  ["cb", "Te laat-balie", "Tardy in Magister", "#FF3B30"],
+  ["panel", "Handvat", "Opent de zijkolom (Alt+D)", "#636366"]
 ];

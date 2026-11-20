@@ -161,7 +161,7 @@ DT.register({
       walk(document);
       const card = DT.deepQuery("dna-link-card"), head = DT.deepQuery("dna-page-header");
       const cs = (el, prop) => el ? getComputedStyle(el).getPropertyValue(prop).trim() : "-";
-      out.push(`Docent Tools: versie ${DT.version}, thema ${th.preset || "?"} (donkere stijl ${th.darkStyle || "invert"}), shadow-bron ${src ? src.textContent.length + " tekens" : "ontbreekt"}, shadow roots ${roots} waarvan ${injected} met themastijl` +
+      out.push(`Docent Tools: versie ${DT.version}, thema ${th.preset || "?"} (${th.mode || "auto"}, kleur ${th.kleur || "thema"}), shadow-bron ${src ? src.textContent.length + " tekens" : "ontbreekt"}, shadow roots ${roots} waarvan ${injected} met themastijl` +
         (card ? `, tegel hoekradius ${cs(card, "border-radius")} (var ${cs(card, "--border-radius") || "-"})` : "") + (head ? `, paginakop achtergrond ${cs(head, "background-color")}` : ""));
     } catch (e) { out.push(`Docent Tools: diagnose mislukt (${e.message})`); }
     const frames = [...document.querySelectorAll("iframe")].map((f) => `${f.id ? "#" + f.id : "iframe"} → ${(f.src || "").replace(/\d{3,}/g, "{id}") || "(geen src)"}`);

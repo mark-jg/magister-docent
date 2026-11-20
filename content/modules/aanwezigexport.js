@@ -279,7 +279,7 @@ DT.register({
     document.addEventListener("keydown", esc, true);
     const lijst = (x) => (x && x.status === 200 && x.json) ? (Array.isArray(x.json) ? x.json : x.json.items || []) : null;
     const wacht = (ms) => new Promise((res) => setTimeout(res, ms));
-    const api = async (url) => { let x; for (let i = 0; i < 6; i++) { x = await DT.api(url, { full: true, timeout: 25000 }); if (x.status !== 429 && x.status !== 503) return x; await wacht(1500 * 2 ** i); } return x; };
+    const api = (url) => DT.apiRetry(url);
     start.addEventListener("click", async () => {
       if (bezig) return; bezig = true; start.disabled = true; excel.disabled = true; uitkomst.replaceChildren();
       try { localStorage.setItem("dt-bespreek-klas", klasSel.value); } catch {}
@@ -365,16 +365,7 @@ DT.register({
     /* Magister begrenst het aantal aanvragen (429 = te veel tegelijk). Daarom na elkaar, met een
      * korte pauze, en bij 429/503 wachten en opnieuw proberen (steeds langer). */
     const wacht = (ms) => new Promise((r) => setTimeout(r, ms));
-    const api = async (url) => {
-      let r;
-      for (let poging = 0; poging < 6; poging++) {
-        r = await DT.api(url, { full: true, timeout: 25000 });
-        if (r.status !== 429 && r.status !== 503) return r;
-        voortgang(i, lln.length, `even wachten, Magister vraagt om rustiger aan te doen…`);
-        await wacht(1500 * 2 ** poging);
-      }
-      return r;
-    };
+    const api = (url) => DT.apiRetry(url, { opWachten: () => voortgang(i, lln.length, `even wachten, Magister vraagt om rustiger aan te doen…`) });
     const haal = async (id, van, tot) => {
       const v = await api(`/api/m6/leerlingen/${id}/verantwoordingen?begin=${this.ymd(van)}&einde=${this.ymd(tot)}`);
       await wacht(150);

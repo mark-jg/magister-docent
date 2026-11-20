@@ -45,13 +45,36 @@ function scheduleUpdateCheck() {
   chrome.alarms.create(ALARM, { delayInMinutes: 1, periodInMinutes: CHECK_INTERVAL_MIN });
 }
 
+/* Ontwikkelmap herkennen: package.json zit niet in de zip van een release, alleen in een map die uit git komt
+ * (de dev-map, of een git clone). Zo'n map werk je bij met git; de updater blijft er dan af, er wordt niet op
+ * updates gecontroleerd en het icoon krijgt het label DEV, zodat je ziet welke versie je voor je hebt. */
+let devBelofte = null;
+function isDev() {
+  return devBelofte ||= fetch(chrome.runtime.getURL("package.json")).then((r) => r.ok, () => false);
+}
+async function devLabel() {
+  const dev = await isDev();
+  await chrome.storage.local.set({ dev });
+  if (!dev) return false;
+  await chrome.action.setBadgeText({ text: "DEV" });
+  await chrome.action.setBadgeBackgroundColor({ color: "#AF52DE" });
+  await chrome.action.setTitle({ title: `Docent Tools voor Magister ${chrome.runtime.getManifest().version} (ontwikkelversie)` });
+  return true;
+}
+
 async function setBadge(on) {
+  if (await isDev()) return;   // het label DEV blijft staan
   await chrome.action.setBadgeText({ text: on ? "1" : "" });
   if (on) await chrome.action.setBadgeBackgroundColor({ color: "#E8B84A" });
 }
 
 async function checkForUpdate(force = false) {
   const current = chrome.runtime.getManifest().version;
+  if (await devLabel()) {
+    const info = { current, latest: null, available: false, dev: true, checkedAt: Date.now(), error: null };
+    await chrome.storage.local.set({ update: info });
+    return info;
+  }
   if (!force && !(await updatesEnabled())) {
     await setBadge(false);
     return { current, disabled: true };
@@ -80,6 +103,7 @@ async function checkForUpdate(force = false) {
       const rel = await res.json();
       const latest = String(rel.tag_name || "").replace(/^v/i, "");
       const asset = (rel.assets || []).find((a) => /\.zip$/i.test(a.name));
+      const som = asset && (rel.assets || []).find((a) => a.name === `${asset.name}.sha256`);   // controlegetal van de zip
       info = {
         current,
         latest,
@@ -88,6 +112,8 @@ async function checkForUpdate(force = false) {
         zip: asset?.browser_download_url || null,
         zipApi: asset?.url || null,
         zipName: asset?.name || null,
+        sha: som?.browser_download_url || null,
+        shaApi: som?.url || null,
         hasToken: Boolean(token),
         notes: String(rel.body || "").slice(0, 1500),
         publishedAt: rel.published_at || null,
@@ -106,9 +132,40 @@ async function checkForUpdate(force = false) {
 chrome.alarms.onAlarm.addListener((alarm) => { if (alarm.name === ALARM) checkForUpdate(); });
 chrome.runtime.onStartup.addListener(() => { scheduleUpdateCheck(); checkForUpdate(); });
 
+/* ---------- Zijkolom ----------
+ * Het paneel, de updates en de instellingen staan in de zijkolom van de browser (sidepanel/). Een klik op het
+ * icoon opent hem. De kolom meldt zich hier per venster aan, zodat Alt+D hem ook weer kan sluiten en een ander
+ * onderdeel hem een tabblad kan laten tonen. De browser opent de kolom alleen direct na een klik of toets:
+ * daarom hier nergens eerst wachten (await) vóór chrome.sidePanel.open. */
+chrome.sidePanel?.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
+const kolommen = new Map();   // venster -> verbinding met de open kolom
+const straks = new Map();     // venster -> { blad, anker } om te tonen zodra de kolom open is
+chrome.runtime.onConnect.addListener((lijn) => {
+  if (lijn.name !== "dt-kolom") return;
+  let venster = null;
+  lijn.onMessage.addListener((m) => {
+    if (m?.windowId == null) return;
+    venster = m.windowId; kolommen.set(venster, lijn);
+    const wens = straks.get(venster);
+    if (wens) { straks.delete(venster); lijn.postMessage({ type: "toon", ...wens }); }
+  });
+  lijn.onDisconnect.addListener(() => { if (venster != null && kolommen.get(venster) === lijn) kolommen.delete(venster); });
+});
+function zijkolom(windowId, { alleenOpenen = false, blad = null, anker = "" } = {}) {
+  if (windowId == null || !chrome.sidePanel) return chrome.runtime.openOptionsPage();
+  const open = kolommen.get(windowId);
+  if (open) {
+    try { open.postMessage(blad ? { type: "toon", blad, anker } : alleenOpenen ? { type: "toon", blad: "start" } : { type: "sluit" }); } catch {}
+    return;
+  }
+  if (blad) straks.set(windowId, { blad, anker });
+  chrome.sidePanel.open({ windowId }).catch(() => { straks.delete(windowId); if (blad === "instellingen") chrome.runtime.openOptionsPage(); });
+}
+
 /* ---------- Sneltoetsen ---------- */
-// Stuurt sneltoetsen door naar het actieve Magister-tabblad.
-chrome.commands.onCommand.addListener(async (command) => {
+// Alt+D opent of sluit de zijkolom; de andere sneltoetsen gaan door naar het actieve Magister-tabblad.
+chrome.commands.onCommand.addListener(async (command, actief) => {
+  if (command === "toggle-panel") return zijkolom(actief?.windowId);
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab || !tab.url || !tab.url.includes("magister.net")) return;
   chrome.tabs.sendMessage(tab.id, { type: "command", command }).catch(() => {});
@@ -130,13 +187,16 @@ chrome.runtime.onInstalled.addListener(async ({ reason, previousVersion }) => {
 });
 
 /* ---------- Berichten van popup, instellingen en content ---------- */
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   switch (msg?.type) {
+    case "zijkolom":   // het handvat of Alt+D op de pagina
+      zijkolom(sender.tab?.windowId, { alleenOpenen: msg.alleenOpenen === true });
+      return false;
     case "openPopup":
-      (chrome.action.openPopup ? chrome.action.openPopup() : Promise.reject()).catch(() => chrome.runtime.openOptionsPage());
-      break;
+      zijkolom(sender.tab?.windowId, { alleenOpenen: true });
+      return false;
     case "openOptions":
-      chrome.runtime.openOptionsPage();
+      zijkolom(sender.tab?.windowId, { blad: "instellingen", anker: msg.anker || "" });
       return false;
     case "checkUpdate":
       checkForUpdate(true).then(sendResponse);

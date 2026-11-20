@@ -211,7 +211,7 @@ DT.register({
     const now = new Date(), per = this.gekozenPeriode(d, now);
     const S = vzStats(d.regs || [], d.rooster || [], per.van, per.tot);
     const pers = await DT.api(`/api/leerlingen/${d.id}`, { full: true, timeout: 10000 });
-    const exp = DT.module?.("aanwezigexport");
+    const exp = DT.actief("aanwezigexport") ? DT.module("aanwezigexport") : null;
     if (!exp) return DT.toast?.("Zet de module Aanwezigheid naar Excel aan in het zijpaneel", "err");
     exp.leerlingBestand(DT, { persoon: pers.status === 200 ? pers.json : null, id: d.id, periode: per, S, vergelijk: Array.isArray(d.jaren) ? this.vergelijkRijen(d, now).rijen : null });
   },

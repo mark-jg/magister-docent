@@ -27,7 +27,7 @@ DT.register({
     const typing = e.target && (e.target.isContentEditable || /^(input|textarea|select)$/i.test(e.target.tagName));
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "k") { e.preventDefault(); this.open(DT); return; }
     if (e.altKey && !e.ctrlKey && !e.metaKey) {
-      const k = e.key.toLowerCase();
+      const k = DT.keyOf(e);
       if (k === "k") { e.preventDefault(); this.open(DT); }
       if (k === "s") { e.preventDefault(); this.focusSearch(DT); }
       if (/^[1-9]$/.test(k) && !typing) {
@@ -66,16 +66,16 @@ DT.register({
 
   actions(DT) {
     return [
-      { label: "Paneel openen", hint: "Alt+D", go: () => DT.module("panel")?.toggle(true) },
+      { label: "Zijkolom openen", hint: "Alt+D", go: () => DT.module("panel")?.toggle(true) },
       { label: "Thema wisselen", hint: "Alt+T", go: () => DT.module("theme")?.toggle(DT) },
       { label: "Tabellen naar Excel", hint: "Alt+E", go: () => DT.module("tables")?.exportAll(DT) },
       { label: "Zoeken (leerling, groep, stamnummer)", hint: "Alt+S", go: () => this.focusSearch(DT) },
       { label: "Naar AI-assistent", hint: "", go: () => DT.module("ai")?.open(DT) },
       ...(DT.settings.developer?.enabled ? [{ label: "Inspector", hint: "Alt+I", go: () => DT.module("inspector")?.start(DT) }] : []),
       { label: "Instellingen", hint: "", go: () => chrome.runtime.sendMessage({ type: "openOptions" }) },
-      ...Object.entries(DT.module("theme")?.presets || {}).map(([id, p]) => ({
-        label: `Thema: ${p.label}`, hint: p.dark === null ? "" : (p.dark ? "donker" : "licht"),
-        go: () => DT.saveSettings({ theme: { preset: id, [p.dark ? "darkPreset" : "lightPreset"]: id } })
+      ...(globalThis.DT_THEMAS_LIST || []).map(([id, label, sub]) => ({
+        label: `Thema: ${label}`, hint: sub,
+        go: () => DT.saveSettings({ theme: { preset: id } })
       }))
     ];
   },
@@ -113,8 +113,8 @@ DT.register({
 
     input.addEventListener("input", () => { sel = 0; render(); });
     input.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowDown") { e.preventDefault(); sel = (sel + 1) % shown.length; render(); }
-      else if (e.key === "ArrowUp") { e.preventDefault(); sel = (sel - 1 + shown.length) % shown.length; render(); }
+      if (e.key === "ArrowDown") { e.preventDefault(); if (shown.length) { sel = (sel + 1) % shown.length; render(); } }
+      else if (e.key === "ArrowUp") { e.preventDefault(); if (shown.length) { sel = (sel - 1 + shown.length) % shown.length; render(); } }
       else if (e.key === "Enter") { e.preventDefault(); shown[sel] && choose(shown[sel]); }
       else if (e.key === "Escape") { e.preventDefault(); close(); }
       e.stopPropagation();

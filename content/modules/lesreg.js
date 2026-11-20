@@ -28,25 +28,11 @@ DT.register({
     if (this._dlg && (!this._dlg.isConnected || !document.querySelector("mg-att-tiles"))) this.sluit();
     let wil = false; try { wil = sessionStorage.getItem("dt-lr-open") === "1"; } catch {}
     if (wil && document.querySelector("mg-att-tiles") && !this._dlg) { try { sessionStorage.removeItem("dt-lr-open"); } catch {} this.open(DT, true); }
-    const oud = wrap?.querySelector("#dt-lr-tegel");
-    if (oud && oud.shadowRoot?.querySelector("h1")?.textContent.trim() !== "Lesregistraties") window.postMessage({ type: "dt:attr:opnieuw", selector: "#dt-lr-tegel", attr: "heading" }, "*");
-    if (!wrap || oud) return;
-    const c = document.createElement("dna-link-card");
-    c.id = "dt-lr-tegel"; c.setAttribute("heading", "Lesregistraties"); c.setAttribute("tabindex", "0"); c.setAttribute("role", "link"); c.style.cursor = "pointer";
-    const oms = document.createElement("div"); oms.slot = "description"; oms.textContent = "Aanwezigheid van klassen per vak of docent, met export";
-    const ic = document.createElement("dna-icon"); ic.slot = "icon"; ic.setAttribute("name", "fad-traffic-light");
-    c.append(oms, ic);
-    const open = (e) => { e.preventDefault(); e.stopPropagation(); this.open(DT, true); };
-    c.addEventListener("click", open);
-    c.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") open(e); });
-    wrap.append(c);
-    this.icoon(ic);
-  },
-  icoon(ic, poging = 0) {   // tabel met vinkjes, in Magisters duotone-stijl
-    const svg = ic.shadowRoot?.querySelector("svg");
-    if (!svg) { if (poging < 20) setTimeout(() => this.icoon(ic, poging + 1), 150); return; }
-    svg.setAttribute("viewBox", "0 0 512 512");
-    svg.innerHTML = `<path opacity=".4" d="M64 96h384v320H64z"></path><path d="M48 64h416a32 32 0 0 1 32 32v320a32 32 0 0 1-32 32H48a32 32 0 0 1-32-32V96a32 32 0 0 1 32-32zm16 64v64h96v-64H64zm144 0v64h240v-64H208zM64 240v64h96v-64H64zm144 0v64h240v-64H208zM64 352v64h96v-64H64zm144 0v64h240v-64H208z"></path>`;
+    DT.navTegel(wrap, {
+      id: "dt-lr-tegel", titel: "Lesregistraties", tekst: "Aanwezigheid van klassen per vak of docent, met export",
+      icoon: `<path fill="var(--sl-icon-fill-accent)" d="M64 96h384v320H64z"></path><path fill="var(--sl-icon-fill-default)" fill-rule="evenodd" d="M48 64h416a32 32 0 0 1 32 32v320a32 32 0 0 1-32 32H48a32 32 0 0 1-32-32V96a32 32 0 0 1 32-32zm16 64v64h96v-64H64zm144 0v64h240v-64H208zM64 240v64h96v-64H64zm144 0v64h240v-64H208zM64 352v64h96v-64H64zm144 0v64h240v-64H208z"></path>`,   // tabel met rijen, in Magisters tweekleurige stijl
+      open: () => this.open(DT, true)
+    });
   },
 
   ymd(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; },
@@ -165,13 +151,14 @@ DT.register({
     const peil = this.ymd(new Date());
     const lijst = (x) => (x && x.status === 200 && x.json) ? (Array.isArray(x.json) ? x.json : x.json.items || []) : null;
     const wacht = (ms) => new Promise((r) => setTimeout(r, ms));
-    const api = async (url) => { let x; for (let i = 0; i < 6; i++) { x = await DT.api(url, { full: true, timeout: 25000 }); if (x.status !== 429 && x.status !== 503) return x; voortgang(klaar, lln.length, "Even wachten: Magister vraagt om rustiger aan te doen…"); await wacht(1500 * 2 ** i); } return x; };
+    const api = (url) => DT.apiRetry(url, { opWachten: () => voortgang(klaar, lln.length, "Even wachten: Magister vraagt om rustiger aan te doen…") });
     const lln = [];
     let klaar = 0;
     for (const klas of klassen) {
       voortgang(0, 1, `Klas ${klas} ophalen…`);
       const z = await api(`/api/leerlingen/zoeken?q=**&top=300&skip=0&peildatum=${peil}&klassen=${encodeURIComponent(klas)}&velden=stamnummer&velden=naam`);
-      for (const x of lijst(z) || []) if (!lln.some((l) => l.id === x.id)) lln.push({ id: x.id, naam: this.naam(x), achternaam: x.achternaam || "", stam: String(x.code ?? x.stamnummer ?? ""), klas });
+      if (!lijst(z)) throw new Error(`klas ${klas} ophalen lukte niet (Magister antwoordde ${z.status === 429 ? "te veel aanvragen" : z.status || "niet"})`);
+      for (const x of lijst(z)) if (!lln.some((l) => l.id === x.id)) lln.push({ id: x.id, naam: this.naam(x), achternaam: x.achternaam || "", stam: String(x.code ?? x.stamnummer ?? ""), klas });
     }
     lln.sort((a, b) => a.klas.localeCompare(b.klas, "nl", { numeric: true }) || a.achternaam.localeCompare(b.achternaam, "nl"));
     const werk = lln.slice(), uit = [];
@@ -412,6 +399,7 @@ DT.register({
         --lr-rood: var(--sl-color-border-accent-red-bold, #d7263d);
         --lr-r: var(--sl-size-borderRadius-default, 4px); --lr-rl: var(--sl-size-borderRadius-lg, 8px);
         display: block; min-width: 0; --dna-page-layout-max-width: min(100%, calc(100% - 2 * 2rem));
+        background: var(--sl-elevation-surface-base-default, transparent); min-height: 100vh;
         color: var(--lr-fg); font-family: var(--sl-text-typeset-font-family-body, open-sans), sans-serif; font-size: 14px; line-height: 20px; }
       #dt-lrp * { box-sizing: border-box; }
       #dt-lrp input, #dt-lrp select, #dt-lrp button { font-family: inherit; }
@@ -458,6 +446,7 @@ DT.register({
       .dt-lr-week rect { transition: opacity .12s; } .dt-lr-week rect:hover { opacity: .8; }
       .dt-lr-legenda { margin-bottom: 4px; display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--lr-zacht); }
       .dt-lr-legenda i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+      #dt-lrp dna-page-header { --_padding-block: .5rem 1rem; --padding-block: .5rem 1rem; }   /* even hoog als Magisters kop, zie cb-css.js */
       #dt-lrp dna-tabs { display: block; } #dt-lrp dna-tab { width: 100%; justify-self: stretch; } #dt-lrp dna-tab:not([selected]) { display: none; }
       .dt-lr-scroll { max-height: 62vh; overflow: auto; margin-top: 12px; border: 1px solid var(--lr-lijnzacht); border-radius: var(--lr-r); }
       .dt-lr-tabel { width: 100%; border-collapse: collapse; }

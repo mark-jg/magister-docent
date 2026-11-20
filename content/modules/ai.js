@@ -32,9 +32,7 @@ DT.register({
 
     const mask = () => {
       // Maskeert waarschijnlijke namen (twee of meer woorden met hoofdletter achter elkaar) en leerlingnummers.
-      ta.value = ta.value
-        .replace(/\b([A-Z][a-zà-ÿ]+)(?:\s+(?:van|de|der|den|le|du|te|ten)\s+)?(\s+[A-Z][a-zà-ÿ]+)+\b/g, "[naam]")
-        .replace(/\b\d{5,8}\b/g, "[nummer]");
+      ta.value = dtMaskeerNamen(ta.value);
       DT.toast("Namen en nummers gemaskeerd");
     };
 
@@ -61,3 +59,29 @@ DT.register({
     dlg.showModal();
   }
 });
+
+/* Maskeert waarschijnlijke namen en leerlingnummers in een tekst.
+ *  - voor- en achternaam, ook met tussenvoegsels (Jan de Vries, Sanne van der Berg), een koppelteken
+ *    (Anne-Marie Bakker), een apostrof (Noah O'Brien) of letters met accenten (Zoë Çelik);
+ *  - de schrijfwijze "Vries, Jan de";
+ *  - een voor- of achternaam die elders in de tekst los terugkomt ("Jan was er niet");
+ *  - getallen van 5 tot 8 cijfers (stamnummers).
+ * Het blijft een hulpmiddel op basis van hoofdletters: een losse voornaam die nergens met achternaam staat wordt
+ * niet herkend, en twee woorden met een hoofdletter achter elkaar (een schoolnaam) worden ook gemaskeerd. Lees de
+ * tekst dus altijd na voor je hem deelt. */
+function dtMaskeerNamen(tekst) {
+  const W = "\\p{Lu}[\\p{L}'’]+(?:-\\p{Lu}[\\p{L}'’]+)*";   // woord met een hoofdletter, eventueel met koppelteken
+  const TV = "(?:van|de|der|den|het|ter|te|ten|la|le|du|el|al|bin|ben|op|in|aan|uit|v\\.?d\\.?|'t)";
+  const S = "[ \\u00A0]+";   // alleen spaties: een tab of regeleinde scheidt cellen, geen delen van een naam
+  const VOL = new RegExp(`(?<![\\p{L}'’-])${W}(?:${S}(?:${TV}${S}){0,3}${W})+`, "gu");
+  const OMGEKEERD = new RegExp(`(?<![\\p{L}'’-])${W},${S}${W}(?:${S}${TV})*(?![\\p{L}])`, "gu");
+  const tvRe = new RegExp(`^${TV}$`, "iu"), delen = new Set();
+  const onthoud = (m) => { for (const d of m.split(/[\s,]+/)) if (d.length > 2 && !tvRe.test(d)) delen.add(d); return "[naam]"; };
+  let uit = String(tekst).replace(OMGEKEERD, onthoud).replace(VOL, onthoud);
+  if (delen.size) {
+    // De delen bestaan alleen uit letters, apostroffen en koppeltekens: er hoeft niets te worden ge-escaped.
+    const los = new RegExp(`(?<![\\p{L}'’-])(?:${[...delen].sort((a, b) => b.length - a.length).join("|")})(?![\\p{L}'’-])`, "gu");
+    uit = uit.replace(los, "[naam]");
+  }
+  return uit.replace(/(?<!\d)\d{5,8}(?!\d)/g, "[nummer]");
+}
