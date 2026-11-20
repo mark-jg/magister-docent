@@ -68,6 +68,7 @@
         "content/modules/leaderboard.js",
         "content/modules/opleidingen-reken.js",
         "content/modules/opleidingen.js",
+        "content/modules/opleidingen-gegevens.js",
         "content/modules/lestools.js",
         "content/modules/pva-docx.js",
         "content/modules/magisterforms.js",

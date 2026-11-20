@@ -14,16 +14,18 @@
  *  - /api/leerlingen/zoeken?klassen=…             de studenten van een klas (opleiding, leerjaar, mentor);
  *  - /api/leerlingen/{id}/aanmeldingen            opleiding en leerjaar als het zoekresultaat die niet geeft;
  *  - registraties en rooster per student          voor de aanwezigheid (op verzoek, per klas of voor alles).
- * Er wordt niets in Magister gewijzigd. Op de pagina en in de opslag van de extensie staan alleen aantallen per
- * klas, geen namen van studenten. */
+ * Er wordt niets in Magister gewijzigd. De aanwezigheid en de lessen staan in een jaaropslag per klas die bewaard
+ * blijft en bij het openen wordt bijgewerkt, met een back-up in een map naar keuze (opleidingen-gegevens.js). Die
+ * opslag bevat per student de naam en de lessen per week; de mutaties (in- en uitstroom) tonen die namen. */
 DT.register({
   id: "opleidingen",
-  _pagina: null, _run: 0, _d: null, _jaren: 2, _per: "4w", _weergave: "opleiding",
+  _pagina: null, _run: 0, _d: null, _jaren: 0, _per: "4w", _weergave: "opleiding",
   ICOON: `<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 3 1 9l11 6 9-4.9V17h2V9L12 3zM5 13.2V17c0 1.7 3.1 3 7 3s7-1.3 7-3v-3.8l-7 3.8-7-3.8z"/></svg>`,
 
   init(DT) {
     if (!DT.isTop) return;
-    this._open = new Set();
+    this._open = new Set(); this._uit = new Set();
+    try { const j = localStorage.getItem("dt-opl-jaren"); if (j != null && j !== "") this._jaren = Number(j) || 0; } catch {}
     this._stop = DT.observe(() => this.menu(DT), { debounce: 300, poll: 2000 });
     this._hash = () => this.sluit();
     window.addEventListener("hashchange", this._hash);
@@ -182,6 +184,8 @@ DT.register({
     const nl = (a, b) => a.localeCompare(b, "nl", { numeric: true });
     try {
       this.status("Klassen ophalen…");
+      /* Eerst de back-up in de map (als die er is) samenvoegen met wat de extensie zelf bewaart. */
+      await this.mapLaden(); await this.backupLezen();
       const tel = await this.opslag("tel"), ind = await this.opslag("indeling2"), sj = R.sjNaam(nu), sjJaar = R.sjStart(nu).getFullYear();
       if (vers) delete ind[sj];
       const nuTel = await this.telling(vandaag);
@@ -222,7 +226,7 @@ DT.register({
       const klassen = namen.map((k) => ({ naam: k, aantal: nuTel[k] || 0, ...kaart[k] }));
       const boom = R.boom(klassen);
       this._d = { vandaag, sj, nu: nuTel, klassen, boom, knopen: R.plat(boom), kaart, cohorten: R.cohorten(namen.map((k) => bekend[k]?.codes)), tellingen: [{ datum: vandaag, vandaag: true, klassen: nuTel }], aanw: {}, verloopKlaar: false };
-      await this.aanwUitOpslag();
+      await this.gegevensLaden();
       this.status(""); this.teken(DT);
       await this.verloop(DT, run, tel, ind, vers);
     } catch (e) { console.warn("[DT] opleidingen", e); if (leeft()) this.status(`Er ging iets mis: ${e?.message || e}`, true); }
@@ -285,49 +289,13 @@ DT.register({
     if (!leeft()) return;
     d.verloopKlaar = true;
     this.status(""); this.teken(DT);
+    await this.backupSchrijven();
+    this.autoBijwerken(DT);
   },
 
-  /* ---------- ophalen: aanwezigheid ---------- */
-  aanwSleutel(klas, per = this.periode()) { return `${klas}|${OplReken.ymd(per.van)}|${OplReken.ymd(per.tot)}`; },
-  async aanwUitOpslag() {
-    const cache = await this.opslag("aanw"), d = this._d; if (!d) return;
-    d.aanw = {};
-    for (const k of Object.keys(d.nu)) { const c = cache[this.aanwSleutel(k)]; if (c?.agg) d.aanw[k] = c.agg; }
-  },
-  async haalAanw(DT, klasNamen) {
-    const R = OplReken, d = this._d;
-    if (!d || this._aanwBezig) return;
-    if (typeof vzStats !== "function") return DT.toast("Zet de module Inzicht verzuim aan: die rekent de aanwezigheid uit.", "err", 6000);
-    const per = this.periode(), werk = klasNamen.filter((k) => !d.aanw[k]);
-    if (!werk.length) return;
-    const totaal = werk.reduce((n, k) => n + (d.nu[k] || 0), 0), pagina = this._pagina, door = () => !this._stopAanw && this._pagina === pagina && this.periode().key === per.key;
-    this._aanwBezig = true; this._stopAanw = false;
-    const cache = await this.opslag("aanw"); let klaar = 0;
-    try {
-      for (const klas of werk) {
-        if (!door()) break;
-        const lln = DT.lijst(await this.api(`/api/leerlingen/zoeken?q=**&top=300&skip=0&peildatum=${d.vandaag}&klassen=${encodeURIComponent(klas)}&velden=stamnummer&velden=naam`));
-        if (!lln) continue;
-        const agg = R.leeg();
-        await this.parallel(lln, async (l) => {
-          if (!door()) return;
-          const v = await this.api(`/api/m6/leerlingen/${l.id}/verantwoordingen?begin=${R.ymd(per.van)}&einde=${R.ymd(per.tot)}`); await this.wacht(120);
-          const a = await this.api(`/api/leerlingen/${l.id}/afspraken?status=actief&begin=${R.ymd(per.van)}&einde=${R.ymd(per.tot)}`); await this.wacht(120);
-          const regs = DT.lijst(v), rooster = DT.lijst(a);
-          R.voegStudent(agg, regs && rooster ? vzStats(regs, rooster, per.van, per.tot).lessen : null);
-          if (door()) this.status(`Aanwezigheid ophalen (${per.naam.toLowerCase()}): klas ${klas}, student ${++klaar} van ${totaal}…`, false, klaar / Math.max(1, totaal), true);
-        });
-        if (!door()) break;   // een halve klas bewaren we niet
-        d.aanw[klas] = agg; cache[this.aanwSleutel(klas, per)] = { op: Date.now(), agg };
-        this.teken(DT);
-      }
-    } finally {
-      for (const [k, v] of Object.entries(cache)) if (!v?.op || Date.now() - v.op > 14 * 864e5) delete cache[k];
-      await this.bewaar("aanw", cache);
-      this._aanwBezig = false;
-      if (this._pagina === pagina) { this.status(""); this.teken(DT); }
-    }
-  },
+  /* Studenten per week van een knoop, op een vaste rij weken (zodat reeksen naast elkaar passen). */
+  lesVan(knoop, weken = null) { const d = this._d; return OplReken.lesReeks(knoop.klassen.map((k) => d.les[k] && OplReken.lesPunten(d.les[k].weken)), weken); },
+  lesWekenAlle(klasNamen) { const d = this._d; return [...new Set(klasNamen.flatMap((k) => Object.keys(d.les[k] ? OplReken.lesPunten(d.les[k].weken) : {})))].sort(); },
 
   /* ---------- bediening ---------- */
   klik(DT, e) {
@@ -336,19 +304,31 @@ DT.register({
     switch (el.dataset.act) {
       case "open": if (knoop) { this._open.has(knoop.id) ? this._open.delete(knoop.id) : this._open.add(knoop.id); this.teken(DT); } break;
       case "alles-open": { const alle = d.knopen.filter((k) => k.soort !== "klas"); const dicht = alle.some((k) => !this._open.has(k.id)); for (const k of alle) dicht ? this._open.add(k.id) : this._open.delete(k.id); this.teken(DT); break; }
-      case "aanw": if (knoop) this.haalAanw(DT, knoop.klassen); break;
-      case "aanw-alles": if (d) this.haalAanw(DT, Object.keys(d.nu)); break;
+      case "aanw": case "les": if (knoop) this.bijwerken(DT, knoop.klassen); break;
+      case "aanw-alles": case "les-alles": case "bijwerk": if (d) this.bijwerken(DT, Object.keys(d.nu)); break;
+      case "les-opnieuw": if (d) this.bijwerken(DT, Object.keys(d.nu), { vol: true }); break;
+      case "map-kies": this.kiesMap(DT); break;
+      case "map-toegang": this.mapToegang(DT); break;
+      case "map-los": this.mapLos(DT); break;
+      case "filter": { const o = d?.boom[+el.dataset.s]; if (o) { this._uit.has(o.studie) ? this._uit.delete(o.studie) : this._uit.add(o.studie); this.teken(DT); } break; }
+      case "filter-alles": this._uit.clear(); this.teken(DT); break;
+      case "ga": case "zoom": if (knoop) { if (!this._zoom) this._terug = this._pagina.scrollTop; this._zoom = knoop.id; this.teken(DT); this._pagina.scrollTop = 0; } break;
+      case "terug": this._zoom = null; this.teken(DT); this._pagina.scrollTop = this._terug || 0; break;
+      case "tab": this._tab = el.dataset.t; this._zoom = null; this.teken(DT); this._pagina.scrollTop = 0; break;
+      case "mut-soort": this._mutSoort = el.dataset.w || null; this._mutAlles = false; this.teken(DT); break;
+      case "mut-alles": this._mutAlles = !this._mutAlles; this.teken(DT); break;
       case "stop": this._stopAanw = true; this.status("Stoppen…"); break;
       case "weergave": this._weergave = el.dataset.w; this.teken(DT); break;
       case "vernieuw": if (!this._aanwBezig) this.laad(DT, true); break;
       case "excel": this.excel(DT); break;
       case "diagnose": this.diagnose(DT); break;
+      case "diag-mut": this.diagnoseMutaties(DT); break;
     }
   },
   kies(DT, e) {
     const el = e.target.closest?.("select[data-act]"); if (!el) return;
-    if (el.dataset.act === "periode") { this._per = el.value; this._stopAanw = true; this.aanwUitOpslag().then(() => this.teken(DT)); }
-    if (el.dataset.act === "jaren") { this._jaren = +el.value || 2; this.laad(DT); }
+    if (el.dataset.act === "periode") { this._per = el.value; this.herbereken(); this.teken(DT); }
+    if (el.dataset.act === "jaren") { this._jaren = Number(el.value) || 0; try { localStorage.setItem("dt-opl-jaren", String(this._jaren)); } catch {} if (!this._aanwBezig) this.laad(DT); }
   },
   tip(e) {
     const el = e.target.closest?.("[data-tip]"), t = this._tip;
@@ -366,28 +346,37 @@ DT.register({
   /* Peildatum voor "sinds": 1 oktober van dit schooljaar als die voorbij is, anders die van vorig schooljaar. */
   sinds() { const y = OplReken.sjStart().getFullYear(), dit = `${y}-10-01`; return dit < this._d.vandaag ? dit : `${y - 1}-10-01`; },
   /* Vaste kleur per reeks: plek 1 t/m 7 voor de grootste, de rest samen als "Overig". */
-  reeksen(knopen) {
-    const groot = knopen.slice().sort((a, b) => b.aantal - a.aantal), top = new Set(groot.slice(0, knopen.length > 8 ? 7 : 8));
-    const uit = knopen.filter((k) => top.has(k)).map((k, i) => ({ naam: k.naam, kleur: `var(--opl-s${i + 1})`, punten: this.reeksVan(k) }));
-    const rest = knopen.filter((k) => !top.has(k));
-    if (rest.length) { const rs = rest.map((k) => this.reeksVan(k)); uit.push({ naam: `Overig (${rest.length})`, kleur: "var(--opl-s0)", punten: rs[0].map((p, i) => ({ datum: p.datum, n: rs.reduce((n, r) => n + r[i].n, 0) })) }); }
+  /* alle: de volledige rij waaruit knopen een keuze is; de kleur hangt aan de plek in die rij, zodat een opleiding
+   * zijn kleur houdt als je andere wegfiltert. */
+  plekken(alle) { const top = alle.slice().sort((a, b) => b.aantal - a.aantal).slice(0, alle.length > 8 ? 7 : 8); return alle.filter((k) => top.includes(k)); },
+  kleurVan(k, alle) { const i = this.plekken(alle).indexOf(k); return i < 0 ? "var(--opl-s0)" : `var(--opl-s${i + 1})`; },
+  reeksen(knopen, van = (k) => this.reeksVan(k), alle = knopen) {
+    const top = this.plekken(alle), uit = knopen.filter((k) => top.includes(k)).map((k) => ({ naam: k.naam, kleur: this.kleurVan(k, alle), punten: van(k) }));
+    const rest = knopen.filter((k) => !top.includes(k));
+    if (rest.length) { const rs = rest.map((k) => van(k)); uit.push({ naam: `Overig (${rest.length})`, kleur: "var(--opl-s0)", punten: rs[0].map((p, i) => ({ datum: p.datum, n: rs.reduce((n, x) => n + x[i].n, 0) })) }); }
     return uit;
   },
 
   /* ---------- grafieken (SVG) ---------- */
-  lijn(reeksen, { hoogte = 230 } = {}) {
+  lijn(reeksen, { hoogte = 230, week = false } = {}) {
     const E = (s) => this.esc(s), R = OplReken, data = reeksen[0]?.punten || [];
-    if (data.length < 2) return `<p class="dt-opl-zacht">Nog geen verloop: er is maar één peildatum.</p>`;
+    if (data.length < 2) return `<p class="dt-opl-zacht">Nog geen verloop: er is maar één ${week ? "week" : "peildatum"}.</p>`;
+    const wk = (d) => (typeof isoWeek === "function" ? isoWeek(d).w : "");
     const labels = reeksen.length > 1 && reeksen.length <= 4, W = 760, H = hoogte, L = 44, Rr = labels ? 150 : 14, T = 12, B = 26;
     const t0 = R.datum(data[0].datum).getTime(), t1 = R.datum(data[data.length - 1].datum).getTime();
     const max = Math.max(1, ...reeksen.flatMap((r) => r.punten.map((p) => p.n)));
-    const stap = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000].find((s) => max / s <= 5) || 10000, top = Math.ceil(max / stap) * stap;
-    const x = (datum) => L + (W - L - Rr) * (R.datum(datum).getTime() - t0) / Math.max(1, t1 - t0), y = (n) => T + (H - T - B) * (1 - n / top);
-    let s = `<svg class="dt-opl-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Aantal studenten per peildatum">`;
-    for (let v = 0; v <= top; v += stap) s += `<line class="raster" x1="${L}" x2="${W - Rr}" y1="${y(v)}" y2="${y(v)}"/><text class="as" x="${L - 6}" y="${y(v) + 3.5}" text-anchor="end">${this.getal(v)}</text>`;
+    /* Liggen alle waarden dicht bij elkaar (de kleinste is meer dan de helft van de grootste), dan begint de as
+     * niet bij nul: anders is een verschil van een paar studenten niet te zien. */
+    const min = Math.min(...reeksen.flatMap((r) => r.punten.map((p) => p.n))), dicht = min > 0 && min / max > 0.5, onder = dicht ? Math.max(0, min - Math.max(2, (max - min) * 0.5)) : 0;
+    const stap = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000].find((s) => (Math.ceil(max / s) * s - Math.floor(onder / s) * s) / s <= 6) || 10000;
+    const basis = Math.floor(onder / stap) * stap, top = Math.max(basis + stap, Math.ceil(max / stap) * stap);
+    const x = (datum) => L + (W - L - Rr) * (R.datum(datum).getTime() - t0) / Math.max(1, t1 - t0), y = (n) => T + (H - T - B) * (1 - (n - basis) / (top - basis));
+    let s = `<svg class="dt-opl-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Aantal studenten per ${week ? "week" : "peildatum"}">`;
+    for (let v = basis; v <= top; v += stap) s += `<line class="raster" x1="${L}" x2="${W - Rr}" y1="${y(v)}" y2="${y(v)}"/><text class="as" x="${L - 6}" y="${y(v) + 3.5}" text-anchor="end">${this.getal(v)}</text>`;
     const wijd = (W - L - Rr) / (data.length - 1), elk = Math.ceil(60 / wijd / 3) * 3 || 3;
     data.forEach((p, i) => {
-      const d = R.datum(p.datum), okt = d.getMonth() === 9 && d.getDate() === 1;
+      const d = R.datum(p.datum), okt = !week && d.getMonth() === 9 && d.getDate() === 1;
+      if (week) { if (i % Math.max(1, Math.ceil(44 / wijd)) === 0) s += `<text class="as" x="${x(p.datum)}" y="${H - 8}" text-anchor="middle">wk ${wk(d)}</text>`; return; }
       if (okt) s += `<line class="teldatum" x1="${x(p.datum)}" x2="${x(p.datum)}" y1="${T}" y2="${H - B}"/>`;
       if (okt || (i % elk === 0 && wijd * elk >= 40 && d.getDate() === 1 && ![8, 10].includes(d.getMonth()))) s += `<text class="as" x="${x(p.datum)}" y="${H - 8}" text-anchor="middle">${E(d.toLocaleDateString("nl-NL", { month: "short" }))} ’${String(d.getFullYear()).slice(2)}</text>`;
     });
@@ -400,11 +389,12 @@ DT.register({
     } else if (reeksen.length === 1) { const p = data[data.length - 1]; s += `<circle class="punt" cx="${x(p.datum)}" cy="${y(p.n)}" r="4" fill="${reeksen[0].kleur}"/>`; }
     /* Aanwijzen: per peildatum een onzichtbare kolom met een leeslijn, de punten en de waarden. */
     data.forEach((p, i) => {
-      const d = R.datum(p.datum), tip = [`${this.kort(p.datum)}${d.getMonth() === 9 && d.getDate() === 1 ? " · teldatum" : i === data.length - 1 ? " · vandaag" : ""}`,
+      const d = R.datum(p.datum), tip = [week ? `Week ${wk(d)} (vanaf ${this.kort(p.datum, false)})` : `${this.kort(p.datum)}${d.getMonth() === 9 && d.getDate() === 1 ? " · teldatum" : i === data.length - 1 ? " · vandaag" : ""}`,
         ...reeksen.map((r) => ({ naam: r.naam, n: r.punten[i].n })).sort((a, b) => b.n - a.n).map((r) => `${r.naam}: ${this.getal(r.n)}`)].join("\n");
       s += `<g class="kolom" data-tip="${E(tip)}"><rect x="${x(p.datum) - wijd / 2}" y="${T}" width="${wijd}" height="${H - T - B}" fill="transparent"/><line class="kruis" x1="${x(p.datum)}" x2="${x(p.datum)}" y1="${T}" y2="${H - B}"/>${reeksen.map((r) => `<circle class="punt" cx="${x(p.datum)}" cy="${y(r.punten[i].n)}" r="4" fill="${r.kleur}"/>`).join("")}</g>`;
     });
     s += `</svg>`;
+    if (basis > 0) s += `<p class="dt-opl-zacht dt-opl-asnoot">De as begint bij ${this.getal(basis)}, niet bij nul.</p>`;
     if (reeksen.length > 1) s += `<div class="dt-opl-legenda">${reeksen.map((r) => `<span><i style="background:${r.kleur}"></i>${E(r.naam)}</span>`).join("")}</div>`;
     return s;
   },
@@ -451,7 +441,7 @@ DT.register({
     const alle = this.aanwVan(Object.keys(d.nu)), cAlle = alle ? R.cijfers(alle.per) : null, geladen = Object.keys(d.aanw).length;
     const delta = (n) => n == null ? "" : `<span class="dt-opl-delta ${n > 0 ? "is-op" : n < 0 ? "is-neer" : ""}">${n > 0 ? "▲ +" : n < 0 ? "▼ −" : "= "}${this.getal(Math.abs(n))}</span>`;
     const kpi = (label, waarde, sub = "") => `<dna-card class="dt-opl-kaart dt-opl-kpi"><small>${label}</small><b>${waarde}</b><span>${sub}</span></dna-card>`;
-    let h = `<div class="dt-opl-kpis">
+    const kpis = `<div class="dt-opl-kpis">
       ${kpi("Studenten", this.getal(totaal), dTot == null || stand === "leeg" ? "ingeschreven op dit moment" : `${delta(dTot)} sinds ${E(this.kort(sinds))}`)}
       ${kpi("Opleidingen", this.getal(d.boom.length), `${this.getal(d.boom.reduce((n, o) => n + o.kinderen.length, 0))} leerjaren`)}
       ${kpi("Klassen", this.getal(d.klassen.length), `gemiddeld ${this.getal(Math.round(10 * totaal / Math.max(1, d.klassen.length)) / 10)} studenten per klas`)}
@@ -461,45 +451,80 @@ DT.register({
 
     /* Verloop van de inschrijvingen */
     const perOpl = this._weergave === "opleiding" && d.boom.length > 1;
+    /* Opleidingen aan en uit zetten: de knoppen zijn meteen de legenda (de kleur hoort bij de opleiding). */
+    for (const st of [...this._uit]) if (!d.boom.some((o) => o.studie === st)) this._uit.delete(st);
+    const zicht = d.boom.filter((o) => !this._uit.has(o.studie)), somReeks = (rs) => (rs[0] || []).map((p, i) => ({ datum: p.datum, n: rs.reduce((n, x) => n + x[i].n, 0) }));
+    const filter = d.boom.length > 1 ? `<div class="dt-opl-filter" role="group" aria-label="Opleidingen tonen">${d.boom.map((o, i) => `<button type="button" class="dt-opl-chip" data-act="filter" data-s="${i}" aria-pressed="${!this._uit.has(o.studie)}"><i style="background:${this.kleurVan(o, d.boom)}"></i>${E(o.naam)}</button>`).join("")}${this._uit.size ? `<button type="button" class="dt-opl-knop is-stil" data-act="filter-alles">Alles tonen</button>` : ""}</div>` : "";
     const seg = (w, naam) => `<button type="button" class="dt-opl-seg" data-act="weergave" data-w="${w}" aria-pressed="${String(this._weergave === w || (w === "totaal" && !perOpl))}">${naam}</button>`;
-    h += `<dna-card class="dt-opl-kaart"><div class="dt-opl-kaartkop"><div><h2>Verloop van de inschrijvingen</h2><p class="dt-opl-zacht">Aantal ingeschreven studenten op de eerste van elke maand. De stippellijn staat op 1 oktober, de landelijke teldatum.</p></div>
+    const verloopKaart = `<dna-card class="dt-opl-kaart"><div class="dt-opl-kaartkop"><div><h2>Verloop van de inschrijvingen</h2><p class="dt-opl-zacht">Aantal ingeschreven studenten op de eerste van elke maand. De stippellijn staat op 1 oktober, de landelijke teldatum.</p></div>
       <div class="dt-opl-rij">${d.boom.length > 1 ? `<span class="dt-opl-segs">${seg("opleiding", "Per opleiding")}${seg("totaal", "Totaal")}</span>` : ""}
-      <label class="dt-opl-zacht">Terug tot <select class="dt-opl-veld" data-act="jaren">${[1, 2, 3, 5].map((j) => `<option value="${j}"${j === this._jaren ? " selected" : ""}>${j} ${j === 1 ? "schooljaar" : "schooljaren"} terug</option>`).join("")}</select></label></div></div>
-      ${!d.verloopKlaar ? `<p class="dt-opl-zacht">Verloop wordt opgehaald…</p>` : stand === "leeg" ? "" : this.lijn(perOpl ? this.reeksen(d.boom) : [{ naam: "Alle studenten", kleur: "var(--opl-s1)", punten: tot }])}
+      <label class="dt-opl-zacht">Terug tot <select class="dt-opl-veld" data-act="jaren">${[0, 1, 2, 3, 5].map((j) => `<option value="${j}"${j === this._jaren ? " selected" : ""}>${j === 0 ? "alleen dit schooljaar" : `${j} ${j === 1 ? "schooljaar" : "schooljaren"} terug`}</option>`).join("")}</select></label></div></div>
+      ${filter}
+      ${!d.verloopKlaar ? `<p class="dt-opl-zacht">Verloop wordt opgehaald…</p>` : stand === "leeg" ? "" : !zicht.length ? `<p class="dt-opl-zacht">Kies hierboven minstens één opleiding.</p>` : this.lijn(perOpl ? this.reeksen(zicht, undefined, d.boom) : [{ naam: this._uit.size ? `Selectie (${zicht.length} opleidingen)` : "Alle studenten", kleur: "var(--opl-s1)", punten: this._uit.size ? somReeks(zicht.map((o) => this.reeksVan(o))) : tot }])}
       ${d.verloopKlaar ? this.verloopNoot(stand) : ""}</dna-card>`;
-    h += this.cohortKaart();
 
     /* Boom: opleiding › leerjaar › klas */
-    const maxAantal = Math.max(1, ...d.boom.map((o) => o.aantal));
+    const maxAantal = Math.max(1, ...d.boom.map((o) => o.aantal)), verouderd = d.klassen.filter((k) => this.verouderd(d.jaar[k.naam])).length;
+    const uitCache = d.klassen.filter((k) => !d.jaar[k.naam] && (d.oud.aanw[k.naam] || d.oud.les[k.naam])).length;
     const rij = (k, diep) => {
       const i = d.knopen.indexOf(k), open = this._open.has(k.id), reeks = this.reeksVan(k), agg = this.aanwVan(k.klassen), c = agg ? R.cijfers(agg.per) : null;
       const nGeladen = k.klassen.filter((x) => d.aanw[x]).length, dk = R.verschil(reeks, sinds);
       const sub = (k.soort === "opleiding" && k.crebo ? `crebo ${E(k.crebo)} · ` : k.soort === "leerjaar" && k.cohort ? `cohort ${k.cohort} · ` : "") + (k.soort === "opleiding" ? `${k.kinderen.length} leerja${k.kinderen.length === 1 ? "ar" : "ren"} · ${k.klassen.length} klas${k.klassen.length === 1 ? "" : "sen"}` : k.soort === "leerjaar" ? `${k.klassen.length} klas${k.klassen.length === 1 ? "" : "sen"}` : (k.mentor ? `mentor ${E(k.mentor)}` : ""));
-      let r = `<tr class="is-${k.soort}${open ? " is-open" : ""}"><td class="naam" style="padding-left:${8 + diep * 22}px"><button type="button" class="dt-opl-klap" data-act="open" data-i="${i}" aria-expanded="${open}"><span class="pijl" aria-hidden="true">▸</span><span><b>${E(k.naam)}</b>${sub ? `<small>${sub}</small>` : ""}</span></button></td>
+      const blad = !k.kinderen.length;
+      let r = `<tr id="dt-opl-r${i}" class="is-${k.soort}${open ? " is-open" : ""}"><td class="naam" style="padding-left:${8 + diep * 22}px"><button type="button" class="dt-opl-klap" data-act="${blad ? "zoom" : "open"}" data-i="${i}"${blad ? ` title="Details van ${E(k.naam)}"` : ` aria-expanded="${open}"`}><span class="pijl" aria-hidden="true">${blad ? "" : "▸"}</span><span><b>${E(k.naam)}</b>${sub ? `<small>${sub}</small>` : ""}</span></button></td>
         <td class="getal"><b>${this.getal(k.aantal)}</b></td><td class="aandeel"><span class="dt-opl-pbalk"><i style="width:${Math.round(100 * k.aantal / maxAantal)}%"></i></span></td>
         <td class="vonk">${stand !== "leeg" ? this.vonk(reeks) : ""}</td><td class="getal">${stand !== "leeg" ? delta(dk) : ""}</td>
-        <td class="aanw">${c && c.telt ? `${this.verdeling(c)}<b class="${c.pct < 80 ? "is-laag" : ""}">${this.pct(c.pct)}</b>${nGeladen < k.klassen.length ? `<small>${nGeladen}/${k.klassen.length} klassen</small>` : ""}` : `<button type="button" class="dt-opl-knop" data-act="aanw" data-i="${i}"${this._aanwBezig ? " disabled" : ""}>Ophalen</button>`}</td></tr>`;
-      if (open) {
-        r += `<tr class="detail"><td colspan="6" style="padding-left:${30 + diep * 22}px">${this.detail(k, i, stand !== "leeg" ? reeks : null, agg, c, nGeladen)}</td></tr>`;
-        for (const kind of k.kinderen) r += rij(kind, diep + 1);
-      }
+        <td class="aanw">${c && c.telt ? `${this.verdeling(c)}<b class="${c.pct < 80 ? "is-laag" : ""}">${this.pct(c.pct)}</b>${nGeladen < k.klassen.length ? `<small>${nGeladen}/${k.klassen.length} klassen</small>` : ""}` : `<button type="button" class="dt-opl-knop" data-act="aanw" data-i="${i}"${this._aanwBezig ? " disabled" : ""}>Ophalen</button>`}</td>
+        <td class="getal"><button type="button" class="dt-opl-knop is-stil" data-act="zoom" data-i="${i}" title="Verloop, aanwezigheid en mutaties van ${E(k.naam)}">Details ›</button></td></tr>`;
+      if (open) for (const kind of k.kinderen) r += rij(kind, diep + 1);
       return r;
     };
-    h += `<dna-card class="dt-opl-kaart"><div class="dt-opl-kaartkop"><div><h2>Opleidingen, leerjaren en klassen</h2><p class="dt-opl-zacht">Klik op een regel om uit te klappen: het verloop, de aanwezigheid en wat eronder valt.</p></div>
+    const boomKaart = (wortels, titel, uitleg) => `<dna-card class="dt-opl-kaart"><div class="dt-opl-kaartkop"><div><h2>${titel}</h2><p class="dt-opl-zacht">${uitleg}</p></div>
       <div class="dt-opl-rij"><label class="dt-opl-zacht">Aanwezigheid over <select class="dt-opl-veld" data-act="periode">${this.periodes().map((p) => `<option value="${E(p.key)}"${p.key === per.key ? " selected" : ""}>${E(p.naam)}</option>`).join("")}</select></label>
-      <button type="button" class="dt-opl-knop" data-act="aanw-alles"${this._aanwBezig || geladen === d.klassen.length ? " disabled" : ""} title="Per student twee aanvragen aan Magister: reken op ongeveer een minuut per 40 studenten">Aanwezigheid van alle klassen ophalen (${this.getal(d.klassen.filter((k) => !d.aanw[k.naam]).reduce((n, k) => n + k.aantal, 0))} studenten)</button>
-      <button type="button" class="dt-opl-knop is-stil" data-act="alles-open">Alles in- of uitklappen</button></div></div>
-      <div class="dt-opl-scroll"><table class="dt-opl-tabel"><thead><tr><th>Opleiding › leerjaar › klas</th><th class="getal">Studenten</th><th></th><th>${stand !== "leeg" ? "Verloop" : ""}</th><th class="getal">${stand !== "leeg" ? `Sinds ${E(this.kort(sinds, false))}` : ""}</th><th>Aanwezigheid (${E(per.naam.toLowerCase())})</th></tr></thead><tbody>${d.boom.map((o) => rij(o, 0)).join("")}</tbody></table></div>
-      ${this.legendaCats()}</dna-card>`;
+      ${verouderd ? `<button type="button" class="dt-opl-knop" data-act="aanw-alles"${this._aanwBezig ? " disabled" : ""} title="Haalt alleen op wat vandaag nog niet is bijgewerkt">Bijwerken (${verouderd} ${verouderd === 1 ? "klas" : "klassen"})</button>` : ""}
+      ${wortels.some((o) => o.kinderen.length) ? `<button type="button" class="dt-opl-knop is-stil" data-act="alles-open">Alles in- of uitklappen</button>` : ""}</div></div>
+      <div class="dt-opl-scroll"><table class="dt-opl-tabel"><thead><tr><th>Opleiding › leerjaar › klas</th><th class="getal">Studenten</th><th></th><th>${stand !== "leeg" ? "Verloop" : ""}</th><th class="getal">${stand !== "leeg" ? `Sinds ${E(this.kort(sinds, false))}` : ""}</th><th>Aanwezigheid (${E(per.naam.toLowerCase())})</th><th></th></tr></thead><tbody>${wortels.map((o) => rij(o, 0)).join("")}</tbody></table></div>
+      ${this.legendaCats()}${uitCache ? `<p class="dt-opl-zacht">${uitCache} ${uitCache === 1 ? "klas toont" : "klassen tonen"} nog wat er eerder is opgehaald; dat wordt vervangen zodra het bijwerken klaar is.</p>` : ""}</dna-card>`;
 
-    h += this.aandacht(sinds);
-    h += `<p class="dt-opl-zacht dt-opl-voet">Uit Magister, met jouw rechten: je ziet de klassen die jij in Magister mag zien. Aanwezig % = aanwezig en te laat, gedeeld door de lessen die meetellen; een vrijstelling telt niet mee (zoals Inzicht). Het verloop per opleiding gaat ervan uit dat een klas elk jaar bij dezelfde opleiding en hetzelfde leerjaar hoort. Op deze pagina en in de opslag van de extensie staan alleen aantallen, geen namen.</p>`;
+    /* Weergaven: vier tabbladen, en een eigen weergave per opleiding, leerjaar of klas ("Details"). */
+    const nMut = Object.values(d.mut || {}).reduce((n, m) => n + m.length, 0), zoom = this._zoom ? d.knopen.find((k) => k.id === this._zoom) : null;
+    if (!zoom) this._zoom = null;
+    const TABS = [["overzicht", "Overzicht"], ["verloop", "Verloop"], ["mutaties", `Mutaties${nMut ? ` <small>${this.getal(nMut)}</small>` : ""}`], ["opslag", "Opslag en back-up"]];
+    if (!TABS.some(([t]) => t === this._tab)) this._tab = "overzicht";
+    let h = `<div class="dt-opl-tabs" role="tablist" aria-label="Weergave">${TABS.map(([t, naam]) => `<button type="button" role="tab" class="dt-opl-tab" data-act="tab" data-t="${t}" aria-selected="${String(!zoom && this._tab === t)}">${naam}</button>`).join("")}${zoom ? `<button type="button" role="tab" class="dt-opl-tab" aria-selected="true">${E(zoom.naam)}</button>` : ""}</div>`;
+    if (zoom) h += this.zoomWeergave(zoom, { stand, sinds, delta, kpi, boomKaart });
+    else if (this._tab === "verloop") h += verloopKaart + this.lesKaart(perOpl, zicht) + this.cohortKaart();
+    else if (this._tab === "mutaties") h += this.mutatieKaart();
+    else if (this._tab === "opslag") h += this.opslagKaart();
+    else h += kpis + boomKaart(d.boom, "Opleidingen, leerjaren en klassen", "Klik op een opleiding of leerjaar om uit te klappen, of op Details voor het verloop, de aanwezigheid en de mutaties.") + this.aandacht(sinds);
+    h += `<p class="dt-opl-zacht dt-opl-voet">Uit Magister, met jouw rechten: je ziet de klassen die jij in Magister mag zien. Aanwezig % = aanwezig en te laat, gedeeld door de lessen die meetellen; een vrijstelling telt niet mee (zoals Inzicht). Het verloop per opleiding gaat ervan uit dat een klas elk jaar bij dezelfde opleiding en hetzelfde leerjaar hoort. De aanwezigheid gaat over hele weken en over de studenten die nu in de klas zitten.</p>`;
     const top = this._pagina.scrollTop;
     this._lijf.innerHTML = h;
     this._pagina.scrollTop = top;
   },
 
-  /* Uitgeklapte regel: het verloop (gesplitst naar wat eronder valt) en de aanwezigheid. */
+  /* Eigen weergave van één opleiding, leerjaar of klas: kerncijfers, verloop, aanwezigheid, mutaties en wat eronder valt. */
+  zoomWeergave(k, { stand, sinds, delta, kpi, boomKaart }) {
+    const d = this._d, R = OplReken, E = (s) => this.esc(s), per = this.periode(), i = d.knopen.indexOf(k);
+    const reeks = this.reeksVan(k), agg = this.aanwVan(k.klassen), c = agg ? R.cijfers(agg.per) : null, nGeladen = k.klassen.filter((x) => d.aanw[x]).length, dk = R.verschil(reeks, sinds);
+    const mut = k.klassen.flatMap((x) => d.mut[x] || []), n = (srt) => mut.filter((m) => m.soort === srt).length;
+    const boven = d.knopen.filter((x) => x !== k && x.klassen.length > k.klassen.length && k.klassen.every((y) => x.klassen.includes(y))).sort((a, b) => b.klassen.length - a.klassen.length);
+    const SOORT = { opleiding: "Opleiding", leerjaar: "Leerjaar", klas: "Klas" };
+    return `<div class="dt-opl-zoomkop"><button type="button" class="dt-opl-knop" data-act="terug">‹ Terug</button>
+        <div><h2>${E(k.naam)}</h2><p class="dt-opl-zacht">${SOORT[k.soort] || ""}${boven.map((x) => ` · <button type="button" class="dt-opl-ga" data-act="zoom" data-i="${d.knopen.indexOf(x)}">${E(x.naam)}</button>`).join("")}${k.crebo ? ` · crebo ${E(k.crebo)}` : ""}${k.cohort ? ` · cohort ${E(k.cohort)}` : ""}${k.mentor ? ` · mentor ${E(k.mentor)}` : ""}</p></div>
+        <label class="dt-opl-zacht">Aanwezigheid over <select class="dt-opl-veld" data-act="periode">${this.periodes().map((p) => `<option value="${E(p.key)}"${p.key === per.key ? " selected" : ""}>${E(p.naam)}</option>`).join("")}</select></label></div>
+      <div class="dt-opl-kpis">
+        ${kpi("Studenten", this.getal(k.aantal), dk == null || stand === "leeg" ? `${k.klassen.length} klas${k.klassen.length === 1 ? "" : "sen"}` : `${delta(dk)} sinds ${E(this.kort(sinds))}`)}
+        ${kpi("Aanwezigheid", c && c.telt ? this.pct(c.pct) : "—", c && c.telt ? E(per.naam.toLowerCase()) : "nog niet opgehaald")}
+        ${kpi("Onder de norm", agg ? this.getal(agg.onder) : "—", agg ? `van ${this.getal(agg.studenten)} studenten onder 80% aanwezig` : "studenten onder 80% aanwezig")}
+        ${kpi("Ingestroomd", this.getal(n("in")), "later begonnen dan de klas")}
+        ${kpi("Uit de klas", this.getal(n("uit")), n("stil") ? `${n("stil")} zonder lessen in de laatste weken` : "dit schooljaar")}
+      </div>
+      <dna-card class="dt-opl-kaart dt-opl-zoom">${this.detail(k, i, stand !== "leeg" ? reeks : null, agg, c, nGeladen)}</dna-card>
+      ${k.kinderen.length ? boomKaart(k.kinderen, `${k.soort === "opleiding" ? "Leerjaren en klassen" : "Klassen"} van ${E(k.naam)}`, "Klik op Details om verder in te zoomen.") : ""}`;
+  },
+
+  /* Het verloop (gesplitst naar wat eronder valt), de aanwezigheid en de mutaties van één knoop. */
   detail(k, i, reeks, agg, c, nGeladen) {
     const R = OplReken, E = (s) => this.esc(s), per = this.periode();
     let h = `<div class="dt-opl-detail">`;
@@ -507,6 +532,13 @@ DT.register({
       const lijnen = k.kinderen.length > 1 ? this.reeksen(k.kinderen) : [{ naam: k.naam, kleur: "var(--opl-s1)", punten: reeks }];
       h += `<section class="breed"><h3>Verloop ${E(k.naam)}${k.kinderen.length > 1 ? ` per ${k.soort === "opleiding" ? "leerjaar" : "klas"}` : ""}</h3>${this.lijn(lijnen, { hoogte: 200 })}</section>`;
     }
+    const lesKl = k.klassen.filter((x) => this._d.les[x]);
+    if (lesKl.length) {
+      const weken = this.lesWekenAlle(lesKl), kinderen = k.kinderen.filter((x) => x.klassen.some((y) => this._d.les[y]));
+      h += `<section class="breed"><h3>Studenten per week (uit de lessen)${lesKl.length < k.klassen.length ? ` <span class="dt-opl-zacht">· ${lesKl.length} van ${k.klassen.length} klassen <button type="button" class="dt-opl-knop" data-act="les" data-i="${i}"${this._aanwBezig ? " disabled" : ""}>Rest ophalen</button></span>` : ""}</h3>${this.lijn(kinderen.length > 1 ? this.reeksen(kinderen, (x) => this.lesVan(x, weken)) : [{ naam: k.naam, kleur: "var(--opl-s1)", punten: this.lesVan(k, weken) }], { hoogte: 200, week: true })}</section>`;
+      const mut = k.klassen.flatMap((x) => (this._d.mut[x] || []).map((m) => ({ ...m, klas: x })));
+      if (mut.length) h += `<section class="breed"><h3>Mutaties uit de lessen</h3>${this.mutatieTabel(mut.sort((a, b) => String(b.week || "").localeCompare(String(a.week || ""))), k.soort !== "klas")}</section>`;
+    } else h += `<section class="breed"><h3>Studenten per week (uit de lessen)</h3><p class="dt-opl-zacht">Nog niet opgehaald. <button type="button" class="dt-opl-knop" data-act="les" data-i="${i}"${this._aanwBezig ? " disabled" : ""}>Lessen van dit schooljaar ophalen (${this.getal(k.aantal)} studenten)</button></p></section>`;
     if (!c || !c.telt) {
       h += `<section class="breed"><h3>Aanwezigheid</h3><p class="dt-opl-zacht">${agg ? "Geen lessen in deze periode." : `Nog niet opgehaald voor ${E(per.naam.toLowerCase())}.`} ${agg ? "" : `<button type="button" class="dt-opl-knop" data-act="aanw" data-i="${i}"${this._aanwBezig ? " disabled" : ""}>Ophalen (${this.getal(k.aantal)} studenten)</button>`}</p></section></div>`;
       return h;
@@ -523,6 +555,19 @@ DT.register({
       <h3>Per weekdag</h3>${[1, 2, 3, 4, 5, 6, 0].filter((dg) => agg.dagen[dg]).map((dg) => { const cd = R.cijfers(agg.dagen[dg]); return balk(DAG[dg], cd.pct ?? 0, this.pct(cd.pct), "var(--opl-s1)", `${DAG[dg]}: ${this.pct(cd.pct)} aanwezig van ${this.getal(cd.telt)} lessen`); }).join("")}</section>
       <section class="breed"><h3>Per week</h3>${this.weken(agg)}</section></div>`;
     return h;
+  },
+
+  /* Studenten per week, geteld uit de lessen van dit schooljaar. zicht: de opleidingen die het filter laat staan. */
+  lesKaart(perOpl, zicht) {
+    const d = this._d, E = (s) => this.esc(s), namen = Object.keys(d.nu), met = namen.filter((k) => d.les[k]);
+    let h = `<dna-card class="dt-opl-kaart"><div class="dt-opl-kaartkop"><div><h2>Studenten per week, uit de lessen</h2><p class="dt-opl-zacht">Per week het aantal studenten dat les had, geteld uit de roosters van dit schooljaar. Weken met weinig lessen (vakantie, toetsweek, stage) tellen niet mee.</p></div></div>`;
+    if (!met.length) return h + `<p class="dt-opl-zacht">${this._aanwBezig ? "De lessen van dit schooljaar worden opgehaald…" : `Nog niet opgehaald. <button type="button" class="dt-opl-knop" data-act="les-alles">Lessen van dit schooljaar ophalen</button>`}</p></dna-card>`;
+    const knopen = zicht.filter((o) => o.klassen.some((k) => d.les[k])), kl = knopen.flatMap((o) => o.klassen).filter((k) => d.les[k]), weken = this.lesWekenAlle(kl);
+    h += !knopen.length ? `<p class="dt-opl-zacht">Geen lessen opgehaald voor de gekozen opleidingen.</p>`
+      : this.lijn(perOpl && d.boom.length > 1 ? this.reeksen(knopen, (k) => this.lesVan(k, weken), d.boom) : [{ naam: this._uit.size ? `Selectie (${knopen.length} opleidingen)` : "Alle studenten", kleur: "var(--opl-s1)", punten: OplReken.lesReeks(kl.map((k) => OplReken.lesPunten(d.les[k].weken)), weken) }], { week: true });
+    const weg = met.reduce((s, k) => s + (d.les[k].weg || 0), 0);
+    h += `<p class="dt-opl-zacht">${met.length} van ${namen.length} klassen. ${weg ? `${this.getal(weg)} student${weg === 1 ? " staat" : "en staan"} inmiddels niet meer in hun klas en ${weg === 1 ? "telt" : "tellen"} mee tot de laatste les; zie het tabblad Mutaties.` : "Tot nu toe is niemand uit een klas verdwenen."} Een student telt in een week mee zodra die minstens één les in het rooster had.</p>`;
+    return h + `</dna-card>`;
   },
 
   /* Toelichting onder het verloop: tot waar Magister teruggaat, en dat de extensie de stand zelf bijhoudt. */
@@ -586,24 +631,45 @@ DT.register({
     await DT.copy(uit.join("\n"));
   },
 
-  /* Aandachtspunten: wat opvalt in aantallen en aanwezigheid. */
+  /* Aandachtspunten: wat opvalt in aantallen en aanwezigheid. Elke regel springt naar de klas in de boom. */
   aandacht(sinds) {
-    const d = this._d, R = OplReken, E = (s) => this.esc(s), klassen = d.knopen.filter((k) => k.soort === "klas");
-    const lijst = (titel, rijen, uitleg) => rijen.length ? `<section><h3>${titel}</h3><ul>${rijen.map(([naam, waarde, sub]) => `<li><span>${E(naam)}${sub ? ` <small>${E(sub)}</small>` : ""}</span><b>${waarde}</b></li>`).join("")}</ul>${uitleg ? `<p class="dt-opl-zacht">${uitleg}</p>` : ""}</section>` : "";
+    const d = this._d, R = OplReken, E = (s) => this.esc(s), klassen = d.knopen.filter((k) => k.soort === "klas"), naamOpl = (k) => d.boom.find((o) => o.studie === k.studie)?.naam || k.studie;
+    const lijst = (titel, rijen, uitleg) => rijen.length ? `<section><h3>${titel}</h3><ul>${rijen.map(([k, waarde, sub]) => `<li><button type="button" class="dt-opl-ga" data-act="ga" data-i="${d.knopen.indexOf(k)}" title="Details van ${E(k.naam)}">${E(k.naam)}${sub ? ` <small>${E(sub)}</small>` : ""}</button><b>${waarde}</b></li>`).join("")}</ul>${uitleg ? `<p class="dt-opl-zacht">${uitleg}</p>` : ""}</section>` : "";
     const metDelta = R.verloopStand(d.tellingen) !== "leeg" ? klassen.map((k) => ({ k, n: R.verschil(this.reeksVan(k), sinds) })).filter((x) => x.n) : [];
     const teken = (n) => `${n > 0 ? "+" : "−"}${Math.abs(n)}`;
     const metAanw = klassen.map((k) => ({ k, agg: d.aanw[k.naam], c: d.aanw[k.naam] ? R.cijfers(d.aanw[k.naam].per) : null })).filter((x) => x.c && x.c.telt);
+    const mut = klassen.map((k) => ({ k, in: (d.mut[k.naam] || []).filter((m) => m.soort === "in").length, uit: (d.mut[k.naam] || []).filter((m) => m.soort === "uit").length, stil: (d.mut[k.naam] || []).filter((m) => m.soort === "stil").length }));
+    const cat = (key, titel) => lijst(titel, metAanw.filter((x) => x.c.cat[key].n).sort((a, b) => b.c.cat[key].pct - a.c.cat[key].pct).slice(0, 5).map((x) => [x.k, this.pct(x.c.cat[key].pct), `${this.getal(x.c.cat[key].n)} lessen`]), "");
     const delen = [
-      lijst("Meeste uitstroom", metDelta.filter((x) => x.n < 0).sort((a, b) => a.n - b.n).slice(0, 5).map((x) => [x.k.naam, teken(x.n), x.k.studie]), `Verschil in aantal studenten sinds ${E(this.kort(sinds))}.`),
-      lijst("Meeste instroom", metDelta.filter((x) => x.n > 0).sort((a, b) => b.n - a.n).slice(0, 5).map((x) => [x.k.naam, teken(x.n), x.k.studie]), ""),
-      lijst("Kleinste klassen", klassen.filter((k) => k.aantal > 0).sort((a, b) => a.aantal - b.aantal).slice(0, 5).map((k) => [k.naam, this.getal(k.aantal), k.studie]), ""),
-      lijst("Grootste klassen", klassen.slice().sort((a, b) => b.aantal - a.aantal).slice(0, 5).map((k) => [k.naam, this.getal(k.aantal), k.studie]), ""),
-      lijst("Laagste aanwezigheid", metAanw.slice().sort((a, b) => a.c.pct - b.c.pct).slice(0, 5).map((x) => [x.k.naam, this.pct(x.c.pct), `${x.agg.onder} onder de norm`]), ""),
-      lijst("Meeste ongeoorloofd absent", metAanw.filter((x) => x.c.cat.AB_NO.n).sort((a, b) => b.c.cat.AB_NO.pct - a.c.cat.AB_NO.pct).slice(0, 5).map((x) => [x.k.naam, this.pct(x.c.cat.AB_NO.pct), `${this.getal(x.c.cat.AB_NO.n)} lessen`]), ""),
-      lijst("Meeste ziek", metAanw.filter((x) => x.c.cat.ZK.n).sort((a, b) => b.c.cat.ZK.pct - a.c.cat.ZK.pct).slice(0, 5).map((x) => [x.k.naam, this.pct(x.c.cat.ZK.pct), `${this.getal(x.c.cat.ZK.n)} lessen`]), ""),
-      lijst("Meeste te laat", metAanw.filter((x) => x.c.cat.TL.n).sort((a, b) => b.c.cat.TL.pct - a.c.cat.TL.pct).slice(0, 5).map((x) => [x.k.naam, this.pct(x.c.cat.TL.pct), `${this.getal(x.c.cat.TL.n)} lessen`]), ""),
+      lijst("Uit de klas (uit de lessen)", mut.filter((x) => x.uit).sort((a, b) => b.uit - a.uit).slice(0, 5).map((x) => [x.k, this.getal(x.uit), naamOpl(x.k)]), "Studenten die dit schooljaar lessen hadden en nu niet meer in de klas staan."),
+      lijst("Later ingestroomd (uit de lessen)", mut.filter((x) => x.in).sort((a, b) => b.in - a.in).slice(0, 5).map((x) => [x.k, this.getal(x.in), naamOpl(x.k)]), ""),
+      lijst("Geen lessen meer, nog wel in de klas", mut.filter((x) => x.stil).sort((a, b) => b.stil - a.stil).slice(0, 5).map((x) => [x.k, this.getal(x.stil), naamOpl(x.k)]), "De laatste twee gewone lesweken zonder lessen in het rooster."),
+      lijst("Meeste uitstroom (peildatums)", metDelta.filter((x) => x.n < 0).sort((a, b) => a.n - b.n).slice(0, 5).map((x) => [x.k, teken(x.n), naamOpl(x.k)]), `Verschil in aantal studenten sinds ${E(this.kort(sinds))}.`),
+      lijst("Meeste instroom (peildatums)", metDelta.filter((x) => x.n > 0).sort((a, b) => b.n - a.n).slice(0, 5).map((x) => [x.k, teken(x.n), naamOpl(x.k)]), ""),
+      lijst("Kleinste klassen", klassen.filter((k) => k.aantal > 0).sort((a, b) => a.aantal - b.aantal).slice(0, 5).map((k) => [k, this.getal(k.aantal), naamOpl(k)]), ""),
+      lijst("Grootste klassen", klassen.slice().sort((a, b) => b.aantal - a.aantal).slice(0, 5).map((k) => [k, this.getal(k.aantal), naamOpl(k)]), ""),
+      lijst("Laagste aanwezigheid", metAanw.slice().sort((a, b) => a.c.pct - b.c.pct).slice(0, 5).map((x) => [x.k, this.pct(x.c.pct), `${x.agg.onder} onder de norm`]), ""),
+      cat("AB_NO", "Meeste ongeoorloofd absent"), cat("ZK", "Meeste ziek"), cat("TL", "Meeste te laat"),
     ].filter(Boolean);
-    return delen.length ? `<dna-card class="dt-opl-kaart"><h2>Aandachtspunten</h2><div class="dt-opl-aandacht">${delen.join("")}</div></dna-card>` : "";
+    return delen.length ? `<dna-card class="dt-opl-kaart"><h2>Aandachtspunten</h2><p class="dt-opl-zacht">Klik op een klas voor de details.</p><div class="dt-opl-aandacht">${delen.join("")}</div></dna-card>` : "";
+  },
+  /* Mutaties uit de lessen: wie later begon, wie uit de klas is en wie geen lessen meer heeft. */
+  mutatieTabel(rijen, metKlas = true) {
+    const d = this._d, E = (s) => this.esc(s), R = OplReken, wk = (w) => (w ? `wk ${typeof isoWeek === "function" ? isoWeek(R.datum(w)).w : ""} · ${this.kort(w, false)}` : "—");
+    const SOORT = { in: ["Ingestroomd", "eerste les in", "is-in"], uit: ["Uit de klas", "laatste les in", "is-uit"], stil: ["Geen lessen meer", "laatste les in", "is-stil"] };
+    return `<div class="dt-opl-scroll"><table class="dt-opl-tabel dt-opl-mut"><thead><tr><th>Mutatie</th><th>Student</th>${metKlas ? "<th>Klas</th>" : ""}<th>Week</th></tr></thead><tbody>${rijen.map((m) => { const k = d.knopen.find((x) => x.soort === "klas" && x.naam === m.klas);
+      return `<tr><td><span class="dt-opl-label ${SOORT[m.soort][2]}">${SOORT[m.soort][0]}</span></td><td>${E(m.naam && m.naam !== "Onbekende student" ? m.naam : "Naam onbekend")}${m.naar ? ` <small class="dt-opl-zacht">naar ${E(m.naar)}</small>` : ""}</td>${metKlas ? `<td>${k ? `<button type="button" class="dt-opl-ga" data-act="ga" data-i="${d.knopen.indexOf(k)}">${E(m.klas)}</button>` : E(m.klas)}</td>` : ""}<td>${m.bron === "aanmelding" ? `aangemeld per ${E(this.kort(m.datum))}` : m.week ? `${SOORT[m.soort][1]} ${E(wk(m.week))}${m.datum ? `, aangemeld per ${E(this.kort(m.datum))}` : ""}` : "geen lessen dit schooljaar"}</td></tr>`; }).join("")}</tbody></table></div>`;
+  },
+  mutatieKaart() {
+    const d = this._d, E = (x) => this.esc(x), alle = Object.keys(d.mut || {}).flatMap((k) => d.mut[k].map((m) => ({ ...m, klas: k }))).sort((a, b) => String(b.week || "").localeCompare(String(a.week || "")) || a.klas.localeCompare(b.klas, "nl", { numeric: true }));
+    if (!Object.keys(d.jaar).length) return `<dna-card class="dt-opl-kaart"><h2>Mutaties uit de lessen</h2><p class="dt-opl-zacht">${this._aanwBezig ? "De lessen van dit schooljaar worden opgehaald…" : `Nog niet opgehaald. <button type="button" class="dt-opl-knop" data-act="les-alles">Lessen van dit schooljaar ophalen</button>`}</p></dna-card>`;
+    const oudeVersie = Object.values(d.jaar).filter((o) => o.v !== this.VERSIE).length;
+    const n = (s) => alle.filter((m) => m.soort === s).length, keuze = this._mutSoort ? alle.filter((m) => m.soort === this._mutSoort) : alle, toon = this._mutAlles ? keuze : keuze.slice(0, 50);
+    const chip = (w, naam) => `<button type="button" class="dt-opl-seg" data-act="mut-soort" data-w="${w}" aria-pressed="${String((this._mutSoort || "") === w)}">${naam} · ${w ? n(w) : alle.length}</button>`;
+    return `<dna-card class="dt-opl-kaart"><div class="dt-opl-kaartkop"><div><h2>Mutaties uit de lessen</h2><p class="dt-opl-zacht">${alle.length ? `${alle.filter((m) => m.soort === "uit" && m.naar).length} van de vertrekkers gingen naar een andere klas.` : "Geen mutaties gevonden in de lessen van dit schooljaar."} Uit de klas: wie volgens Magister in de lessen van de klas zat en er nu niet meer in staat (per week worden een paar lessen bekeken). Ingestroomd: een eerste les na de start van de klas, of een aanmelding die later begint. Een stage of een rooster dat later begint kan er ook als mutatie uitzien.${this._namenFout ? ` Namen van vertrekkers: ${E(this._namenFout)}.` : ""}${oudeVersie ? ` <b>${oudeVersie} ${oudeVersie === 1 ? "klas is" : "klassen zijn"} nog niet opnieuw opgehaald; daar ontbreken de vertrekkers nog.</b>` : ""}</p></div>
+      <button type="button" class="dt-opl-knop is-stil" data-act="diag-mut" title="Zet op het klembord wat Magister over in- en uitstroom teruggeeft: alleen aantallen, datums, veldnamen en statuscodes, geen namen">Diagnose mutaties</button></div>
+      ${alle.length ? `<div class="dt-opl-filter" role="group" aria-label="Soort mutatie"><span class="dt-opl-segs">${chip("", "Alle")}${chip("in", "Ingestroomd")}${chip("uit", "Uit de klas")}${chip("stil", "Geen lessen meer")}</span></div>${this.mutatieTabel(toon)}` : ""}
+      ${keuze.length > 50 ? `<p><button type="button" class="dt-opl-knop is-stil" data-act="mut-alles">${this._mutAlles ? "Alleen de nieuwste 50" : `Alle ${keuze.length} tonen`}</button></p>` : ""}</dna-card>`;
   },
 
   /* ---------- Excel ---------- */
@@ -617,7 +683,7 @@ DT.register({
     const aanw = (agg) => { if (!agg) return []; const c = R.cijfers(agg.per); return [c.lessen, ...R.CATS.map(([k]) => c.cat[k].n), p(c.pct), ...R.CATS.slice(1).map(([k]) => p(c.cat[k].pct)), agg.onder]; };
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, blad([["Opleidingen"], ["Gemaakt", new Date().toLocaleString("nl-NL")], ["Peildatum", this.kort(d.vandaag)], ["Aanwezigheid over", `${per.naam} (${this.kort(R.ymd(per.van))} t/m ${this.kort(R.ymd(per.tot))})`], [],
-      ["Aanwezig % = aanwezig en te laat, gedeeld door de lessen die meetellen; vrijstelling telt niet mee en is een deel van alle lessen."], ["Het verloop toont het aantal studenten op de eerste van elke maand; 1 oktober is de landelijke teldatum."], ["Alleen aantallen per klas, geen namen van studenten."]], [20, 90]), "Toelichting");
+      ["Aanwezig % = aanwezig en te laat, gedeeld door de lessen die meetellen; vrijstelling telt niet mee en is een deel van alle lessen."], ["Het verloop toont het aantal studenten op de eerste van elke maand; 1 oktober is de landelijke teldatum."], ["Het blad Mutaties bevat namen van studenten; de andere bladen alleen aantallen."]], [20, 90]), "Toelichting");
     XLSX.utils.book_append_sheet(wb, blad([["Niveau", "Opleiding", "Crebo", "Cohort", "Leerjaar", "Klas", "Mentor", "Studenten", `Verschil sinds ${this.kort(sinds)}`, ...kopAanw],
       ...d.knopen.map((k) => [k.soort, d.boom.find((o) => o.studie === k.studie)?.naam || k.studie, k.crebo || "", k.cohort ?? "", k.leerjaar ?? "", k.soort === "klas" ? k.naam : "", k.mentor || "", k.aantal, R.verschil(this.reeksVan(k), sinds) ?? "", ...aanw(this.aanwVan(k.klassen))])],
       [11, 34, 9, 8, 9, 12, 24, 10, 16, ...kopAanw.map(() => 13)]), "Overzicht");
@@ -625,6 +691,14 @@ DT.register({
     XLSX.utils.book_append_sheet(wb, blad([["Peildatum", "Teldatum", "Totaal", ...d.boom.map((o) => o.naam)], ...d.tellingen.map((t, i) => [t.datum, t.teldatum ? "ja" : "", tot[i].n, ...d.boom.map((o) => this.reeksVan(o)[i].n)])], [12, 9, 9, ...d.boom.map(() => 22)]), "Verloop per opleiding");
     XLSX.utils.book_append_sheet(wb, blad([["Peildatum", ...klasNamen], ...d.tellingen.map((t) => [t.datum, ...klasNamen.map((k) => t.klassen[k] ?? "")])], [12, ...klasNamen.map(() => 9)]), "Verloop per klas");
     if (d.cohorten?.cohorten.length) XLSX.utils.book_append_sheet(wb, blad([["Opleiding", ...d.cohorten.cohorten.map((j) => `Cohort ${j}`), "Totaal"], ...d.cohorten.rijen.map((r) => [d.boom.find((o) => o.studie === r.studie)?.naam || r.studie, ...d.cohorten.cohorten.map((j) => r.per[j] || 0), r.totaal])], [26, ...d.cohorten.cohorten.map(() => 12), 9]), "Per cohort");
+    const metLes = Object.keys(d.nu).filter((k) => d.les[k]).sort((a, b) => a.localeCompare(b, "nl", { numeric: true }));
+    if (metLes.length) {
+      const weken = [...new Set(metLes.flatMap((k) => Object.keys(d.les[k].weken)))].sort();
+      XLSX.utils.book_append_sheet(wb, blad([["Week vanaf", "Totaal (zonder weken met weinig lessen)", ...metLes.flatMap((k) => [`${k} studenten`, `${k} lessen`, `${k} grootste les`])],
+        ...weken.map((w) => [w, R.lesReeks(metLes.map((k) => R.lesPunten(d.les[k].weken)), [w])[0].n, ...metLes.flatMap((k) => { const x = d.les[k].weken[w]; return x ? [x.actief, x.lessen, x.grootste] : ["", "", ""]; })])], [12, 16, ...metLes.flatMap(() => [12, 10, 12])]), "Studenten per week");
+    }
+    const mut = Object.keys(d.mut || {}).flatMap((k) => d.mut[k].map((m) => [{ in: "Ingestroomd", uit: "Uit de klas", stil: "Geen lessen meer" }[m.soort], m.naam, k, d.boom.find((o) => o.klassen.includes(k))?.naam || "", m.week || "", m.bron === "aanmelding" ? "begin aanmelding" : m.soort === "in" ? "eerste les" : "laatste les", m.naar || "", m.datum || ""]));
+    if (mut.length) XLSX.utils.book_append_sheet(wb, blad([["Mutatie", "Student", "Klas", "Opleiding", "Week vanaf", "Betekenis van de week", "Naar klas", "Begin aanmelding"], ...mut.sort((a, b) => String(b[4]).localeCompare(String(a[4])))], [18, 28, 10, 20, 12, 16, 10, 16]), "Mutaties");
     const alle = this.aanwVan(Object.keys(d.nu));
     if (alle) XLSX.utils.book_append_sheet(wb, blad([["Week vanaf", "Lessen", ...R.CATS.map((c) => c[1]), "Aanwezig %"], ...Object.keys(alle.weken).sort().map((w) => { const c = R.cijfers(alle.weken[w]); return [w, c.lessen, ...R.CATS.map(([k]) => c.cat[k].n), p(c.pct)]; })], [12, 9, ...R.CATS.map(() => 13), 11]), "Aanwezigheid per week");
     XLSX.writeFile(wb, `Opleidingen ${d.vandaag}.xlsx`);
@@ -724,6 +798,20 @@ DT.register({
       .dt-opl-cohort { margin-top: 12px; } .dt-opl-cohort .dt-opl-tabel { min-width: 0; } .dt-opl-cohort th small { display: block; font-weight: 400; }
       .dt-opl-cel { display: grid; grid-template-columns: minmax(40px, 1fr) 34px; align-items: center; gap: 8px; } .dt-opl-cel i { display: block; height: 10px; border-radius: 4px; background: var(--opl-lijnzacht); overflow: hidden; }
       .dt-opl-cel i b { display: block; height: 100%; border-radius: 4px; background: var(--opl-s1); } .dt-opl-cel em { font-style: normal; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+      .dt-opl-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
+      .dt-opl-chip { appearance: none; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--opl-lijn); border-radius: 999px; background: var(--opl-kaart); color: var(--opl-fg); font-size: 13px; cursor: pointer; }
+      .dt-opl-chip i { width: 10px; height: 10px; border-radius: 2px; } .dt-opl-chip:hover { background: var(--opl-hover); } .dt-opl-chip:focus-visible, .dt-opl-ga:focus-visible { outline: 2px solid var(--opl-acc); outline-offset: 1px; }
+      .dt-opl-chip[aria-pressed="false"] { color: var(--opl-zacht); text-decoration: line-through; border-style: dashed; } .dt-opl-chip[aria-pressed="false"] i { opacity: .25; }
+      .dt-opl-ga { appearance: none; border: 0; background: none; padding: 0; color: var(--opl-acc); font: inherit; font-weight: 600; cursor: pointer; text-align: left; } .dt-opl-ga:hover { text-decoration: underline; } .dt-opl-ga small { font-weight: 400; }
+      .dt-opl-tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--opl-lijn); margin-bottom: 16px; }
+      .dt-opl-tab { appearance: none; border: 0; border-bottom: 3px solid transparent; background: none; padding: 8px 14px; margin-bottom: -1px; color: var(--opl-zacht); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; border-radius: var(--opl-r) var(--opl-r) 0 0; }
+      .dt-opl-tab:hover { background: var(--opl-hover); color: var(--opl-fg); } .dt-opl-tab[aria-selected="true"] { color: var(--opl-fg); border-bottom-color: var(--opl-acc); }
+      .dt-opl-tab:focus-visible { outline: 2px solid var(--opl-acc); outline-offset: -2px; } .dt-opl-tab small { font-weight: 400; margin-left: 4px; padding: 1px 6px; border-radius: 999px; background: var(--opl-actief); color: var(--opl-fg); }
+      .dt-opl-zoomkop { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; } .dt-opl-zoomkop > div { flex: 1; min-width: 200px; } .dt-opl-zoomkop h2 { margin: 0; } .dt-opl-zoomkop p { margin: 2px 0 0; }
+      .dt-opl-zoom .dt-opl-detail { max-width: none; }
+      .dt-opl-mut { min-width: 0; } .dt-opl-label { display: inline-block; padding: 0 8px; border-radius: 999px; font-size: 12px; line-height: 20px; font-weight: 600; border: 1px solid var(--opl-lijn); white-space: nowrap; }
+      .dt-opl-label.is-in::before { content: "▲ "; color: #1e8a4c; } .dt-opl-label.is-uit::before { content: "▼ "; color: var(--opl-rood); } .dt-opl-label.is-stil::before { content: "● "; color: #d27d00; }
+      .dt-opl-kaart p .dt-opl-knop { margin-left: 6px; }
       .dt-opl-tip { position: fixed; z-index: 5; max-width: 320px; padding: 8px 10px; border-radius: 6px; background: #1f2933; color: #fff; font-size: 12px; line-height: 17px; white-space: pre-line; pointer-events: none; opacity: 0; box-shadow: 0 4px 14px rgba(0,0,0,.25); font-variant-numeric: tabular-nums; }
       .dt-opl-tip.is-aan { opacity: 1; }
       @media (max-width: 900px) { .dt-opl-inhoud { width: calc(100% - 2rem); } .dt-opl-detail { grid-template-columns: minmax(0, 1fr); } }

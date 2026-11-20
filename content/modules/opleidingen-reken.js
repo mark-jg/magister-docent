@@ -170,6 +170,197 @@ var OplReken = {
     if (pct < norm) agg.onder++;
     return agg;
   },
+  /* ---------- studenten per week, uit de lessen ---------- */
+  /* Per klas tellen we uit de roosters van de studenten per lesmoment (zelfde begin, vak en docent) hoeveel
+   * studenten van de klas die les hadden, en per week hoeveel verschillende studenten les hadden. */
+  lesLeeg() { return { momenten: {}, actief: {} }; },
+  voegLessen(acc, lessen) {
+    const weken = new Set();
+    for (const l of lessen || []) {
+      const k = `${l.begin.getTime()}|${l.vak || ""}|${l.docent || ""}`, w = this.maandag(l.begin);
+      acc.momenten[k] = (acc.momenten[k] || 0) + 1;
+      if (!weken.has(w)) { weken.add(w); acc.actief[w] = (acc.actief[w] || 0) + 1; }
+    }
+    return acc;
+  },
+  /* Per week (maandag): actief = studenten met minstens één les, lessen = aantal lesmomenten, grootste = de
+   * drukst bezette les. */
+  lesWeken(acc) {
+    const uit = {};
+    for (const [k, n] of Object.entries(acc.momenten)) {
+      const w = this.maandag(new Date(+k.split("|")[0])), x = (uit[w] ||= { actief: acc.actief[w] || 0, lessen: 0, grootste: 0 });
+      x.lessen++; if (n > x.grootste) x.grootste = n;
+    }
+    return uit;
+  },
+  /* Het studentenaantal per week van één klas: { maandag: aantal }. Weken met weinig lessen (minder dan 30% van
+   * een gewone week: vakantie, toetsweek, stage) zeggen niets over het aantal studenten en vallen weg. */
+  lesPunten(weken) {
+    const ks = Object.keys(weken || {}).sort(); if (!ks.length) return {};
+    const aantallen = ks.map((k) => weken[k].lessen).sort((a, b) => a - b), drempel = Math.max(1, 0.3 * aantallen[Math.floor(aantallen.length / 2)]);
+    const uit = {};
+    for (const k of ks) if (weken[k].lessen >= drempel) uit[k] = weken[k].actief;
+    return uit;
+  },
+  /* Klassen bij elkaar opgeteld, per week. Heeft een klas voor een week geen punt, dan telt zijn laatste eerdere
+   * punt (of, vóór zijn eerste week, zijn eerste): een klas op stage is niet leeg. weken: de weken om te tonen
+   * (standaard alle weken waarvoor een klas een punt heeft). */
+  lesReeks(perKlas, weken = null) {
+    const lijst = perKlas.filter((p) => p && Object.keys(p).length).map((p) => ({ p, ks: Object.keys(p).sort() }));
+    const alle = weken || [...new Set(lijst.flatMap((x) => x.ks))].sort();
+    return alle.map((w) => ({ datum: w, n: lijst.reduce((s, x) => s + x.p[x.ks.filter((k) => k <= w).pop() ?? x.ks[0]], 0) }));
+  },
+
+  /* ---------- jaaropslag per klas ---------- */
+  /* Eén bewaarde opslag per klas voor het hele schooljaar, die per week wordt bijgewerkt:
+   *   { sj, op, tot, studenten: { id: { naam, nu, w: { maandag: [aantal per categorie, in de volgorde van CATS] } } },
+   *     mom: { maandag: { lessen, grootste } }, dagen: { maandag: { weekdag: [aantal per categorie] } } }
+   * nu: staat de student vandaag nog in de klas. Daaruit volgt alles: aanwezigheid over elke periode van hele
+   * weken, studenten per week, en wie er in- of uitstroomde. */
+  catIndex(cat) { const i = this.CATS.findIndex((c) => c[0] === cat); return i < 0 ? 0 : i; },
+  /* De lessen van één student (uit vzStats) per week. */
+  studentWeken(lessen) {
+    const w = {};
+    for (const l of lessen || []) (w[this.maandag(l.begin)] ||= [0, 0, 0, 0, 0, 0, 0])[this.catIndex(l.cat)]++;
+    return w;
+  },
+  /* Lesmomenten en weekdagen van een klas uit de lessen van al zijn studenten ([[les, …], …]), vanaf een week. */
+  klasWeken(lessenPerStudent, vanaf = "") {
+    const tel = {}, mom = {}, dagen = {};
+    for (const lessen of lessenPerStudent) for (const l of lessen || []) {
+      const w = this.maandag(l.begin); if (w < vanaf) continue;
+      const k = `${l.begin.getTime()}|${l.vak || ""}|${l.docent || ""}`;
+      tel[k] = (tel[k] || 0) + 1;
+      ((dagen[w] ||= {})[l.begin.getDay()] ||= [0, 0, 0, 0, 0, 0, 0])[this.catIndex(l.cat)]++;
+    }
+    for (const [k, n] of Object.entries(tel)) { const x = (mom[this.maandag(new Date(+k.split("|")[0]))] ||= { lessen: 0, grootste: 0 }); x.lessen++; if (n > x.grootste) x.grootste = n; }
+    return { mom, dagen };
+  },
+  /* Nieuwe gegevens in de opslag van een klas zetten. nieuw: { studenten: { id: { naam, nu, w, vanaf } }, mom, dagen };
+   * per student vervangen de nieuwe weken alles vanaf zijn `vanaf` (de week vanaf waar hij opnieuw is opgehaald),
+   * voor de klas alles vanaf `vanaf`. Wie niet in nieuw staat, blijft bewaard met nu: false (uit de klas). */
+  voegSamen(oud, nieuw, vanaf) {
+    const uit = { studenten: {}, mom: {}, dagen: {} };
+    for (const soort of ["mom", "dagen"]) {
+      for (const [w, v] of Object.entries(oud?.[soort] || {})) if (w < vanaf) uit[soort][w] = v;
+      Object.assign(uit[soort], nieuw[soort] || {});
+    }
+    /* b: begindatum van de aanmelding; naar: de klas waar de student nu staat (overstap). */
+    const extra = (naar, ...van) => { for (const k of ["b", "naar"]) { const v = van.map((x) => x?.[k]).find((x) => x != null && x !== ""); if (v) naar[k] = v; } return naar; };
+    for (const [id, st] of Object.entries(oud?.studenten || {})) uit.studenten[id] = extra({ naam: st.naam, nu: false, w: { ...st.w } }, st);
+    for (const [id, st] of Object.entries(nieuw.studenten || {})) {
+      const w = {}, grens = st.vanaf ?? vanaf, was = uit.studenten[id];
+      for (const [wk, v] of Object.entries(was?.w || {})) if (wk < grens) w[wk] = v;
+      uit.studenten[id] = extra({ naam: st.naam || was?.naam || "", nu: st.nu !== false, w: st.w ? Object.assign(w, st.w) : (was?.w || {}) }, st, st.nu !== false ? { b: was?.b } : was);
+    }
+    return uit;
+  },
+  /* De aanwezigheid van een klas over de weken van..tot (maandagen, inclusief), als optelling zoals leeg(). Alleen
+   * de studenten die nu in de klas zitten. */
+  aggUit(opslag, van, tot, norm = 80) {
+    const agg = this.leeg(), plus = (naar, rij) => { rij.forEach((n, i) => { if (n) naar[this.CATS[i][0]] = (naar[this.CATS[i][0]] || 0) + n; }); };
+    for (const st of Object.values(opslag?.studenten || {})) {
+      if (!st.nu) continue;
+      agg.studenten++;
+      let telt = 0, aanwezig = 0;
+      for (const [w, rij] of Object.entries(st.w || {})) {
+        if (w < van || w > tot) continue;
+        plus(agg.per, rij); plus((agg.weken[w] ||= {}), rij);
+        if (rij.some((n) => n)) agg.actief[w] = (agg.actief[w] || 0) + 1;
+        telt += rij[0] + rij[1] + rij[2] + rij[3] + rij[4] + rij[5]; aanwezig += rij[0] + rij[1];
+      }
+      if (!telt) { agg.zonder++; continue; }
+      const pct = 100 * aanwezig / telt;
+      agg.banden[pct < 70 ? 0 : pct < 80 ? 1 : pct < 90 ? 2 : 3]++;
+      if (pct < norm) agg.onder++;
+    }
+    for (const [w, perDag] of Object.entries(opslag?.dagen || {})) if (w >= van && w <= tot) for (const [dag, rij] of Object.entries(perDag)) plus((agg.dagen[dag] ||= {}), rij);
+    return agg;
+  },
+  /* Per week: actief = studenten (ook wie inmiddels weg is) met minstens één les, plus de lesmomenten van de klas. */
+  lesWekenUit(opslag) {
+    const uit = {};
+    for (const [w, m] of Object.entries(opslag?.mom || {})) uit[w] = { actief: 0, lessen: m.lessen, grootste: m.grootste };
+    for (const st of Object.values(opslag?.studenten || {})) for (const [w, rij] of Object.entries(st.w || {})) if (rij.some((n) => n) && uit[w]) uit[w].actief++;
+    return uit;
+  },
+  /* ---------- deelnemers per les ---------- */
+  /* Welke lessen vragen we op om te zien wie er toen in de klas zat? Per week de lessen die de meeste studenten
+   * van de klas hadden, liefst op verschillende dagen. lessenPerStudent: [[{ id, begin }, …], …]. */
+  lesKeuze(lessenPerStudent, vanaf = "", perWeek = 3) {
+    const tel = new Map();
+    for (const lessen of lessenPerStudent) for (const l of lessen || []) {
+      if (l.id == null) continue;
+      const week = this.maandag(l.begin); if (week < vanaf) continue;
+      const x = tel.get(String(l.id)) || { id: String(l.id), week, dag: l.begin.getDay(), n: 0 };
+      x.n++; tel.set(x.id, x);
+    }
+    const perWk = {}, uit = [];
+    for (const x of tel.values()) (perWk[x.week] ||= []).push(x);
+    for (const week of Object.keys(perWk).sort()) {
+      const lijst = perWk[week].sort((a, b) => b.n - a.n || a.id.localeCompare(b.id)), dagen = new Set(), kies = [];
+      for (const x of lijst) if (kies.length < perWeek && !dagen.has(x.dag)) { dagen.add(x.dag); kies.push(x); }
+      for (const x of lijst) if (kies.length < perWeek && !kies.includes(x)) kies.push(x);
+      uit.push(...kies.map(({ id, n }) => ({ id, week, n })));
+    }
+    return uit;
+  },
+  /* Wie zat er in de lessen van de klas zonder er nu in te staan? lessen: [{ week, n, ids }] (n: zoveel studenten
+   * van de klas hadden de les in hun rooster; ids: de deelnemers volgens Magister). eigen: de studenten van de klas
+   * nu; klasVan: id → klas voor alle studenten van nu; grootte: klas → aantal.
+   *  - Een les waar minder dan de helft van de eigen studenten in staat, slaan we over (niet te vertrouwen).
+   *  - Staat een flink deel van een andere klas erbij (30%, minstens 3), dan is het een gezamenlijke les en zijn
+   *    dat gasten. Een enkeling uit een andere klas zat toen in deze klas: een overstapper (naar: de klas van nu).
+   *  - Wie nu nergens meer staat, is weg van school; die rekenen we tot deze klas als deze klas de grootste groep
+   *    in de les is.
+   * Geeft { id: { weken: [maandag, …], n: aantal lessen, naar: klas of null } }. */
+  gasten(lessen, eigen, klasVan, grootte, klas) {
+    const uit = {};
+    for (const les of lessen || []) {
+      const ids = [...new Set(les.ids || [])], eigenN = ids.filter((i) => eigen.has(i)).length;
+      if (!eigenN || eigenN < 0.5 * (les.n || 1)) continue;
+      const per = {};
+      for (const i of ids) { const k = klasVan.get(i); if (k && k !== klas && !eigen.has(i)) per[k] = (per[k] || 0) + 1; }
+      const samen = new Set(Object.keys(per).filter((k) => per[k] >= Math.max(3, 0.3 * (grootte[k] || 0))));
+      const grootste = eigenN >= Math.max(0, ...Object.values(per));
+      for (const i of ids) {
+        if (eigen.has(i)) continue;
+        const k = klasVan.get(i);
+        if (k ? samen.has(k) : !grootste) continue;
+        const x = (uit[i] ||= { weken: [], n: 0, naar: k || null });
+        x.n++; if (!x.weken.includes(les.week)) x.weken.push(les.week);
+      }
+    }
+    for (const x of Object.values(uit)) x.weken.sort();
+    return uit;
+  },
+  /* Mutaties: wie later begon dan de klas ("in": uit de eerste les, of anders uit de begindatum van de aanmelding),
+   * wie uit de klas is ("uit", met de week van de laatste les; naar: de klas van nu bij een overstap) en wie nog
+   * in de klas staat maar de laatste twee gewone lesweken geen lessen had ("stil"). De klas begint in de eerste
+   * week waarin minstens de helft van de studenten les had. Gewone lesweken: de weken die lesPunten laat staan.
+   * Nieuwste eerst. */
+  mutaties(opslag) {
+    const weken = this.lesWekenUit(opslag), gewoon = Object.keys(this.lesPunten(weken)).sort(), uit = [];
+    const alle = Object.keys(weken).sort(); if (!alle.length) return uit;
+    const top = Math.max(...alle.map((w) => weken[w].actief)), eerste = alle.find((w) => weken[w].actief >= 0.5 * top) || alle[0];
+    const set = new Set(gewoon), voorlaatste = gewoon.length > 1 ? gewoon[gewoon.length - 2] : null;
+    for (const [id, st] of Object.entries(opslag?.studenten || {})) {
+      const wk = Object.keys(st.w || {}).filter((w) => st.w[w].some((n) => n)).sort(), basis = { id, naam: st.naam };
+      const begin = st.b && this.maandag(this.datum(st.b)) > eerste ? st.b : null;
+      if (wk.length && wk[0] > eerste) uit.push({ ...basis, soort: "in", week: wk[0], bron: "les", ...(begin ? { datum: begin } : {}) });
+      else if (begin && st.nu) uit.push({ ...basis, soort: "in", week: this.maandag(this.datum(begin)), bron: "aanmelding", datum: begin });
+      if (!st.nu) uit.push({ ...basis, soort: "uit", week: wk[wk.length - 1] || null, ...(st.naar ? { naar: st.naar } : {}) });
+      else if (voorlaatste && wk.length && (wk.filter((w) => set.has(w)).pop() || "") < voorlaatste) uit.push({ ...basis, soort: "stil", week: wk[wk.length - 1] });
+    }
+    return uit.sort((a, b) => String(b.week || "").localeCompare(String(a.week || "")) || a.naam.localeCompare(b.naam, "nl"));
+  },
+  /* Twee back-ups of opslagen samenvoegen: per klas wint de laatst bijgewerkte (op). */
+  nieuwste(a, b) {
+    const uit = { ...(a || {}) };
+    for (const [k, v] of Object.entries(b || {})) if (!uit[k] || (v?.op || 0) > (uit[k]?.op || 0)) uit[k] = v;
+    return uit;
+  },
+
   /* Optellingen bij elkaar (lege of ontbrekende worden overgeslagen); null als er geen enkele is. */
   som(aggs) {
     const lijst = aggs.filter(Boolean); if (!lijst.length) return null;

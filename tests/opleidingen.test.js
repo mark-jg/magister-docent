@@ -132,3 +132,105 @@ test("aanwezigheid: per week het aantal studenten met lessen, ook opgeteld over 
   assert.deepStrictEqual(kaal(a.actief), { "2026-11-16": 2, "2026-11-09": 1 });
   assert.deepStrictEqual(kaal(R.som([a, b]).actief), { "2026-11-16": 3, "2026-11-09": 1 });
 });
+
+test("studenten per week uit de lessen: per lesmoment en per week, weken met weinig lessen vallen weg", () => {
+  const l = (dag, uur, vak = "Engels") => ({ begin: new Date(2026, 10, dag, uur), vak, docent: "D" }), acc = R.lesLeeg();
+  /* Drie studenten in week 46 (9-13 nov), twee in week 47 (één is weg), en in week 48 alleen één losse les. */
+  const dagen = (ds) => ds.flatMap((d) => [l(d, 9), l(d, 10, "Nederlands")]);
+  R.voegLessen(acc, [...dagen([9, 10, 11, 16, 17, 18]), l(23, 9)]);
+  R.voegLessen(acc, dagen([9, 10, 11, 16, 17, 18]));
+  R.voegLessen(acc, [...dagen([9, 10]), l(11, 11, "Keuzevak")]);
+  R.voegLessen(acc, null);
+  const weken = R.lesWeken(acc);
+  assert.deepStrictEqual(kaal(weken), { "2026-11-09": { actief: 3, lessen: 7, grootste: 3 }, "2026-11-16": { actief: 2, lessen: 6, grootste: 2 }, "2026-11-23": { actief: 1, lessen: 1, grootste: 1 } });
+  assert.deepStrictEqual(kaal(R.lesPunten(weken)), { "2026-11-09": 3, "2026-11-16": 2 }, "één les in een week van normaal zes is te weinig om te tellen");
+  assert.deepStrictEqual(kaal(R.lesPunten({})), {});
+});
+
+test("studenten per week: klassen optellen; een klas zonder punt in een week telt met zijn vorige stand", () => {
+  const a = { "2026-11-02": 20, "2026-11-09": 19, "2026-11-16": 19 }, b = { "2026-11-09": 25, "2026-11-23": 24 };
+  assert.deepStrictEqual(kaal(R.lesReeks([a, b, undefined, {}])), [{ datum: "2026-11-02", n: 45 }, { datum: "2026-11-09", n: 44 }, { datum: "2026-11-16", n: 44 }, { datum: "2026-11-23", n: 43 }]);
+  assert.deepStrictEqual(kaal(R.lesReeks([a], ["2026-11-09", "2026-11-30"])), [{ datum: "2026-11-09", n: 19 }, { datum: "2026-11-30", n: 19 }]);
+  assert.deepStrictEqual(kaal(R.lesReeks([])), []);
+});
+
+/* ---------- jaaropslag ---------- */
+const lesOp = (dag, cat, uur = 9) => ({ begin: new Date(2026, 10, dag, uur), cat, vak: "Engels", docent: "D" });
+
+test("jaaropslag: lessen per student per week, in de volgorde van de categorieën", () => {
+  const w = R.studentWeken([lesOp(9, "OK"), lesOp(10, "TL"), lesOp(11, "ZK"), lesOp(16, "VR"), lesOp(17, "OK")]);
+  assert.deepStrictEqual(kaal(w), { "2026-11-09": [1, 1, 1, 0, 0, 0, 0], "2026-11-16": [1, 0, 0, 0, 0, 0, 1] });
+  const k = R.klasWeken([[lesOp(9, "OK"), lesOp(16, "OK")], [lesOp(9, "AB_NO"), lesOp(16, "OK", 10)]], "2026-11-16");
+  assert.deepStrictEqual(kaal(k.mom), { "2026-11-16": { lessen: 2, grootste: 1 } }, "alleen weken vanaf de grens");
+  assert.deepStrictEqual(kaal(R.klasWeken([[lesOp(9, "OK")], [lesOp(9, "AB_NO")]]).dagen), { "2026-11-09": { 1: [1, 0, 0, 0, 1, 0, 0] } });
+});
+
+test("jaaropslag bijwerken: alleen de weken vanaf de grens worden vervangen; wie ontbreekt is uit de klas", () => {
+  const oud = { studenten: { 1: { naam: "A", nu: true, w: { "2026-11-02": [5, 0, 0, 0, 0, 0, 0], "2026-11-09": [4, 0, 0, 0, 1, 0, 0] } }, 2: { naam: "B", nu: true, w: { "2026-11-02": [5, 0, 0, 0, 0, 0, 0] } } },
+    mom: { "2026-11-02": { lessen: 5, grootste: 2 }, "2026-11-09": { lessen: 5, grootste: 1 } }, dagen: {} };
+  const nieuw = { studenten: { 1: { naam: "A", nu: true, vanaf: "2026-11-09", w: { "2026-11-09": [5, 0, 0, 0, 0, 0, 0], "2026-11-16": [3, 0, 0, 0, 0, 0, 0] } }, 3: { naam: "C", nu: true, vanaf: "", w: { "2026-11-16": [3, 0, 0, 0, 0, 0, 0] } } },
+    mom: { "2026-11-09": { lessen: 5, grootste: 1 }, "2026-11-16": { lessen: 3, grootste: 2 } }, dagen: {} };
+  const s = R.voegSamen(oud, nieuw, "2026-11-09");
+  assert.deepStrictEqual(kaal(s.studenten[1].w), { "2026-11-02": [5, 0, 0, 0, 0, 0, 0], "2026-11-09": [5, 0, 0, 0, 0, 0, 0], "2026-11-16": [3, 0, 0, 0, 0, 0, 0] }, "de achteraf gewijzigde registratie in week 46 is vervangen");
+  assert.strictEqual(s.studenten[2].nu, false); assert.deepStrictEqual(kaal(s.studenten[2].w), { "2026-11-02": [5, 0, 0, 0, 0, 0, 0] }, "B is weg maar zijn lessen blijven");
+  assert.strictEqual(s.studenten[3].nu, true);
+  assert.deepStrictEqual(Object.keys(s.mom).sort(), ["2026-11-02", "2026-11-09", "2026-11-16"]);
+  /* Een student van wie het ophalen mislukte (geen w) houdt wat er stond. */
+  assert.deepStrictEqual(kaal(R.voegSamen(oud, { studenten: { 1: { naam: "A", nu: true } } }, "2026-11-09").studenten[1].w), kaal(oud.studenten[1].w));
+  assert.deepStrictEqual(kaal(R.voegSamen(null, nieuw, "").studenten[3]), { naam: "C", nu: true, w: { "2026-11-16": [3, 0, 0, 0, 0, 0, 0] } });
+});
+
+const OPSLAG = () => {
+  const vol = (weken) => Object.fromEntries(weken.map((w) => [w, [5, 0, 0, 0, 0, 0, 0]])), W = ["2026-10-26", "2026-11-02", "2026-11-09", "2026-11-16"];
+  return { studenten: { 1: { naam: "Blijver", nu: true, w: { ...vol(W), "2026-11-16": [2, 1, 0, 0, 2, 0, 1] } }, 2: { naam: "Instromer", nu: true, w: vol(W.slice(2)) }, 3: { naam: "Vertrekker", nu: false, w: vol(W.slice(0, 2)) },
+    4: { naam: "Stil", nu: true, w: vol(W.slice(0, 1)) } }, mom: Object.fromEntries(W.map((w) => [w, { lessen: 5, grootste: 3 }])), dagen: { "2026-11-16": { 1: [2, 1, 0, 0, 2, 0, 1] } } };
+};
+
+test("jaaropslag: aanwezigheid over een periode van hele weken, alleen wie nu in de klas zit", () => {
+  const a = R.aggUit(OPSLAG(), "2026-11-09", "2026-11-16");
+  assert.strictEqual(a.studenten, 3); assert.strictEqual(a.zonder, 1, "Stil had in deze weken geen lessen");
+  assert.deepStrictEqual(kaal(a.per), { OK: 17, TL: 1, AB_NO: 2, VR: 1 });
+  assert.strictEqual(R.cijfers(a.per).pct, 90);
+  assert.deepStrictEqual(kaal(a.banden), [0, 0, 1, 1], "Blijver 8 van 10 (80%: niet onder de norm), Instromer 10 van 10");
+  assert.strictEqual(a.onder, 0);
+  assert.deepStrictEqual(kaal(a.actief), { "2026-11-09": 2, "2026-11-16": 2 });
+  assert.deepStrictEqual(kaal(a.dagen), { 1: { OK: 2, TL: 1, AB_NO: 2, VR: 1 } });
+  assert.strictEqual(R.aggUit(null, "2026-01-01", "2026-12-31").studenten, 0);
+});
+
+test("jaaropslag: studenten per week tellen ook wie inmiddels weg is, en de mutaties volgen uit de lessen", () => {
+  const o = OPSLAG();
+  assert.deepStrictEqual(kaal(Object.fromEntries(Object.entries(R.lesWekenUit(o)).map(([w, x]) => [w, x.actief]))), { "2026-10-26": 3, "2026-11-02": 2, "2026-11-09": 2, "2026-11-16": 2 });
+  assert.deepStrictEqual(kaal(R.mutaties(o).map((m) => [m.naam, m.soort, m.week])), [["Instromer", "in", "2026-11-09"], ["Vertrekker", "uit", "2026-11-02"], ["Stil", "stil", "2026-10-26"]]);
+  assert.deepStrictEqual(kaal(R.mutaties({ studenten: {}, mom: {} })), []);
+});
+
+test("back-up: per klas wint de laatst bijgewerkte versie", () => {
+  assert.deepStrictEqual(kaal(R.nieuwste({ A: { op: 5, x: "lokaal" }, B: { op: 1, x: "lokaal" } }, { B: { op: 9, x: "map" }, C: { op: 2, x: "map" } })), { A: { op: 5, x: "lokaal" }, B: { op: 9, x: "map" }, C: { op: 2, x: "map" } });
+  assert.deepStrictEqual(kaal(R.nieuwste(undefined, undefined)), {});
+});
+
+test("deelnemers per les: lessen kiezen, en gasten, overstappers en vertrekkers onderscheiden", () => {
+  const les = (id, dag) => ({ id, begin: new Date(2026, 8, dag, 9) });
+  const keuze = R.lesKeuze([[les(1, 7), les(2, 7), les(3, 8), les(9, 14)], [les(1, 7), les(3, 8), les(9, 14)], [les(1, 7), les(2, 7)]], "", 2);
+  assert.deepStrictEqual(kaal(keuze), [{ id: "1", week: "2026-09-07", n: 3 }, { id: "3", week: "2026-09-07", n: 2 }, { id: "9", week: "2026-09-14", n: 2 }]);
+  const eigen = new Set(["a1", "a2", "a3", "a4"]), klasVan = new Map([...eigen].map((i) => [i, "A"]));
+  for (const i of ["b1", "b2", "b3", "b4"]) klasVan.set(i, "B");
+  const g = R.gasten([
+    { week: "2026-08-31", n: 4, ids: ["a1", "a2", "a3", "a4", "x1", "b1"] },                 // x1 weg van school, b1 stapte over
+    { week: "2026-09-07", n: 4, ids: ["a1", "a2", "a3", "a4", "x1", "b1", "b2", "b3", "b4"] }, // gezamenlijke les met B
+    { week: "2026-09-14", n: 4, ids: ["a1", "x9"] },                                          // te weinig eigen studenten
+  ], eigen, klasVan, { A: 4, B: 4 }, "A");
+  assert.deepStrictEqual(kaal(g), { x1: { weken: ["2026-08-31", "2026-09-07"], n: 2, naar: null }, b1: { weken: ["2026-08-31"], n: 1, naar: "B" } });
+});
+
+test("mutaties: instroom uit de aanmelding, overstap met de nieuwe klas, en extra velden blijven bewaard", () => {
+  const W = ["2026-08-31", "2026-09-07", "2026-09-14", "2026-09-21"], vol = (w) => Object.fromEntries(w.map((x) => [x, [5, 0, 0, 0, 0, 0, 0]]));
+  const o = { studenten: { 1: { naam: "Blijver", nu: true, w: vol(W), b: "2026-08-01" }, 2: { naam: "Later aangemeld", nu: true, w: vol(W), b: "2026-09-14" },
+    3: { naam: "Overstapper", nu: false, naar: "B", w: vol(W.slice(0, 1)) }, 4: { naam: "Tweede week", nu: true, w: vol(W.slice(1)), b: "2026-09-10" }, 5: { naam: "Ook blijver", nu: true, w: vol(W) } },
+  mom: Object.fromEntries(W.map((w) => [w, { lessen: w === W[0] ? 1 : 5, grootste: 4 }])) };
+  assert.deepStrictEqual(kaal(R.mutaties(o).map((m) => [m.naam, m.soort, m.week, m.bron || m.naar || ""])),
+    [["Later aangemeld", "in", "2026-09-14", "aanmelding"], ["Tweede week", "in", "2026-09-07", "les"], ["Overstapper", "uit", "2026-08-31", "B"]]);
+  const s = R.voegSamen(o, { studenten: { 1: { naam: "Blijver", nu: true, w: {} }, 3: { naam: "Overstapper", nu: false } } }, "2026-09-21").studenten;
+  assert.strictEqual(s[1].b, "2026-08-01"); assert.strictEqual(s[3].naar, "B"); assert.strictEqual(s[2].nu, false); assert.strictEqual(s[2].b, "2026-09-14");
+});
