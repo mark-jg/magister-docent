@@ -343,23 +343,20 @@ var OplReken = {
     for (const x of Object.values(uit)) x.weken.sort();
     return uit;
   },
-  /* Mutaties: wie later begon dan de klas ("in": uit de eerste les, of anders uit de begindatum van de aanmelding),
-   * wie uit de klas is ("uit", met de week van de laatste les; naar: de klas van nu bij een overstap) en wie nog
-   * in de klas staat maar de laatste twee gewone lesweken geen lessen had ("stil"). De klas begint in de eerste
-   * week waarin minstens de helft van de studenten les had. Gewone lesweken: de weken die lesPunten laat staan.
-   * Nieuwste eerst. */
+  /* Mutaties: wie later begon dan de klas ("in": uit de eerste les, of anders uit de begindatum van de aanmelding)
+   * en wie uit de klas is ("uit", met de week van de laatste les; naar: de klas van nu bij een overstap). De klas
+   * begint in de eerste week waarin minstens de helft van de studenten les had. Wie nog in de klas staat maar een
+   * tijd geen lessen heeft, is geen mutatie: stages staan niet in Magister. Nieuwste eerst. */
   mutaties(opslag) {
-    const weken = this.lesWekenUit(opslag), gewoon = Object.keys(this.lesPunten(weken)).sort(), uit = [];
+    const weken = this.lesWekenUit(opslag), uit = [];
     const alle = Object.keys(weken).sort(); if (!alle.length) return uit;
     const top = Math.max(...alle.map((w) => weken[w].actief)), eerste = alle.find((w) => weken[w].actief >= 0.5 * top) || alle[0];
-    const set = new Set(gewoon), voorlaatste = gewoon.length > 1 ? gewoon[gewoon.length - 2] : null;
     for (const [id, st] of Object.entries(opslag?.studenten || {})) {
       const wk = Object.keys(st.w || {}).filter((w) => st.w[w].some((n) => n)).sort(), basis = { id, naam: st.naam };
       const begin = st.b && this.maandag(this.datum(st.b)) > eerste ? st.b : null;
       if (wk.length && wk[0] > eerste) uit.push({ ...basis, soort: "in", week: wk[0], bron: "les", ...(begin ? { datum: begin } : {}) });
       else if (begin && st.nu) uit.push({ ...basis, soort: "in", week: this.maandag(this.datum(begin)), bron: "aanmelding", datum: begin });
       if (!st.nu) uit.push({ ...basis, soort: "uit", week: wk[wk.length - 1] || null, ...(st.naar ? { naar: st.naar } : {}) });
-      else if (voorlaatste && wk.length && (wk.filter((w) => set.has(w)).pop() || "") < voorlaatste) uit.push({ ...basis, soort: "stil", week: wk[wk.length - 1] });
     }
     return uit.sort((a, b) => String(b.week || "").localeCompare(String(a.week || "")) || a.naam.localeCompare(b.naam, "nl"));
   },

@@ -527,7 +527,7 @@ DT.register({
         ${kpi("Aanwezigheid", c && c.telt ? this.pct(c.pct) : "—", c && c.telt ? E(per.naam.toLowerCase()) : "nog niet opgehaald")}
         ${kpi("Onder de norm", agg ? this.getal(agg.onder) : "—", agg ? `van ${this.getal(agg.studenten)} studenten onder 80% aanwezig` : "studenten onder 80% aanwezig")}
         ${kpi("Ingestroomd", this.getal(n("in")), "later begonnen dan de klas")}
-        ${kpi("Uit de klas", this.getal(n("uit")), n("stil") ? `${n("stil")} zonder lessen in de laatste weken` : "dit schooljaar")}
+        ${kpi("Uit de klas", this.getal(n("uit")), "dit schooljaar")}
       </div>
       <dna-card class="dt-opl-kaart dt-opl-zoom">${this.detail(k, i, stand !== "leeg" ? reeks : null, agg, c, nGeladen)}</dna-card>
       ${k.kinderen.length ? boomKaart(k.kinderen, `${k.soort === "opleiding" ? "Leerjaren en klassen" : "Klassen"} van ${E(k.naam)}`, "Klik op Details om verder in te zoomen.") : ""}`;
@@ -647,12 +647,11 @@ DT.register({
     const metDelta = R.verloopStand(d.tellingen) !== "leeg" ? klassen.map((k) => ({ k, n: R.verschil(this.reeksVan(k), sinds) })).filter((x) => x.n) : [];
     const teken = (n) => `${n > 0 ? "+" : "−"}${Math.abs(n)}`;
     const metAanw = klassen.map((k) => ({ k, agg: d.aanw[k.naam], c: d.aanw[k.naam] ? R.cijfers(d.aanw[k.naam].per) : null })).filter((x) => x.c && x.c.telt);
-    const mut = klassen.map((k) => ({ k, in: (d.mut[k.naam] || []).filter((m) => m.soort === "in").length, uit: (d.mut[k.naam] || []).filter((m) => m.soort === "uit").length, stil: (d.mut[k.naam] || []).filter((m) => m.soort === "stil").length }));
+    const mut = klassen.map((k) => ({ k, in: (d.mut[k.naam] || []).filter((m) => m.soort === "in").length, uit: (d.mut[k.naam] || []).filter((m) => m.soort === "uit").length }));
     const cat = (key, titel) => lijst(titel, metAanw.filter((x) => x.c.cat[key].n).sort((a, b) => b.c.cat[key].pct - a.c.cat[key].pct).slice(0, 5).map((x) => [x.k, this.pct(x.c.cat[key].pct), `${this.getal(x.c.cat[key].n)} lessen`]), "");
     const delen = [
       lijst("Uit de klas (uit de lessen)", mut.filter((x) => x.uit).sort((a, b) => b.uit - a.uit).slice(0, 5).map((x) => [x.k, this.getal(x.uit), naamOpl(x.k)]), "Studenten die dit schooljaar lessen hadden en nu niet meer in de klas staan."),
       lijst("Later ingestroomd (uit de lessen)", mut.filter((x) => x.in).sort((a, b) => b.in - a.in).slice(0, 5).map((x) => [x.k, this.getal(x.in), naamOpl(x.k)]), ""),
-      lijst("Geen lessen meer, nog wel in de klas", mut.filter((x) => x.stil).sort((a, b) => b.stil - a.stil).slice(0, 5).map((x) => [x.k, this.getal(x.stil), naamOpl(x.k)]), "De laatste twee gewone lesweken zonder lessen in het rooster."),
       lijst("Meeste uitstroom (peildatums)", metDelta.filter((x) => x.n < 0).sort((a, b) => a.n - b.n).slice(0, 5).map((x) => [x.k, teken(x.n), naamOpl(x.k)]), `Verschil in aantal studenten sinds ${E(this.kort(sinds))}.`),
       lijst("Meeste instroom (peildatums)", metDelta.filter((x) => x.n > 0).sort((a, b) => b.n - a.n).slice(0, 5).map((x) => [x.k, teken(x.n), naamOpl(x.k)]), ""),
       lijst("Kleinste klassen", klassen.filter((k) => k.aantal > 0).sort((a, b) => a.aantal - b.aantal).slice(0, 5).map((k) => [k, this.getal(k.aantal), naamOpl(k)]), ""),
@@ -665,7 +664,7 @@ DT.register({
   /* Mutaties uit de lessen: wie later begon, wie uit de klas is en wie geen lessen meer heeft. */
   mutatieTabel(rijen, metKlas = true) {
     const d = this._d, E = (s) => this.esc(s), R = OplReken, wk = (w) => (w ? `wk ${typeof isoWeek === "function" ? isoWeek(R.datum(w)).w : ""} · ${this.kort(w, false)}` : "—");
-    const SOORT = { in: ["Ingestroomd", "eerste les in", "is-in"], uit: ["Uit de klas", "laatste les in", "is-uit"], stil: ["Geen lessen meer", "laatste les in", "is-stil"] };
+    const SOORT = { in: ["Ingestroomd", "eerste les in", "is-in"], uit: ["Uit de klas", "laatste les in", "is-uit"] };
     return `<div class="dt-opl-scroll"><table class="dt-opl-tabel dt-opl-mut"><thead><tr><th>Mutatie</th><th>Student</th>${metKlas ? "<th>Klas</th>" : ""}<th>Week</th></tr></thead><tbody>${rijen.map((m) => { const k = d.knopen.find((x) => x.soort === "klas" && x.naam === m.klas);
       return `<tr><td><span class="dt-opl-label ${SOORT[m.soort][2]}">${SOORT[m.soort][0]}</span></td><td>${E(m.naam && m.naam !== "Onbekende student" ? m.naam : "Naam onbekend")}${m.naar ? ` <small class="dt-opl-zacht">naar ${E(m.naar)}</small>` : ""}</td>${metKlas ? `<td>${k ? `<button type="button" class="dt-opl-ga" data-act="ga" data-i="${d.knopen.indexOf(k)}">${E(m.klas)}</button>` : E(m.klas)}</td>` : ""}<td>${m.bron === "aanmelding" ? `aangemeld per ${E(this.kort(m.datum))}` : m.week ? `${SOORT[m.soort][1]} ${E(wk(m.week))}${m.datum ? `, aangemeld per ${E(this.kort(m.datum))}` : ""}` : "geen lessen dit schooljaar"}</td></tr>`; }).join("")}</tbody></table></div>`;
   },
@@ -677,7 +676,7 @@ DT.register({
     const chip = (w, naam) => `<button type="button" class="dt-opl-seg" data-act="mut-soort" data-w="${w}" aria-pressed="${String((this._mutSoort || "") === w)}">${naam} · ${w ? n(w) : alle.length}</button>`;
     return `<dna-card class="dt-opl-kaart"><div class="dt-opl-kaartkop"><div><h2>Mutaties uit de lessen</h2><p class="dt-opl-zacht">${alle.length ? `${alle.filter((m) => m.soort === "uit" && m.naar).length} van de vertrekkers gingen naar een andere klas.` : "Geen mutaties gevonden in de lessen van dit schooljaar."} Uit de klas: wie volgens Magister in de lessen van de klas zat en er nu niet meer in staat (per week worden een paar lessen bekeken). Ingestroomd: een eerste les na de start van de klas, of een aanmelding die later begint. Een stage of een rooster dat later begint kan er ook als mutatie uitzien.${this._namenFout ? ` Namen van vertrekkers: ${E(this._namenFout)}.` : ""}${oudeVersie ? ` <b>${oudeVersie} ${oudeVersie === 1 ? "klas is" : "klassen zijn"} nog niet opnieuw opgehaald; daar ontbreken de vertrekkers nog.</b>` : ""}</p></div>
       <button type="button" class="dt-opl-knop is-stil" data-act="diag-mut" title="Zet op het klembord wat Magister over in- en uitstroom teruggeeft: alleen aantallen, datums, veldnamen en statuscodes, geen namen">Diagnose mutaties</button></div>
-      ${alle.length ? `<div class="dt-opl-filter" role="group" aria-label="Soort mutatie"><span class="dt-opl-segs">${chip("", "Alle")}${chip("in", "Ingestroomd")}${chip("uit", "Uit de klas")}${chip("stil", "Geen lessen meer")}</span></div>${this.mutatieTabel(toon)}` : ""}
+      ${alle.length ? `<div class="dt-opl-filter" role="group" aria-label="Soort mutatie"><span class="dt-opl-segs">${chip("", "Alle")}${chip("in", "Ingestroomd")}${chip("uit", "Uit de klas")}</span></div>${this.mutatieTabel(toon)}` : ""}
       ${keuze.length > 50 ? `<p><button type="button" class="dt-opl-knop is-stil" data-act="mut-alles">${this._mutAlles ? "Alleen de nieuwste 50" : `Alle ${keuze.length} tonen`}</button></p>` : ""}</dna-card>`;
   },
 
@@ -706,7 +705,7 @@ DT.register({
       XLSX.utils.book_append_sheet(wb, blad([["Week vanaf", "Totaal (zonder weken met weinig lessen)", ...metLes.flatMap((k) => [`${k} studenten`, `${k} lessen`, `${k} grootste les`])],
         ...weken.map((w) => [w, R.lesReeks(metLes.map((k) => R.lesPunten(d.les[k].weken)), [w])[0].n, ...metLes.flatMap((k) => { const x = d.les[k].weken[w]; return x ? [x.actief, x.lessen, x.grootste] : ["", "", ""]; })])], [12, 16, ...metLes.flatMap(() => [12, 10, 12])]), "Studenten per week");
     }
-    const mut = Object.keys(d.mut || {}).flatMap((k) => d.mut[k].map((m) => [{ in: "Ingestroomd", uit: "Uit de klas", stil: "Geen lessen meer" }[m.soort], m.naam, k, d.boom.find((o) => o.klassen.includes(k))?.naam || "", m.week || "", m.bron === "aanmelding" ? "begin aanmelding" : m.soort === "in" ? "eerste les" : "laatste les", m.naar || "", m.datum || ""]));
+    const mut = Object.keys(d.mut || {}).flatMap((k) => d.mut[k].map((m) => [{ in: "Ingestroomd", uit: "Uit de klas" }[m.soort], m.naam, k, d.boom.find((o) => o.klassen.includes(k))?.naam || "", m.week || "", m.bron === "aanmelding" ? "begin aanmelding" : m.soort === "in" ? "eerste les" : "laatste les", m.naar || "", m.datum || ""]));
     if (mut.length) XLSX.utils.book_append_sheet(wb, blad([["Mutatie", "Student", "Klas", "Opleiding", "Week vanaf", "Betekenis van de week", "Naar klas", "Begin aanmelding"], ...mut.sort((a, b) => String(b[4]).localeCompare(String(a[4])))], [18, 28, 10, 20, 12, 16, 10, 16]), "Mutaties");
     const alle = this.aanwVan(Object.keys(d.nu));
     if (alle) XLSX.utils.book_append_sheet(wb, blad([["Week vanaf", "Lessen", ...R.CATS.map((c) => c[1]), "Aanwezig %"], ...Object.keys(alle.weken).sort().map((w) => { const c = R.cijfers(alle.weken[w]); return [w, c.lessen, ...R.CATS.map(([k]) => c.cat[k].n), p(c.pct)]; })], [12, 9, ...R.CATS.map(() => 13), 11]), "Aanwezigheid per week");
