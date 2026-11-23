@@ -81,10 +81,24 @@ Object.assign(DtCb, {
     this.teken();
     this.melding(`De stand van ${this.moment(k.op)} is teruggezet.`, "info", 7000);
   },
+  /* De code waaraan de balie het eigen apparaat herkent in tardy-in-gebruik.json. Die blijft de hele sessie
+   * dezelfde (this._app) en staat in de extensie (chrome.storage.local), niet alleen in de opslag van de
+   * Magister-pagina: raakt die leeg of is ze geblokkeerd, dan kreeg de balie telkens een nieuwe code en zag ze
+   * het eigen slot aan voor dat van een collega. */
+  APPARAAT: "dt-cb-apparaat",
   apparaat() {
-    let id = null; try { id = localStorage.getItem("dt-cb-apparaat"); } catch {}
-    if (!id) { id = "chrome-" + Math.random().toString(36).slice(2, 10); try { localStorage.setItem("dt-cb-apparaat", id); } catch {} }
-    return id;
+    if (this._app) return this._app;
+    let id = null; try { id = localStorage.getItem(this.APPARAAT); } catch {}
+    if (!id) { id = "chrome-" + Math.random().toString(36).slice(2, 10); try { localStorage.setItem(this.APPARAAT, id); } catch {} }
+    return this._app = id;
+  },
+  async apparaatLaden() {
+    if (this._appGeladen) return this._app;
+    let vast = null; try { vast = (await chrome.storage.local.get(this.APPARAAT))[this.APPARAAT]; } catch {}
+    if (vast) { this._app = vast; try { localStorage.setItem(this.APPARAAT, vast); } catch {} }
+    else { const id = this.apparaat(); try { await chrome.storage.local.set({ [this.APPARAAT]: id }); } catch {} }
+    this._appGeladen = true;
+    return this._app;
   },
   async lees(naam) {
     try { const f = await (await this._map.getFileHandle(naam)).getFile(); return await f.text(); } catch { return null; }
@@ -226,7 +240,13 @@ Object.assign(DtCb, {
     const rev = (() => { try { return JSON.parse(tekst || "null")?.revisie || 0; } catch { return 0; } })();
     if (this._kijkt) {
       if (rev > this._basis) await this.herlaad();
-      if (!this.bezetDoorAnder(b)) { this._ander = null; this.tekenStand(); }
+      /* De ander is klaar (slot weg of verlopen): zelf verder, zonder de pagina opnieuw te hoeven openen. */
+      if (!this.bezetDoorAnder(b) && !this._modal) {
+        const wie = this._ander?.naam || "Je collega";
+        this._kijkt = false; this._ander = null;
+        await this.herlaad(); await this.bezettingZet(); this.teken();
+        this.melding(`${wie} werkt niet meer in Tardy. Je werkt nu zelf; wijzigingen worden weer bewaard.`, "info", 8000);
+      }
     } else if (this.bezetDoorAnder(b)) {
       this._kijkt = true; this._ander = b; await this.herlaad();
       this.melding(`${b.naam || "Je collega"} heeft Tardy overgenomen. Je kijkt nu mee.`, "info", 8000);

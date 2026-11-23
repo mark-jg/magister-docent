@@ -9,16 +9,17 @@ const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0
 const P = (naam, b, e) => ({ id: b, naam, begin: new Date(b + "T00:00"), einde: new Date(e + "T23:59:59") });
 
 function balie(mijnPeriodes) {
-  const opslag = {}, staat = { mijn: mijnPeriodes, bewaard: 0 };
+  const opslag = {}, ext = {}, staat = { mijn: mijnPeriodes, bewaard: 0 };
   const K = { S: null, H: {}, UI: { periodeId: null }, SOORT: { ziek: { g: "ziek" } }, TELLERS: { klokuren4w: {}, ziek8w: {} }, vandaag: () => "2026-11-19", periodeVanDatum: () => null,
     plusDagen: (s, n) => { const d = new Date(s + "T12:00"); d.setDate(d.getDate() + n); return ymd(d); },
     periodeById: (id) => (K.S.instellingen.periodes || []).find((p) => p.id === id) };
   const { modules, DT } = metRegister({ periodes: () => staat.mijn });
   laad(CB_DELEN, { DT, TardyKern: K, window: {}, document: {}, setTimeout: () => 0, clearTimeout() {},
+    chrome: { storage: { local: { get: async (k) => ({ [k]: ext[k] }), set: async (o) => { Object.assign(ext, o); } } } },
     localStorage: { getItem: (k) => (k in opslag ? opslag[k] : null), setItem: (k, v) => { opslag[k] = String(v); } } });
   const cb = modules.cb;
   cb.bewaar = () => { staat.bewaard++; }; cb.opnieuwOphalen = () => {}; cb.melding = () => {}; cb._map = {}; cb._kijkt = false;
-  return { cb, K, staat, opslag, bestand: (ps) => { K.S = { instellingen: { periodes: kaal(ps) } }; } };
+  return { cb, K, staat, opslag, ext, bestand: (ps) => { K.S = { instellingen: { periodes: kaal(ps) } }; } };
 }
 
 test("periodes: gelijk aan het bestand, dan verandert er niets", () => {
@@ -97,4 +98,38 @@ test("opmaak van de balie: geen regel staat per ongeluk binnen een andere regel"
   }
   assert.deepStrictEqual(fout, []);
   assert.strictEqual(stapel.length, 0);
+});
+
+/* Het slot (tardy-in-gebruik.json): de balie moet het eigen apparaat blijven herkennen. */
+test("apparaat: zonder werkende opslag van de pagina blijft de code de hele sessie dezelfde", () => {
+  const { cb } = balie([]);
+  const eerste = cb.apparaat();
+  assert.match(eerste, /^chrome-/); assert.strictEqual(cb.apparaat(), eerste);
+  /* Magister leegt de opslag: het eigen slot blijft van mij. */
+  const { cb: cb2, opslag } = balie([]);
+  const code = cb2.apparaat(); delete opslag["dt-cb-apparaat"];
+  assert.strictEqual(cb2.apparaat(), code);
+  assert.strictEqual(cb2.bezetDoorAnder({ naam: "Ik", apparaat: code, bijgewerkt: new Date().toISOString() }), false);
+});
+
+test("apparaat: de code uit de extensie gaat voor en wordt daar bewaard", async () => {
+  const { cb, opslag, ext } = balie([]);
+  ext["dt-cb-apparaat"] = "chrome-vast1234";
+  assert.strictEqual(await cb.apparaatLaden(), "chrome-vast1234");
+  assert.strictEqual(cb.apparaat(), "chrome-vast1234"); assert.strictEqual(opslag["dt-cb-apparaat"], "chrome-vast1234");
+  const nieuw = balie([]), code = await nieuw.cb.apparaatLaden();
+  assert.match(code, /^chrome-/); assert.strictEqual(nieuw.ext["dt-cb-apparaat"], code);
+});
+
+test("meekijken: is de ander klaar, dan werk je vanzelf weer zelf", async () => {
+  const { cb } = balie([]);
+  let gezet = 0; const meldingen = [];
+  Object.assign(cb, { _scherm: {}, _kijkt: true, _ander: { naam: "Marit" }, _basis: 3, lees: async () => null, herlaad: async () => {}, teken() {}, tekenStand() {},
+    bezettingZet: async () => { gezet++; }, melding: (t) => meldingen.push(t) });
+  cb.bezetting = async () => ({ naam: "Marit", apparaat: "mac-1", bijgewerkt: new Date().toISOString() });
+  await cb.controle();
+  assert.strictEqual(cb._kijkt, true); assert.strictEqual(gezet, 0);
+  cb.bezetting = async () => null;
+  await cb.controle();
+  assert.strictEqual(cb._kijkt, false); assert.strictEqual(gezet, 1); assert.match(meldingen[0], /Marit werkt niet meer/);
 });
