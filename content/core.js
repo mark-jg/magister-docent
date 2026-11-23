@@ -13,7 +13,20 @@
   /* Gedeelde waarnemer voor DT.observe: één MutationObserver voor alle modules. */
   const waarnemers = new Set();
   let waarnemer = null;
-  const alleWaarnemers = () => { for (const w of waarnemers) w.run(); };
+  /* De schaduw-DOM's van het document. Ze opzoeken betekent het hele document doorlopen; omdat elke module dat
+   * meermaals per controle vraagt, blijft de lijst kort bruikbaar: tot de pagina verandert, en hooguit 400 ms
+   * (wijzigingen binnen een schaduw-DOM ziet de MutationObserver niet). */
+  let rootsLijst = null, rootsOp = 0, rootsVuil = true;
+  const alleRoots = () => {
+    const nu = Date.now();
+    if (rootsLijst && !rootsVuil && nu - rootsOp < 400) return rootsLijst;
+    const uit = [document];
+    const walk = (r) => { r.querySelectorAll("*").forEach((e) => { if (e.shadowRoot) { uit.push(e.shadowRoot); walk(e.shadowRoot); } }); };
+    walk(document);
+    rootsLijst = uit; rootsOp = nu; rootsVuil = false;
+    return uit;
+  };
+  const alleWaarnemers = () => { rootsVuil = true; for (const w of waarnemers) w.run(); };
   const zichtbaar = () => { if (!document.hidden) alleWaarnemers(); };
   /* Wordt de extensie herladen of bijgewerkt terwijl Magister openstaat, dan blijft dit script in het tabblad
    * draaien zonder verbinding met de extensie: elke aanroep van chrome.* geeft dan "Extension context
@@ -173,6 +186,7 @@
       for (let poging = 0; poging < pogingen; poging++) {
         r = await DT.api(url, { full: true, timeout: 25000, ...opties });
         if (r.status !== 429 && r.status !== 503) return r;
+        DT.druk = Date.now();   // Magister vraagt om rust: wie veel ophaalt doet het daarna een tijd kalmer aan (vzBron)
         if (poging === pogingen - 1) break;
         if (opWachten) opWachten(poging);
         await new Promise((ok) => setTimeout(ok, basis * 2 ** poging));
@@ -199,6 +213,10 @@
     /* Doorzoekt ook alle open shadow roots (Magister OP gebruikt webcomponenten). */
     deepQueryAll(selector, root = document) {
       const out = [];
+      if (root === document) {
+        for (const r of alleRoots()) { if (r !== document && !r.host.isConnected) continue; try { out.push(...r.querySelectorAll(selector)); } catch {} }
+        return out;
+      }
       const walk = (r) => {
         try { out.push(...r.querySelectorAll(selector)); } catch {}
         r.querySelectorAll("*").forEach((e) => { if (e.shadowRoot) walk(e.shadowRoot); });

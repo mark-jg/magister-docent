@@ -14,7 +14,9 @@ DT.register({
   _panel: null,
   _data: null,     // { id, at, regs, rooster }
   _busy: null,
-  _periode: "jaar",
+  _periode: "jaar", // "jaar", "8w", "4w", "p:<id>" (eigen periode) of "balk" (het bereik uit Magisters werkbalk, zie _bereik)
+  _bereik: null,    // { van, tot, naam }: wat in de werkbalk is gekozen (Week, Maand, Jaar of de datumkiezer)
+  _balkSleutel: null,
   _active: false,
 
   init(DT) {
@@ -95,6 +97,58 @@ DT.register({
       if (bewaard) this.activate(DT, bewaard === "vergelijk" ? "vergelijk" : "inzicht", true);
     }
     if (this._data && this._data.id !== id) { this._data = null; if (this._active) this.activate(DT, this._view, true); }
+    this.volgBalk(DT);
+  },
+
+  /* De keuze in Magisters werkbalk boven de tabbladen (Week, Maand, Jaar, de datumkiezer of een eigen periode)
+   * geldt ook voor dit tabblad: na een klik of keuze daar wordt het bereik gelezen en overgenomen. De eigen
+   * knoppen van het tabblad (Schooljaar, 8 weken, 4 weken, Periode) blijven daarnaast werken. */
+  volgBalk(DT) {
+    const dp = this._root?.querySelector(".toolbar .date-picker");
+    if (!dp || dp.dataset.dtVzVolgt) return;
+    dp.dataset.dtVzVolgt = "1";
+    const na = () => { clearTimeout(this._volgT); this._volgT = setTimeout(() => this.leesBalk(DT), 450); };
+    dp.addEventListener("click", na); dp.addEventListener("change", na);
+    this.leesBalk(DT, false);   // de stand van nu onthouden, zodat alleen een wijziging het tabblad verzet
+  },
+
+  async leesBalk(DT, toepassen = true) {
+    const root = this._root; if (!root) return;
+    const eigenId = DT.actief("periodes") ? DT.module("periodes")?._actief?.["att-dk-attendance"]?.id : null;
+    let sleutel, r = null;
+    if (eigenId) sleutel = "p:" + eigenId;
+    else {
+      r = await this.vraagBereik();
+      if (!r || root !== this._root) return;
+      sleutel = `${r.unit}|${r.start}|${r.end}`;
+    }
+    const nieuw = sleutel !== this._balkSleutel; this._balkSleutel = sleutel;
+    if (!toepassen || !nieuw) return;
+    if (eigenId) { this._periode = sleutel; this._bereik = null; } else this.zetBereik(r);
+    if (this._active && this._view === "inzicht") this.load(DT);
+  },
+
+  /* Het bereik dat Magister toont; alleen in de pagina zelf te lezen (netlog.js, dt:periode:get). */
+  vraagBereik() {
+    return new Promise((resolve) => {
+      const id = Math.random().toString(36).slice(2);
+      const klaar = (v) => { window.removeEventListener("message", h); clearTimeout(t); resolve(v); };
+      const h = (e) => { if (e.source === window && e.data?.type === "dt:periode:bereik" && e.data.id === id) klaar(e.data.ok ? e.data : null); };
+      const t = setTimeout(() => klaar(null), 1500);
+      window.addEventListener("message", h);
+      window.postMessage({ type: "dt:periode:get", id, target: "att-dk-attendance" }, location.origin);
+    });
+  },
+
+  /* r: { unit: "week" | "month" | "year", start, end } (tijden in ms). Het lopende schooljaar is gewoon "Schooljaar". */
+  zetBereik(r, now = new Date()) {
+    const a = new Date(r.start), b = new Date(r.end);
+    const van = new Date(a.getFullYear(), a.getMonth(), a.getDate()), tot = new Date(b.getFullYear(), b.getMonth(), b.getDate(), 23, 59, 59, 999);
+    const sj = new Date(now.getFullYear() - (now.getMonth() < 7 ? 1 : 0), 7, 1);
+    if (r.unit === "year" && van.getTime() === sj.getTime()) { this._periode = "jaar"; this._bereik = null; return; }
+    const naam = r.unit === "week" ? `Week ${isoWeek(van).w}` : r.unit === "month" ? van.toLocaleDateString("nl-NL", { month: "long", year: "numeric" })
+      : r.unit === "year" ? `Schooljaar ${van.getFullYear()}–${van.getFullYear() + 1}` : "Gekozen bereik";
+    this._periode = "balk"; this._bereik = { van, tot, naam };
   },
 
   /* vanzelf: niet door een klik (onthouden tabblad, andere leerling, Terug of Vooruit); dan komt er geen nieuwe stap
@@ -146,44 +200,47 @@ DT.register({
 
   async load(DT) {
     const id = this.leerlingId(); if (!id || !this._panel) return;
-    if (this._data && this._data.id === id && Date.now() - this._data.at < 10 * 60e3) { this.render(); return; }
+    const today = new Date();
+    const sj = new Date(today.getFullYear() - (today.getMonth() < 7 ? 1 : 0), 7, 1);
+    /* Eigen periodes en een bereik uit de werkbalk die eerder beginnen (tot een jaar terug) ook kunnen tonen */
+    const eerder = [...(DT.periodes?.() || []).map((p) => p.begin), ...(this._periode === "balk" && this._bereik ? [this._bereik.van] : [])];
+    const vanaf = eerder.filter((b) => b < sj && b > new Date(sj.getTime() - 366 * 864e5)).sort((a, b) => a - b)[0] || sj;
+    const oud = this._data && this._data.id === id ? this._data : null;
+    if (oud && Date.now() - oud.at < 10 * 60e3 && oud.vanaf <= vanaf.getTime()) { this.render(); return; }
     if (this._busy === id) return;
     this._busy = id;
     this._panel.innerHTML = `<div class="dt-vz-loading">Registraties en rooster ophalen…</div>`;
     try {
-      const today = new Date(), ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      const sj = new Date(today.getFullYear() - (today.getMonth() < 7 ? 1 : 0), 7, 1);
-      /* Eigen periodes die eerder beginnen (tot een jaar terug) ook kunnen tonen */
-      const vroegst = (DT.periodes?.() || []).map((p) => p.begin).filter((b) => b < sj && b > new Date(sj.getTime() - 366 * 864e5)).sort((a, b) => a - b)[0];
-      const vanaf = vroegst || sj;
-      const list = (r) => (r && r.status === 200 && r.json) ? (Array.isArray(r.json) ? r.json : r.json.items || []) : null;
-      const [v, a] = await Promise.all([
-        DT.api(`/api/m6/leerlingen/${id}/verantwoordingen?begin=${ymd(vanaf)}&einde=${ymd(today)}`, { full: true, timeout: 20000 }),
-        DT.api(`/api/leerlingen/${id}/afspraken?status=actief&begin=${ymd(vanaf)}&einde=${ymd(today)}`, { full: true, timeout: 20000 }),
-      ]);
-      const regs = list(v), rooster = list(a);
-      if (regs && rooster) rooster.push(...await vzLosseLessen(id, regs, rooster, (u) => DT.api(u, { full: true, timeout: 10000 })));
-      this._data = { id, at: Date.now(), regs, rooster, err: { regs: v.status, rooster: a.status }, sj: sj.getTime(), jaren: "laden" };
+      const vers = this._vers === true; this._vers = false;
+      /* Eerst de cijfers tonen (los: 0); vak en docent van lessen buiten het rooster komen er daarna bij. De
+       * vorige schooljaren worden pas opgehaald als het tabblad Vergelijken of de export erom vraagt (zorgJaren). */
+      const b = await vzBron.haal(id, vanaf, today, { vers, los: 0 });
+      const jaren = oud && Array.isArray(oud.jaren) ? oud.jaren : null;
+      const d = this._data = { id, at: b.at, regs: b.regs, rooster: b.rooster, err: b.status, sj: sj.getTime(), vanaf: vanaf.getTime(), jaren };
       this.render();
-      this.loadJaren(DT, id, sj);
+      if (b.regs && b.rooster) {
+        const n = b.rooster.length;
+        vzBron.haal(id, vanaf, today).then((b2) => { if (this._data === d && b2.rooster === d.rooster && d.rooster.length !== n && this._active) this.render(); }).catch(() => {});
+      }
     } finally { if (this._busy === id) this._busy = null; }
   },
 
-  /* Twee vorige schooljaren (1 augustus t/m 31 juli) ophalen voor de vergelijking. Komt na het
-   * eerste beeld binnen, zodat het tabblad niet langer op zich laat wachten. */
+  /* De twee vorige schooljaren ophalen als dat nog niet is gebeurd: alleen het tabblad Vergelijken en de export
+   * hebben ze nodig, dus het tabblad Inzicht doet er geen aanvragen voor. */
+  zorgJaren() {
+    const d = this._data; if (!d) return Promise.resolve();
+    if (Array.isArray(d.jaren)) return Promise.resolve();
+    if (!d._jaren) { d.jaren = "laden"; d._jaren = this.loadJaren(DT, d.id, new Date(d.sj)); }
+    return d._jaren;
+  },
+
+  /* Twee vorige schooljaren (1 augustus t/m 31 juli) voor de vergelijking. */
   async loadJaren(DT, id, sj) {
-    const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    const list = (r) => (r && r.status === 200 && r.json) ? (Array.isArray(r.json) ? r.json : r.json.items || []) : null;
     const jaren = [];
     for (const k of [1, 2]) {
       const van = new Date(sj.getFullYear() - k, 7, 1), tot = new Date(sj.getFullYear() - k + 1, 6, 31);
-      const [v, a] = await Promise.all([
-        DT.api(`/api/m6/leerlingen/${id}/verantwoordingen?begin=${ymd(van)}&einde=${ymd(tot)}`, { full: true, timeout: 25000 }),
-        DT.api(`/api/leerlingen/${id}/afspraken?status=actief&begin=${ymd(van)}&einde=${ymd(tot)}`, { full: true, timeout: 25000 }),
-      ]);
-      const regsJ = list(v), roosterJ = list(a);
-      if (regsJ && roosterJ && roosterJ.length) roosterJ.push(...await vzLosseLessen(id, regsJ, roosterJ, (u) => DT.api(u, { full: true, timeout: 10000 })));
-      jaren.push({ k, van: van.getTime(), tot: tot.getTime() + 864e5 - 1, regs: regsJ, rooster: roosterJ, status: { regs: v.status, rooster: a.status } });
+      const b = await vzBron.haal(id, van, tot);
+      jaren.push({ k, van: van.getTime(), tot: tot.getTime() + 864e5 - 1, regs: b.regs, rooster: b.rooster, status: b.status });
     }
     if (this._data && this._data.id === id) { this._data.jaren = jaren; if (this._active) this.render(); }
   },
@@ -207,11 +264,13 @@ DT.register({
     return { rijen, KLEUR };
   },
 
-  /* Gekozen periode op het tabblad Inzicht: { naam, van, tot } */
+  /* Gekozen periode op het tabblad Inzicht: { naam, van, tot, label, eigen }. label (de datums) alleen bij een
+   * eigen periode en bij een bereik uit de werkbalk. Een periode die nog loopt eindigt nu. */
   gekozenPeriode(d, now = new Date()) {
     const periodes = DT.periodes?.() || [];
     const eigen = this._periode.startsWith("p:") ? periodes.find((p) => "p:" + p.id === this._periode) : null;
-    if (eigen) return { naam: eigen.naam, van: eigen.begin, tot: eigen.einde < now ? eigen.einde : now };
+    if (eigen) return { naam: eigen.naam, van: eigen.begin, tot: eigen.einde < now ? eigen.einde : now, label: DT.periodeLabel(eigen, true), eigen };
+    if (this._periode === "balk" && this._bereik) { const b = this._bereik; return { naam: b.naam, van: b.van, tot: b.tot < now ? b.tot : now, label: DT.periodeLabel({ begin: b.van, einde: b.tot }, true) }; }
     if (this._periode === "8w" || this._periode === "4w") return { naam: `Laatste ${this._periode === "8w" ? 8 : 4} weken`, van: new Date(now.getFullYear(), now.getMonth(), now.getDate() - (this._periode === "8w" ? 56 : 28)), tot: now };
     const y = new Date(d.sj).getFullYear();
     return { naam: `Schooljaar ${y}–${y + 1}`, van: new Date(d.sj), tot: now };
@@ -219,6 +278,7 @@ DT.register({
 
   async exportExcel() {
     const d = this._data; if (!d) return;
+    await this.zorgJaren();
     const now = new Date(), per = this.gekozenPeriode(d, now);
     const S = vzStats(d.regs || [], d.rooster || [], per.van, per.tot);
     const pers = await DT.api(`/api/leerlingen/${d.id}`, { full: true, timeout: 10000 });
@@ -233,10 +293,9 @@ DT.register({
     if (!d.regs && !d.rooster) { p.innerHTML = `<div class="dt-vz-loading">Geen gegevens: registraties ${esc(d.err.regs)}, rooster ${esc(d.err.rooster)}.</div>`; return; }
     const now = new Date();
     const periodes = DT.periodes?.() || [];
-    let eigen = this._periode.startsWith("p:") ? periodes.find((p) => "p:" + p.id === this._periode) : null;
-    if (this._periode.startsWith("p:") && !eigen) this._periode = "jaar";
-    const van = eigen ? eigen.begin : this._periode === "jaar" ? new Date(d.sj) : new Date(now.getFullYear(), now.getMonth(), now.getDate() - (this._periode === "8w" ? 56 : 28));
-    const tot = eigen && eigen.einde < now ? eigen.einde : now;
+    if ((this._periode.startsWith("p:") && !periodes.some((p) => "p:" + p.id === this._periode)) || (this._periode === "balk" && !this._bereik)) this._periode = "jaar";
+    const per = this.gekozenPeriode(d, now), eigen = per.eigen || null, van = per.van, tot = per.tot;
+    const buiten = d.vanaf != null && van.getTime() < d.vanaf;   // begint vóór wat er is opgehaald (meer dan een jaar voor dit schooljaar)
     const S = vzStats(d.regs || [], d.rooster || [], van, tot);
     const pctCol = (pct) => pct >= 90 ? "#34C759" : pct >= 80 ? "#FF9500" : "#FF3B30";
     const SOORT = [["OK", "aanwezig", "#34C759"], ["TL", "te laat", "#FFCC00"], ["ZK", "ziek", "#AF52DE"], ["AB_OK", "absent, geoorloofd", "#FF9500"], ["AB_NO", "absent, ongeoorloofd", "#FF3B30"], ["UI", "uitgestuurd", "#A2845E"]];
@@ -301,8 +360,11 @@ DT.register({
 
     /* Vergelijking met de twee vorige schooljaren: tot dezelfde datum (eerlijk vergelijken) en het hele jaar */
     let vergelijk = "";
-    if (d.jaren === "laden") vergelijk = `<section class="dt-vz-card dt-vz-wide dt-vz-cmpcard"><h4>Per schooljaar</h4><p class="dt-vz-empty">Vorige schooljaren ophalen…</p></section>`;
-    else if (Array.isArray(d.jaren)) {
+    if (this._view !== "vergelijk") { /* alleen het tabblad Vergelijken heeft de vorige schooljaren nodig */ }
+    else if (!Array.isArray(d.jaren)) {
+      this.zorgJaren();
+      vergelijk = `<section class="dt-vz-card dt-vz-wide dt-vz-cmpcard"><h4>Per schooljaar</h4><p class="dt-vz-empty">Vorige schooljaren ophalen…</p></section>`;
+    } else {
       const { rijen, KLEUR } = this.vergelijkRijen(d, now);
       const datumKort = now.toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
       const pc = (T, r) => r.rooster && T && T.telt ? `<b style="color:${pctCol(T.pct)}">${T.pct}%</b>` : `<span class="dt-vz-dim" title="Rooster van dat jaar niet beschikbaar; zonder rooster is er geen percentage">–</span>`;
@@ -334,12 +396,14 @@ DT.register({
       vergelijk = `<section class="dt-vz-card dt-vz-wide dt-vz-cmpcard"><h4>Per schooljaar</h4>${zin ? `<p class="dt-vz-cmpzin">${zin}</p>` : ""}${tabel}${mgraf ? `<div class="dt-vz-cmpgraf">${mgraf}<div class="dt-vz-legend">${lijnen.map(({ r }) => `<span><i style="background:${r.kleur}"></i>${esc(r.naam)}</span>`).join("")}<span class="dt-vz-legend-n">aanwezig per maand</span></div></div>` : ""}<p class="dt-vz-cmpnoot">"t/m ${esc(datumKort)}" telt elk schooljaar van 1 augustus tot dezelfde datum, zodat de jaren eerlijk te vergelijken zijn. Gemist, ziek, ongeoorloofd en te laat gaan ook over die periode.</p></section>`;
     }
 
+    const ververs = `<button type="button" class="dt-vz-ververs" title="Opnieuw ophalen uit Magister, bijvoorbeeld nadat je een registratie hebt aangepast">Bijgewerkt ${esc(new Date(d.at).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" }))}<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 3v2.6h-2.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
     if (this._view === "vergelijk") {
       p.innerHTML = `
-        <div class="dt-vz-head"><div class="dt-vz-title">Vergelijken met vorige schooljaren</div><button type="button" class="dt-vz-xls" title="Naar Excel: samenvatting, per vak, docent, dag, lesuur, week en maand, alle lessen en de vergelijking met vorige schooljaren"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M8 2.5v7.5M4.5 6.8 8 10.3l3.5-3.5M3 13.5h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Excel</button></div>
+        <div class="dt-vz-head"><div class="dt-vz-title">Vergelijken met vorige schooljaren</div><span class="dt-vz-headr">${ververs}<button type="button" class="dt-vz-xls" title="Naar Excel: samenvatting, per vak, docent, dag, lesuur, week en maand, alle lessen en de vergelijking met vorige schooljaren"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M8 2.5v7.5M4.5 6.8 8 10.3l3.5-3.5M3 13.5h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Excel</button></span></div>
         <div class="dt-vz-grid">${vergelijk || `<p class="dt-vz-empty">Geen gegevens om te vergelijken.</p>`}</div>
         <div class="dt-vz-foot">Uit de registraties en het rooster van Magister, per schooljaar van 1 augustus tot en met 31 juli. Afwezig = absent, ziek of uitgestuurd; te laat telt als aanwezig; een vrijstelling telt niet mee. Zonder rooster van een schooljaar is er geen percentage.</div>`;
       p.querySelector(".dt-vz-xls")?.addEventListener("click", () => this.exportExcel());
+      p.querySelector(".dt-vz-ververs")?.addEventListener("click", () => this.ververs());
       return;
     }
 
@@ -348,12 +412,12 @@ DT.register({
       <div class="dt-vz-head">
         <div class="dt-vz-title">Inzicht in aanwezigheid</div>
         <span class="dt-vz-headr">
-        <div class="dt-vz-segs">${seg("jaar", "Schooljaar")}${seg("8w", "8 weken")}${seg("4w", "4 weken")}${periodes.length ? `<select class="dt-vz-psel${eigen ? " is-on" : ""}" aria-label="Eigen periode"><option value="">Periode…</option>${periodes.map((p) => `<option value="p:${esc(p.id)}"${eigen && eigen.id === p.id ? " selected" : ""}>${esc(p.naam)} · ${esc(DT.periodeLabel(p))}</option>`).join("")}</select>` : ""}</div><button type="button" class="dt-vz-xls" title="Naar Excel: samenvatting, per vak, docent, dag, lesuur, week en maand, alle lessen en de vergelijking met vorige schooljaren"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M8 2.5v7.5M4.5 6.8 8 10.3l3.5-3.5M3 13.5h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Excel</button></span>
+        <div class="dt-vz-segs">${this._periode === "balk" ? `<button type="button" class="dt-vz-seg is-on" data-periode="balk" title="Gekozen in de werkbalk van Magister">${esc(per.naam)}</button>` : ""}${seg("jaar", "Schooljaar")}${seg("8w", "8 weken")}${seg("4w", "4 weken")}${periodes.length ? `<select class="dt-vz-psel${eigen ? " is-on" : ""}" aria-label="Eigen periode"><option value="">Periode…</option>${periodes.map((p) => `<option value="p:${esc(p.id)}"${eigen && eigen.id === p.id ? " selected" : ""}>${esc(p.naam)} · ${esc(DT.periodeLabel(p))}</option>`).join("")}</select>` : ""}</div>${ververs}<button type="button" class="dt-vz-xls" title="Naar Excel: samenvatting, per vak, docent, dag, lesuur, week en maand, alle lessen en de vergelijking met vorige schooljaren"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M8 2.5v7.5M4.5 6.8 8 10.3l3.5-3.5M3 13.5h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Excel</button></span>
       </div>
       ${T.lessen ? `
       <div class="dt-vz-summary">
         <span class="dt-vz-big" style="color:${pctCol(T.pct)}">${T.pct}%</span>
-        <span class="dt-vz-sumtext">${eigen ? `<b>${esc(eigen.naam)}</b> (${esc(DT.periodeLabel(eigen, true))}) · ` : ""}<b>aanwezig</b> · ${T.telt - T.afwezig} van ${T.telt} lessen · ${T.afwezig} gemist${T.ongeoorloofd ? ` (${T.ongeoorloofd} ongeoorloofd)` : ""}${T.ziek ? ` · ${T.ziek}× ziek` : ""}${T.teLaat ? ` · ${T.teLaat}× te laat` : ""}${T.vrij ? ` · ${T.vrij}× vrijgesteld (telt niet mee)` : ""}${S.onbekend ? ` · ${S.onbekend} lessen zonder vak in het rooster` : ""}</span>
+        <span class="dt-vz-sumtext">${per.label ? `<b>${esc(per.naam)}</b> (${esc(per.label)}) · ` : ""}<b>aanwezig</b> · ${T.telt - T.afwezig} van ${T.telt} lessen · ${T.afwezig} gemist${T.ongeoorloofd ? ` (${T.ongeoorloofd} ongeoorloofd)` : ""}${T.ziek ? ` · ${T.ziek}× ziek` : ""}${T.teLaat ? ` · ${T.teLaat}× te laat` : ""}${T.vrij ? ` · ${T.vrij}× vrijgesteld (telt niet mee)` : ""}${S.onbekend ? ` · ${S.onbekend} lessen zonder vak in het rooster` : ""}</span>
       </div>
       <div class="dt-vz-obs">${obs.map((o) => `<div class="dt-vz-ob">${o}</div>`).join("")}</div>
       <div class="dt-vz-grid">
@@ -363,11 +427,20 @@ DT.register({
         <section class="dt-vz-card"><h4>Per weekdag</h4>${rows(S.dagen, { max: 7 })}</section>
         <section class="dt-vz-card"><h4>Per lesuur (begintijd)</h4>${rows(S.uren, { max: 12 })}</section>
       </div>
-      ${legend}` : `<p class="dt-vz-empty">Geen lessen in deze periode.</p>`}
+      ${legend}` : `<p class="dt-vz-empty">${per.label ? `<b>${esc(per.naam)}</b> (${esc(per.label)}): ` : ""}${buiten ? "dit bereik ligt te ver terug voor dit tabblad. Het tabblad Vergelijken toont de vorige schooljaren." : van > now ? "dit bereik moet nog beginnen." : "geen lessen in deze periode."}</p>`}
       <div class="dt-vz-foot">Uit de registraties en het rooster van Magister. Afwezig = absent, ziek of uitgestuurd; te laat telt als aanwezig. Een vrijstelling is met toestemming: die les telt niet als gemist en valt buiten het percentage. Vak${S.docenten.length ? " en docent" : ""} uit het rooster; ${d.rooster ? `${(d.rooster || []).length} roosteritems` : "rooster niet beschikbaar"}${d.rooster && !S.docenten.length ? "; het rooster van de leerling noemt geen docenten, daarom is er geen blok per docent" : ""}.</div>`;
     p.querySelectorAll(".dt-vz-seg").forEach((b) => b.addEventListener("click", () => { this._periode = b.dataset.periode; this.render(); }));
     p.querySelector(".dt-vz-xls")?.addEventListener("click", () => this.exportExcel());
     p.querySelector(".dt-vz-psel")?.addEventListener("change", (e) => { this._periode = e.target.value || "jaar"; this.render(); });
+    p.querySelector(".dt-vz-ververs")?.addEventListener("click", () => this.ververs());
+  },
+
+  /* Opnieuw ophalen uit Magister, bijvoorbeeld nadat je een registratie hebt aangepast. */
+  ververs() {
+    if (this._busy) return;
+    vzBron.vergeet(this._data?.id);
+    this._data = null; this._vers = true;
+    this.load(DT);
   },
 
   css(root) {
@@ -430,6 +503,8 @@ DT.register({
       .dt-vz-cmpnoot { margin: 10px 0 0; font: 400 .6875rem/1.4 var(--dt-vz-font); color: var(--dt-vz-muted); }
       .dt-vz-headr { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
       .dt-vz-xls { appearance: none; display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 12px; border: 0; border-radius: 999px; cursor: pointer; background: color-mix(in srgb, #34C759 14%, transparent); color: #1E7B34; font: 600 .75rem/1 var(--dt-vz-font); }
+      .dt-vz-ververs { appearance: none; display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px; border: 0; border-radius: 999px; cursor: pointer; background: transparent; color: var(--dt-vz-muted); font: 500 .75rem/1 var(--dt-vz-font); }
+      .dt-vz-ververs:hover { background: var(--dt-vz-group); color: var(--dt-vz-fg); }
       .dt-vz-xls:hover { background: color-mix(in srgb, #34C759 22%, transparent); }
       .dt-vz-foot { margin-top: 12px; font: 400 .6875rem/1.4 var(--dt-vz-font); color: var(--dt-vz-muted); }
     `;
@@ -443,15 +518,91 @@ DT.register({
 async function vzLosseLessen(id, regs, rooster, api, max = 80) {
   const bekend = new Set((rooster || []).map((a) => String(a.id)));
   const mis = [...new Set((regs || []).map((it) => (it.afspraak || it.appointment || it).id).filter((x) => x != null && !bekend.has(String(x))))].slice(0, max);
-  const uit = [];
-  for (const aid of mis) {
-    const r = await api(`/api/leerlingen/${id}/afspraken/${aid}`);
-    const a = r && r.status === 200 && r.json ? (r.json.items ? r.json.items[0] : r.json) : null;
-    if (a && (a.start || a.begin)) uit.push({ ...a, id: a.id ?? aid, _metRegistratie: true });
-    await new Promise((res) => setTimeout(res, 80));
-  }
+  const uit = [], werk = mis.slice();
+  /* Twee tegelijk: half zo lang wachten, zonder Magister te overvragen. */
+  const doe = async () => {
+    while (werk.length) {
+      const aid = werk.shift(), r = await api(`/api/leerlingen/${id}/afspraken/${aid}`);
+      const a = r && r.status === 200 && r.json ? (r.json.items ? r.json.items[0] : r.json) : null;
+      if (a && (a.start || a.begin)) uit.push({ ...a, id: a.id ?? aid, _metRegistratie: true });
+    }
+  };
+  await Promise.all([doe(), doe()]);
   return uit;
 }
+
+/* Eén bron voor de registraties en het rooster van een leerling. Inzicht, de ranglijst, Lesregistraties, de
+ * Excel-exports, het Plan van aanpak, Opleidingen en de Te laat-balie halen ze hier op, zodat ze dezelfde
+ * aanvragen doen en elkaars antwoord kunnen hergebruiken.
+ *   vzBron.haal(id, van, tot, { api, pauze, vers, los }) -> { regs, rooster, status: { regs, rooster }, at }
+ * regs of rooster is null als het ophalen mislukte. Een antwoord blijft tien minuten bruikbaar voor elk bereik
+ * dat erin valt; een bereik dat helemaal in een vorig schooljaar ligt verandert niet meer en blijft bruikbaar
+ * tot de pagina wordt herladen. Met vers: true wordt altijd opnieuw opgehaald (voor een knop Ophalen of
+ * Vernieuwen). Loopt er al een aanvraag die het bereik dekt, dan wordt daarop gewacht. Is er een antwoord
+ * zonder nagezochte lessen (los: 0) en wil iemand ze wel, dan worden alleen die lessen erbij gehaald.
+ * pauze (ms): voor wie veel leerlingen achter elkaar ophaalt. Normaal gaan de twee aanvragen van een leerling
+ * tegelijk, met daarna een halve pauze. Heeft Magister in de laatste tien minuten om rust gevraagd (429 of 503,
+ * DT.druk), dan gaan ze na elkaar met na elk de hele pauze.
+ * los: hoeveel lessen buiten het rooster hooguit worden nagezocht (vak en docent); 0 als alleen de totalen
+ * nodig zijn, want die veranderen er niet door. */
+const vzBron = {
+  TTL: 10 * 60e3,
+  MAX: 60000,          // regels (registraties plus roosteritems) die hooguit in het geheugen blijven
+  _cache: new Map(),   // "id|van|tot" -> antwoord
+  _loopt: new Map(),   // zelfde sleutel -> lopende aanvraag
+  ymd(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; },
+  dag(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); },
+  haal(id, van, tot, { api = (u) => DT.apiRetry(u), pauze = 0, vers = false, los = 80 } = {}) {
+    id = String(id);
+    const v0 = this.dag(van), t0 = this.dag(tot);
+    if (!vers) {
+      const nu = new Date(), sj = new Date(nu.getFullYear() - (nu.getMonth() < 7 ? 1 : 0), 7, 1).getTime();
+      let kaal = null;
+      for (const e of this._cache.values()) {
+        if (e.id !== id || e.van > v0 || e.tot < t0 || (e.tot >= sj && nu - e.at >= this.TTL)) continue;
+        if (e.los >= los) return Promise.resolve(e);
+        kaal = e;
+      }
+      if (kaal) return this._bij(kaal, los, api);
+      for (const l of this._loopt.values()) if (l.id === id && l.van <= v0 && l.tot >= t0 && l.los >= los) return l.p;
+    }
+    const sleutel = `${id}|${v0}|${t0}|${los}|${vers ? "vers" : ""}`;
+    if (this._loopt.has(sleutel)) return this._loopt.get(sleutel).p;
+    const p = this._haal(id, van, tot, v0, t0, api, pauze, los).finally(() => this._loopt.delete(sleutel));
+    this._loopt.set(sleutel, { p, id, van: v0, tot: t0, los });
+    return p;
+  },
+  /* Een bewaard antwoord aanvullen met de lessen buiten het rooster, zonder alles opnieuw op te halen. */
+  _bij(e, los, api) {
+    if (!e._bij) e._bij = (async () => {
+      try { if (e.rooster.length) e.rooster.push(...await vzLosseLessen(e.id, e.regs, e.rooster, api, los)); e.los = Math.max(e.los, los); }
+      finally { e._bij = null; }
+      return e;
+    })();
+    return e._bij;
+  },
+  async _haal(id, van, tot, v0, t0, api, pauze, los) {
+    const lijst = (r) => (r && r.status === 200 && r.json) ? (Array.isArray(r.json) ? r.json : r.json.items || []) : null;
+    const bereik = `begin=${this.ymd(van)}&einde=${this.ymd(tot)}`;
+    const uv = `/api/m6/leerlingen/${id}/verantwoordingen?${bereik}`, ua = `/api/leerlingen/${id}/afspraken?status=actief&${bereik}`;
+    const wacht = () => new Promise((r) => setTimeout(r, pauze));
+    let v, a;
+    const rustig = pauze && Date.now() - (DT.druk || 0) < this.TTL;
+    if (rustig) { v = await api(uv); await wacht(); a = await api(ua); await wacht(); }
+    else { [v, a] = await Promise.all([api(uv), api(ua)]); if (pauze) await new Promise((r) => setTimeout(r, pauze / 2)); }
+    const regs = lijst(v), rooster = lijst(a);
+    if (los && regs && rooster && rooster.length) rooster.push(...await vzLosseLessen(id, regs, rooster, api, los));
+    const e = { id, van: v0, tot: t0, los, at: Date.now(), regs, rooster, status: { regs: v ? v.status : 0, rooster: a ? a.status : 0 } };
+    if (!regs || !rooster) return e;   // mislukt: niet bewaren
+    for (const [k, o] of this._cache) if (o.id === id && o.van >= v0 && o.tot <= t0 && o.los <= los) this._cache.delete(k);
+    this._cache.set(`${id}|${v0}|${t0}|${los}`, e);
+    let n = 0; for (const o of this._cache.values()) n += o.regs.length + o.rooster.length;
+    for (const [k, o] of this._cache) { if (n <= this.MAX || o === e) break; n -= o.regs.length + o.rooster.length; this._cache.delete(k); }
+    return e;
+  },
+  /* Bewaarde antwoorden van één leerling (of van iedereen) weggooien. */
+  vergeet(id) { for (const [k, e] of this._cache) if (id == null || e.id === String(id)) this._cache.delete(k); },
+};
 
 /* Statistiek: per les één categorie (afwezigheidstype > te laat > aanwezig), gegroepeerd. */
 function vzStats(regs, rooster, van, tot) {

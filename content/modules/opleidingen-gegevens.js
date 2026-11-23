@@ -143,9 +143,7 @@ Object.assign(DT.module("opleidingen"), {
         await this.parallel([...ids.keys()], async (id) => {
           if (!door()) return;
           const info = ids.get(id), bekend = !!oud?.studenten?.[id], begin = bekend ? R.datum(vanaf) : sjVan;   // een nieuwe student: het hele schooljaar
-          const v = await this.api(`/api/m6/leerlingen/${id}/verantwoordingen?begin=${R.ymd(begin)}&einde=${R.ymd(nu)}`); await this.wacht(120);
-          const a = await this.api(`/api/leerlingen/${id}/afspraken?status=actief&begin=${R.ymd(begin)}&einde=${R.ymd(nu)}`); await this.wacht(120);
-          const regs = DT.lijst(v), rooster = DT.lijst(a);
+          const { regs, rooster } = await vzBron.haal(id, begin, nu, { api: (u) => this.api(u), pauze: 120, los: 0, vers: true });
           if (regs && rooster) {
             const lessen = vzStats(regs, rooster, begin, nu).lessen;
             alleLessen.push(lessen);

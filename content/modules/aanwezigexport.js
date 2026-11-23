@@ -278,7 +278,6 @@ DT.register({
     stop.addEventListener("click", sluit);
     document.addEventListener("keydown", esc, true);
     const lijst = (x) => (x && x.status === 200 && x.json) ? (Array.isArray(x.json) ? x.json : x.json.items || []) : null;
-    const wacht = (ms) => new Promise((res) => setTimeout(res, ms));
     const api = (url) => DT.apiRetry(url);
     start.addEventListener("click", async () => {
       if (bezig) return; bezig = true; start.disabled = true; excel.disabled = true; uitkomst.replaceChildren();
@@ -294,9 +293,7 @@ DT.register({
         const doe = async () => {
           while (werk.length && !afbreken) {
             const l = werk.shift();
-            const v = await api(`/api/m6/leerlingen/${l.id}/verantwoordingen?begin=${this.ymd(per.van)}&einde=${this.ymd(per.tot)}`); await wacht(120);
-            const a = await api(`/api/leerlingen/${l.id}/afspraken?status=actief&begin=${this.ymd(per.van)}&einde=${this.ymd(per.tot)}`); await wacht(120);
-            const regs = lijst(v), rooster = lijst(a), T = regs && rooster ? vzStats(regs, rooster, per.van, per.tot).totaal : null;
+            const { regs, rooster } = await vzBron.haal(l.id, per.van, per.tot, { api, pauze: 120, los: 0, vers: true }), T = regs && rooster ? vzStats(regs, rooster, per.van, per.tot).totaal : null;
             const plannen = Array.isArray(opslag[`pva:${l.id}`]) ? opslag[`pva:${l.id}`] : [];
             const open = plannen.map((p) => ({ p, e: (p.evaluaties || []).find((x) => x.datum && !x.op && !x.doelen) })).filter((x) => x.e).sort((x, y) => x.e.datum.localeCompare(y.e.datum))[0];
             rijen.push({ l, T, plannen: plannen.length, open });
@@ -361,19 +358,13 @@ DT.register({
 
   async klasBestand(DT, { lln, titel }, periode, vergelijk, voortgang) {
     const now = new Date();
-    const lijst = (r) => (r && r.status === 200 && r.json) ? (Array.isArray(r.json) ? r.json : r.json.items || []) : null;
     /* Magister begrenst het aantal aanvragen (429 = te veel tegelijk). Daarom na elkaar, met een
      * korte pauze, en bij 429/503 wachten en opnieuw proberen (steeds langer). */
-    const wacht = (ms) => new Promise((r) => setTimeout(r, ms));
     const api = (url) => DT.apiRetry(url, { opWachten: () => voortgang(i, lln.length, `even wachten, Magister vraagt om rustiger aan te doen…`) });
-    const haal = async (id, van, tot) => {
-      const v = await api(`/api/m6/leerlingen/${id}/verantwoordingen?begin=${this.ymd(van)}&einde=${this.ymd(tot)}`);
-      await wacht(150);
-      const a = await api(`/api/leerlingen/${id}/afspraken?status=actief&begin=${this.ymd(van)}&einde=${this.ymd(tot)}`);
-      await wacht(150);
-      const regs = lijst(v), rooster = lijst(a);
-      if (regs && rooster) rooster.push(...await vzLosseLessen(id, regs, rooster, api));
-      return { regs, rooster, status: v.status !== 200 ? v.status : a.status };
+    /* vers: de gekozen periode altijd opnieuw; de vergelijking mag een antwoord van zojuist hergebruiken. */
+    const haal = async (id, van, tot, vers = false) => {
+      const b = await vzBron.haal(id, van, tot, { api, pauze: 150, vers });
+      return { regs: b.regs, rooster: b.rooster, status: b.status.regs !== 200 ? b.status.regs : b.status.rooster };
     };
     const uit = [];
     let i = 0;
@@ -381,7 +372,7 @@ DT.register({
     const doe = async () => {
       while (werk.length) {
         const l = werk.shift(); voortgang(i, lln.length, l.naam);
-        const d = await haal(l.id, periode.van, periode.tot);
+        const d = await haal(l.id, periode.van, periode.tot, true);
         const S = d.regs && d.rooster ? vzStats(d.regs, d.rooster, periode.van, periode.tot) : null;
         let V = null;
         if (vergelijk) {
