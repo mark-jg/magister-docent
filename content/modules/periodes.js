@@ -5,7 +5,8 @@
  *   registraties op voor het gekozen bereik; de lijst en de tellingen gaan dan over de periode.
  * - Verzuim › Inzicht (att-insights-page): de server rekent alleen per week, maand of jaar. Bij een
  *   periode worden de weekrapporten van alle weken in de periode opgeteld (netlog.js). Weken die
- *   deels in de periode vallen, tellen helemaal mee.
+ *   deels in de periode vallen, tellen helemaal mee; naast de keuze staat daarom het bereik in hele
+ *   weken. Percentages worden over de opgetelde aantallen opnieuw berekend.
  *
  * Het toepassen gebeurt in de pagina zelf (netlog.js, bericht dt:periode:set), omdat alleen daar
  * de eigenschappen van Magisters componenten bereikbaar zijn. */
@@ -32,11 +33,20 @@ DT.register({
       setTimeout(async () => { await this.send(tag, null); this.mount(DT, true); }, 300);
     };
     window.addEventListener("message", this._fout);
+    /* De optelsom is klaar: hoe de percentages tot stand kwamen (berekend uit de aantallen, of het gemiddelde van de weken). */
+    this._somKlaar = (e) => {
+      if (e.source !== window || e.data?.type !== "dt:periode:som") return;
+      this._som = { weken: e.data.weken, pct: e.data.pct };
+      const a = this._actief[e.data.target], dp = a?.host?.shadowRoot?.querySelector(".toolbar .date-picker");
+      if (dp) this.state(dp, DT.periodes().find((p) => p.id === a.id) || null);
+    };
+    window.addEventListener("message", this._somKlaar);
   },
 
   destroy() {
     this._stop && this._stop(); this._unsub && this._unsub();
     this._fout && window.removeEventListener("message", this._fout);
+    this._somKlaar && window.removeEventListener("message", this._somKlaar);
     for (const tag of Object.keys(this._actief)) this.send(tag, null);
     this._actief = {};
     for (const el of DT.deepQueryAll(".dt-per-ctl")) { el.closest(".date-picker")?.classList.remove("dt-per-on"); el.remove(); }
@@ -101,15 +111,27 @@ DT.register({
   },
 
   /* Uiterlijk: met een periode actief is de keuze gevuld, staat het bereik ernaast en verdwijnt
-   * Magisters eigen datumkiezer (die zou anders een week of maand tonen). */
+   * Magisters eigen datumkiezer (die zou anders een week of maand tonen). In Verzuim › Inzicht staat
+   * het bereik dat werkelijk is opgeteld: hele weken, van maandag tot en met zondag. */
   state(dp, p) {
     dp.classList.toggle("dt-per-on", !!p);
     const ctl = dp.querySelector(":scope > .dt-per-ctl");
     if (!ctl) return;
-    ctl.querySelector(".dt-per-range").textContent = p ? DT.periodeLabel(p, true) : "";
-    ctl.title = p && dp.getRootNode().host?.localName === "att-insights-page"
-      ? "Opgeteld uit de weekrapporten van Magister; weken die deels in de periode vallen tellen helemaal mee."
-      : "";
+    const inzicht = dp.getRootNode().host?.localName === "att-insights-page";
+    const w = p && inzicht ? this.heleWeken(p) : null;
+    ctl.querySelector(".dt-per-range").textContent = !p ? "" : w && w.anders ? `${DT.periodeLabel(w, true)} (hele weken)` : DT.periodeLabel(p, true);
+    ctl.title = !w ? "" : [
+      "Opgeteld uit de weekrapporten van Magister.",
+      w.anders ? `De periode loopt van ${DT.periodeLabel(p, true)}; weken die er deels in vallen tellen helemaal mee.` : "",
+      this._som?.pct === "berekend" ? "Percentages zijn opnieuw berekend over de opgetelde aantallen." : this._som?.pct === "gemiddeld" ? "Percentages zijn het gemiddelde van de weken (benadering)." : "",
+    ].filter(Boolean).join(" ");
+  },
+
+  /* De hele weken (maandag t/m zondag) waarin een periode valt. */
+  heleWeken(p) {
+    const begin = new Date(p.begin.getFullYear(), p.begin.getMonth(), p.begin.getDate() - (p.begin.getDay() + 6) % 7);
+    const einde = new Date(p.einde.getFullYear(), p.einde.getMonth(), p.einde.getDate() + (7 - p.einde.getDay()) % 7, 23, 59, 59, 999);
+    return { begin, einde, anders: begin.getTime() !== new Date(p.begin).setHours(0, 0, 0, 0) || einde.getDate() !== p.einde.getDate() };
   },
 
   send(tag, p, herstel = true) {

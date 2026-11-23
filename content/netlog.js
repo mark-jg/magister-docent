@@ -214,14 +214,80 @@
     return +m[1] === (s.getFullYear() !== e.getFullYear() ? e.getFullYear() : s.getFullYear()) && +m[2] === isoWeekNr(s);
   };
   /* Telt de aantallen van twee weekrapporten op. Velden die geen aantal zijn blijven zoals in de eerste week:
-   * de leerling zelf, nummers en codes (id, jaar, week) en percentages (die zijn niet op te tellen). */
+   * de leerling zelf, nummers en codes (id, jaar, week). Percentages zijn niet op te tellen; die worden na het
+   * optellen opnieuw berekend (zie herrekenPct). Lijsten met onderdelen die een eigen sleutel hebben (bijvoorbeeld
+   * een aantal per soort registratie) worden per onderdeel opgeteld; andere lijsten blijven zoals ze zijn. */
   const NIET_OPTELLEN = /^(student|leerling|persoon|id|.*Id|code|stamnummer|studentNumber|year|jaar|week|number|nummer|month|maand)$|percent|ratio|gemiddeld|average/i;
+  const PCT = /percent|ratio|gemiddeld|average/i;
+  const isObj = (x) => !!x && typeof x === "object" && !Array.isArray(x);
+  const lidSleutel = (x) => { if (!isObj(x)) return undefined; for (const k of ["id", "code", "type", "key", "name", "naam"]) if (x[k] != null && typeof x[k] !== "object") return k + ":" + x[k]; return undefined; };
   const optel = (a, b) => {
     if (typeof a === "number" && typeof b === "number") return a + b;
-    if (a && b && typeof a === "object" && typeof b === "object" && !Array.isArray(a) && !Array.isArray(b)) {
+    if (isObj(a) && isObj(b)) {
       const o = { ...a }; for (const k of Object.keys(b)) o[k] = !(k in a) ? b[k] : NIET_OPTELLEN.test(k) ? a[k] : optel(a[k], b[k]); return o;
     }
+    if (Array.isArray(a) && Array.isArray(b)) {
+      if (!a.length) return b;
+      if (![...a, ...b].every((x) => lidSleutel(x) !== undefined)) return a;
+      const per = new Map();
+      for (const x of [...a, ...b]) { const k = lidSleutel(x); per.set(k, per.has(k) ? optel(per.get(k), x) : x); }
+      return [...per.values()];
+    }
     return a ?? b;
+  };
+  /* Percentages over de hele periode. Het weekrapport geeft per leerling een percentage naast de aantallen; welk
+   * aantal door welk gedeeld wordt staat nergens. Daarom wordt de regel uit de weekrapporten zelf afgeleid: de
+   * deling (teller / noemer, of 1 − teller / noemer; noemer is één veld of alle aantallen samen) die in élke week
+   * bij élke leerling het percentage van Magister oplevert. Die regel wordt daarna op de opgetelde aantallen
+   * toegepast. Is er geen regel te vinden, dan is het percentage het gemiddelde van de weken (benadering). */
+  const vorm = (o, k) => k + "|" + Object.keys(o).filter((x) => typeof o[x] === "number" && !NIET_OPTELLEN.test(x)).sort().join(",");
+  const monsters = (o, uit) => {
+    if (Array.isArray(o)) { for (const x of o) monsters(x, uit); return uit; }
+    if (!isObj(o)) return uit;
+    for (const k of Object.keys(o)) {
+      if (typeof o[k] === "number" && PCT.test(k)) { const v = vorm(o, k); (uit.get(v) || uit.set(v, []).get(v)).push({ p: o[k], o }); }
+      else if (o[k] && typeof o[k] === "object") monsters(o[k], uit);
+    }
+    return uit;
+  };
+  const SOM = "\u03a3";
+  const deel = (o, r) => { const d = r.d === SOM ? r.keys.reduce((x, k) => x + o[k], 0) : o[r.d]; return d > 0 ? r.s * (r.om ? 1 - o[r.n] / d : o[r.n] / d) : null; };
+  const vindRegel = (ms) => {
+    const keys = Object.keys(ms[0].o).filter((x) => typeof ms[0].o[x] === "number" && !NIET_OPTELLEN.test(x));
+    if (!keys.length) return null;
+    const s = ms.every((m) => m.p >= 0 && m.p <= 1) && ms.some((m) => m.p > 0 && m.p < 1) ? 1 : 100;
+    for (const d of [...keys, SOM]) for (const n of keys) for (const om of [false, true]) {
+      if (n === d) continue;
+      const r = { n, d, om, s, keys, dec: (s === 1 ? 2 : 0) + (ms.every((m) => Number.isInteger(m.p)) ? 0 : 2) }; let geldig = 0, zegtIets = false, goed = true;
+      for (const m of ms) {
+        const v = deel(m.o, r); if (v == null) continue;
+        if (Math.abs(v - m.p) > 1.01 * s / 100) { goed = false; break; }   // Magister rondt af (of kapt af) op hele procenten
+        geldig++; if (m.p > 0 && m.p < s) zegtIets = true;
+      }
+      if (goed && geldig >= 3 && zegtIets) return r;
+    }
+    return null;
+  };
+  const herrekenPct = (som, weken) => {
+    const perVorm = monsters(weken, new Map()), regels = new Map(); let berekend = 0, benaderd = 0;
+    for (const [v, ms] of perVorm) regels.set(v, vindRegel(ms));
+    /* gemiddelde van de weken, per plek in het rapport (voor als er geen regel is) */
+    const loop = (o, delen) => {
+      if (Array.isArray(o)) { o.forEach((x) => { const k = lidSleutel(x); loop(x, k === undefined ? [] : delen.flatMap((d) => (Array.isArray(d) ? d.filter((y) => lidSleutel(y) === k) : []))); }); return; }
+      if (!isObj(o)) return;
+      for (const k of Object.keys(o)) {
+        if (typeof o[k] === "number" && PCT.test(k)) {
+          const r = regels.get(vorm(o, k)), v = r ? deel(o, r) : null;
+          if (v != null) { o[k] = Math.round(v * 10 ** r.dec) / 10 ** r.dec; berekend++; continue; }
+          const ws = delen.map((d) => d && d[k]).filter((x) => typeof x === "number");
+          if (ws.length > 1) { const f = ws.every(Number.isInteger) ? 1 : 1e4; o[k] = Math.round(f * ws.reduce((x, y) => x + y, 0) / ws.length) / f; benaderd++; }
+        } else if (o[k] && typeof o[k] === "object") loop(o[k], delen.map((d) => d && d[k]).filter(Boolean));
+      }
+    };
+    loop(som.totals, weken.map((j) => j.totals).filter(Boolean));
+    const sl = (it) => String(it.student?.id ?? it.student?.studentNumber ?? it.id ?? JSON.stringify(it.student));
+    for (const it of som.items || []) loop(it, weken.flatMap((j) => (j.items || []).filter((x) => sl(x) === sl(it))));
+    return benaderd ? "gemiddeld" : berekend ? "berekend" : "geen";
   };
   const pauze = (ms) => new Promise((r) => setTimeout(r, ms));
   async function periodeRapport(url, input, init) {
@@ -263,6 +329,8 @@
     }
     basis = basis || { items: [], totals: {} };
     basis.items = [...per.values()]; basis.itemCount = basis.items.length;
+    let pct = "geen"; try { pct = herrekenPct(basis, out.filter(Boolean)); } catch (err) { console.warn("[Docent Tools] periode, percentages", err); }
+    try { window.postMessage({ type: "dt:periode:som", target: "att-insights-page", weken: urls.length, pct }, location.origin); } catch {}
     try { record("GET (Docent Tools, periode)", url, 200, "", 0); } catch {}
     return new Response(JSON.stringify(basis), { status: 200, headers: { "Content-Type": "application/json" } });
   }
@@ -300,6 +368,16 @@
       }
     } catch (err) { error = String(err && err.message || err); }
     reply(e, { type: "dt:periode:result", id, ok, error });
+  });
+  /* Het bereik dat Magister nu toont (week, maand, jaar of een eigen periode), voor het tabblad Inzicht. */
+  window.addEventListener("message", (e) => {
+    if (!(e.data && e.data.type === "dt:periode:get" && trusted(e))) return;
+    let uit = { ok: false };
+    try {
+      const el = zoek(e.data.target), r = el && el.selectedDateRange, s = r && +new Date(r.start), t = r && +new Date(r.end);
+      if (s && t && t >= s) uit = { ok: true, unit: String(el.selectedPeriod || ""), start: s, end: t };
+    } catch {}
+    reply(e, { type: "dt:periode:bereik", id: e.data.id, ...uit });
   });
 
   /* ---- Leerlingenoverzicht (op-leerlingen): zoekresultaten en selectie ----

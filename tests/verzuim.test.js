@@ -3,7 +3,7 @@
 const { test } = require("node:test"), assert = require("node:assert");
 const { laad, metRegister } = require("./hulp");
 
-const { DT } = metRegister();
+const { DT, modules } = metRegister({ periodes: () => [], periodeLabel: (p) => `${p.begin.getDate()}-${p.begin.getMonth() + 1} – ${p.einde.getDate()}-${p.einde.getMonth() + 1}` });
 const { vzStats, isoWeek } = laad("content/modules/verzuiminzicht.js", { DT, window: {}, document: {} }, ["vzStats", "isoWeek"]).uit;
 
 const van = new Date(2026, 10, 16), tot = new Date(2026, 10, 20, 23, 59, 59);
@@ -46,4 +46,20 @@ test("weeknummers volgen ISO 8601 rond de jaarwisseling", () => {
   assert.deepStrictEqual({ ...isoWeek(new Date(2026, 11, 28)) }, { y: 2026, w: 53 });
   assert.deepStrictEqual({ ...isoWeek(new Date(2027, 0, 4)) }, { y: 2027, w: 1 });
   assert.deepStrictEqual({ ...isoWeek(new Date(2025, 11, 29)) }, { y: 2026, w: 1 });
+});
+
+test("het bereik uit Magisters werkbalk geldt voor het tabblad: week, maand en het lopende schooljaar", () => {
+  const m = modules.verzuiminzicht, nu = new Date(2026, 10, 23, 12), d = { sj: new Date(2026, 7, 1).getTime() };
+  m.zetBereik({ unit: "week", start: new Date(2026, 10, 9).getTime(), end: new Date(2026, 10, 15, 23, 59, 59).getTime() }, nu);
+  let p = m.gekozenPeriode(d, nu);
+  assert.deepStrictEqual([m._periode, p.naam, p.van.getTime(), p.tot.getTime()], ["balk", "Week 46", new Date(2026, 10, 9).getTime(), new Date(2026, 10, 15, 23, 59, 59, 999).getTime()]);
+  /* Een maand die nog loopt eindigt nu; Magister geeft het einde als begin van de laatste dag. */
+  m.zetBereik({ unit: "month", start: new Date(2026, 10, 1).getTime(), end: new Date(2026, 10, 30).getTime() }, nu);
+  p = m.gekozenPeriode(d, nu);
+  assert.deepStrictEqual([p.van.getTime(), p.tot.getTime()], [new Date(2026, 10, 1).getTime(), nu.getTime()]);
+  m.zetBereik({ unit: "year", start: new Date(2026, 7, 1).getTime(), end: new Date(2027, 6, 31).getTime() }, nu);
+  assert.strictEqual(m._periode, "jaar");
+  m.zetBereik({ unit: "year", start: new Date(2025, 7, 1).getTime(), end: new Date(2026, 6, 31).getTime() }, nu);
+  assert.deepStrictEqual([m._periode, m.gekozenPeriode(d, nu).naam], ["balk", "Schooljaar 2025–2026"]);
+  m._periode = "jaar"; m._bereik = null;
 });

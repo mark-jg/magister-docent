@@ -14,7 +14,9 @@ DT.register({
   _panel: null,
   _data: null,     // { id, at, regs, rooster }
   _busy: null,
-  _periode: "jaar",
+  _periode: "jaar", // "jaar", "8w", "4w", "p:<id>" (eigen periode) of "balk" (het bereik uit Magisters werkbalk, zie _bereik)
+  _bereik: null,    // { van, tot, naam }: wat in de werkbalk is gekozen (Week, Maand, Jaar of de datumkiezer)
+  _balkSleutel: null,
   _active: false,
 
   init(DT) {
@@ -95,6 +97,58 @@ DT.register({
       if (bewaard) this.activate(DT, bewaard === "vergelijk" ? "vergelijk" : "inzicht", true);
     }
     if (this._data && this._data.id !== id) { this._data = null; if (this._active) this.activate(DT, this._view, true); }
+    this.volgBalk(DT);
+  },
+
+  /* De keuze in Magisters werkbalk boven de tabbladen (Week, Maand, Jaar, de datumkiezer of een eigen periode)
+   * geldt ook voor dit tabblad: na een klik of keuze daar wordt het bereik gelezen en overgenomen. De eigen
+   * knoppen van het tabblad (Schooljaar, 8 weken, 4 weken, Periode) blijven daarnaast werken. */
+  volgBalk(DT) {
+    const dp = this._root?.querySelector(".toolbar .date-picker");
+    if (!dp || dp.dataset.dtVzVolgt) return;
+    dp.dataset.dtVzVolgt = "1";
+    const na = () => { clearTimeout(this._volgT); this._volgT = setTimeout(() => this.leesBalk(DT), 450); };
+    dp.addEventListener("click", na); dp.addEventListener("change", na);
+    this.leesBalk(DT, false);   // de stand van nu onthouden, zodat alleen een wijziging het tabblad verzet
+  },
+
+  async leesBalk(DT, toepassen = true) {
+    const root = this._root; if (!root) return;
+    const eigenId = DT.actief("periodes") ? DT.module("periodes")?._actief?.["att-dk-attendance"]?.id : null;
+    let sleutel, r = null;
+    if (eigenId) sleutel = "p:" + eigenId;
+    else {
+      r = await this.vraagBereik();
+      if (!r || root !== this._root) return;
+      sleutel = `${r.unit}|${r.start}|${r.end}`;
+    }
+    const nieuw = sleutel !== this._balkSleutel; this._balkSleutel = sleutel;
+    if (!toepassen || !nieuw) return;
+    if (eigenId) { this._periode = sleutel; this._bereik = null; } else this.zetBereik(r);
+    if (this._active && this._view === "inzicht") this.load(DT);
+  },
+
+  /* Het bereik dat Magister toont; alleen in de pagina zelf te lezen (netlog.js, dt:periode:get). */
+  vraagBereik() {
+    return new Promise((resolve) => {
+      const id = Math.random().toString(36).slice(2);
+      const klaar = (v) => { window.removeEventListener("message", h); clearTimeout(t); resolve(v); };
+      const h = (e) => { if (e.source === window && e.data?.type === "dt:periode:bereik" && e.data.id === id) klaar(e.data.ok ? e.data : null); };
+      const t = setTimeout(() => klaar(null), 1500);
+      window.addEventListener("message", h);
+      window.postMessage({ type: "dt:periode:get", id, target: "att-dk-attendance" }, location.origin);
+    });
+  },
+
+  /* r: { unit: "week" | "month" | "year", start, end } (tijden in ms). Het lopende schooljaar is gewoon "Schooljaar". */
+  zetBereik(r, now = new Date()) {
+    const a = new Date(r.start), b = new Date(r.end);
+    const van = new Date(a.getFullYear(), a.getMonth(), a.getDate()), tot = new Date(b.getFullYear(), b.getMonth(), b.getDate(), 23, 59, 59, 999);
+    const sj = new Date(now.getFullYear() - (now.getMonth() < 7 ? 1 : 0), 7, 1);
+    if (r.unit === "year" && van.getTime() === sj.getTime()) { this._periode = "jaar"; this._bereik = null; return; }
+    const naam = r.unit === "week" ? `Week ${isoWeek(van).w}` : r.unit === "month" ? van.toLocaleDateString("nl-NL", { month: "long", year: "numeric" })
+      : r.unit === "year" ? `Schooljaar ${van.getFullYear()}–${van.getFullYear() + 1}` : "Gekozen bereik";
+    this._periode = "balk"; this._bereik = { van, tot, naam };
   },
 
   /* vanzelf: niet door een klik (onthouden tabblad, andere leerling, Terug of Vooruit); dan komt er geen nieuwe stap
@@ -146,16 +200,17 @@ DT.register({
 
   async load(DT) {
     const id = this.leerlingId(); if (!id || !this._panel) return;
-    if (this._data && this._data.id === id && Date.now() - this._data.at < 10 * 60e3) { this.render(); return; }
+    const today = new Date(), ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const sj = new Date(today.getFullYear() - (today.getMonth() < 7 ? 1 : 0), 7, 1);
+    /* Eigen periodes en een bereik uit de werkbalk die eerder beginnen (tot een jaar terug) ook kunnen tonen */
+    const eerder = [...(DT.periodes?.() || []).map((p) => p.begin), ...(this._periode === "balk" && this._bereik ? [this._bereik.van] : [])];
+    const vanaf = eerder.filter((b) => b < sj && b > new Date(sj.getTime() - 366 * 864e5)).sort((a, b) => a - b)[0] || sj;
+    const oud = this._data && this._data.id === id ? this._data : null;
+    if (oud && Date.now() - oud.at < 10 * 60e3 && oud.vanaf <= vanaf.getTime()) { this.render(); return; }
     if (this._busy === id) return;
     this._busy = id;
     this._panel.innerHTML = `<div class="dt-vz-loading">Registraties en rooster ophalen…</div>`;
     try {
-      const today = new Date(), ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      const sj = new Date(today.getFullYear() - (today.getMonth() < 7 ? 1 : 0), 7, 1);
-      /* Eigen periodes die eerder beginnen (tot een jaar terug) ook kunnen tonen */
-      const vroegst = (DT.periodes?.() || []).map((p) => p.begin).filter((b) => b < sj && b > new Date(sj.getTime() - 366 * 864e5)).sort((a, b) => a - b)[0];
-      const vanaf = vroegst || sj;
       const list = (r) => (r && r.status === 200 && r.json) ? (Array.isArray(r.json) ? r.json : r.json.items || []) : null;
       const [v, a] = await Promise.all([
         DT.api(`/api/m6/leerlingen/${id}/verantwoordingen?begin=${ymd(vanaf)}&einde=${ymd(today)}`, { full: true, timeout: 20000 }),
@@ -163,9 +218,10 @@ DT.register({
       ]);
       const regs = list(v), rooster = list(a);
       if (regs && rooster) rooster.push(...await vzLosseLessen(id, regs, rooster, (u) => DT.api(u, { full: true, timeout: 10000 })));
-      this._data = { id, at: Date.now(), regs, rooster, err: { regs: v.status, rooster: a.status }, sj: sj.getTime(), jaren: "laden" };
+      const jaren = oud && Array.isArray(oud.jaren) ? oud.jaren : "laden";
+      this._data = { id, at: Date.now(), regs, rooster, err: { regs: v.status, rooster: a.status }, sj: sj.getTime(), vanaf: vanaf.getTime(), jaren };
       this.render();
-      this.loadJaren(DT, id, sj);
+      if (jaren === "laden") this.loadJaren(DT, id, sj);
     } finally { if (this._busy === id) this._busy = null; }
   },
 
@@ -207,11 +263,13 @@ DT.register({
     return { rijen, KLEUR };
   },
 
-  /* Gekozen periode op het tabblad Inzicht: { naam, van, tot } */
+  /* Gekozen periode op het tabblad Inzicht: { naam, van, tot, label, eigen }. label (de datums) alleen bij een
+   * eigen periode en bij een bereik uit de werkbalk. Een periode die nog loopt eindigt nu. */
   gekozenPeriode(d, now = new Date()) {
     const periodes = DT.periodes?.() || [];
     const eigen = this._periode.startsWith("p:") ? periodes.find((p) => "p:" + p.id === this._periode) : null;
-    if (eigen) return { naam: eigen.naam, van: eigen.begin, tot: eigen.einde < now ? eigen.einde : now };
+    if (eigen) return { naam: eigen.naam, van: eigen.begin, tot: eigen.einde < now ? eigen.einde : now, label: DT.periodeLabel(eigen, true), eigen };
+    if (this._periode === "balk" && this._bereik) { const b = this._bereik; return { naam: b.naam, van: b.van, tot: b.tot < now ? b.tot : now, label: DT.periodeLabel({ begin: b.van, einde: b.tot }, true) }; }
     if (this._periode === "8w" || this._periode === "4w") return { naam: `Laatste ${this._periode === "8w" ? 8 : 4} weken`, van: new Date(now.getFullYear(), now.getMonth(), now.getDate() - (this._periode === "8w" ? 56 : 28)), tot: now };
     const y = new Date(d.sj).getFullYear();
     return { naam: `Schooljaar ${y}–${y + 1}`, van: new Date(d.sj), tot: now };
@@ -233,10 +291,9 @@ DT.register({
     if (!d.regs && !d.rooster) { p.innerHTML = `<div class="dt-vz-loading">Geen gegevens: registraties ${esc(d.err.regs)}, rooster ${esc(d.err.rooster)}.</div>`; return; }
     const now = new Date();
     const periodes = DT.periodes?.() || [];
-    let eigen = this._periode.startsWith("p:") ? periodes.find((p) => "p:" + p.id === this._periode) : null;
-    if (this._periode.startsWith("p:") && !eigen) this._periode = "jaar";
-    const van = eigen ? eigen.begin : this._periode === "jaar" ? new Date(d.sj) : new Date(now.getFullYear(), now.getMonth(), now.getDate() - (this._periode === "8w" ? 56 : 28));
-    const tot = eigen && eigen.einde < now ? eigen.einde : now;
+    if ((this._periode.startsWith("p:") && !periodes.some((p) => "p:" + p.id === this._periode)) || (this._periode === "balk" && !this._bereik)) this._periode = "jaar";
+    const per = this.gekozenPeriode(d, now), eigen = per.eigen || null, van = per.van, tot = per.tot;
+    const buiten = d.vanaf != null && van.getTime() < d.vanaf;   // begint vóór wat er is opgehaald (meer dan een jaar voor dit schooljaar)
     const S = vzStats(d.regs || [], d.rooster || [], van, tot);
     const pctCol = (pct) => pct >= 90 ? "#34C759" : pct >= 80 ? "#FF9500" : "#FF3B30";
     const SOORT = [["OK", "aanwezig", "#34C759"], ["TL", "te laat", "#FFCC00"], ["ZK", "ziek", "#AF52DE"], ["AB_OK", "absent, geoorloofd", "#FF9500"], ["AB_NO", "absent, ongeoorloofd", "#FF3B30"], ["UI", "uitgestuurd", "#A2845E"]];
@@ -348,12 +405,12 @@ DT.register({
       <div class="dt-vz-head">
         <div class="dt-vz-title">Inzicht in aanwezigheid</div>
         <span class="dt-vz-headr">
-        <div class="dt-vz-segs">${seg("jaar", "Schooljaar")}${seg("8w", "8 weken")}${seg("4w", "4 weken")}${periodes.length ? `<select class="dt-vz-psel${eigen ? " is-on" : ""}" aria-label="Eigen periode"><option value="">Periode…</option>${periodes.map((p) => `<option value="p:${esc(p.id)}"${eigen && eigen.id === p.id ? " selected" : ""}>${esc(p.naam)} · ${esc(DT.periodeLabel(p))}</option>`).join("")}</select>` : ""}</div><button type="button" class="dt-vz-xls" title="Naar Excel: samenvatting, per vak, docent, dag, lesuur, week en maand, alle lessen en de vergelijking met vorige schooljaren"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M8 2.5v7.5M4.5 6.8 8 10.3l3.5-3.5M3 13.5h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Excel</button></span>
+        <div class="dt-vz-segs">${this._periode === "balk" ? `<button type="button" class="dt-vz-seg is-on" data-periode="balk" title="Gekozen in de werkbalk van Magister">${esc(per.naam)}</button>` : ""}${seg("jaar", "Schooljaar")}${seg("8w", "8 weken")}${seg("4w", "4 weken")}${periodes.length ? `<select class="dt-vz-psel${eigen ? " is-on" : ""}" aria-label="Eigen periode"><option value="">Periode…</option>${periodes.map((p) => `<option value="p:${esc(p.id)}"${eigen && eigen.id === p.id ? " selected" : ""}>${esc(p.naam)} · ${esc(DT.periodeLabel(p))}</option>`).join("")}</select>` : ""}</div><button type="button" class="dt-vz-xls" title="Naar Excel: samenvatting, per vak, docent, dag, lesuur, week en maand, alle lessen en de vergelijking met vorige schooljaren"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M8 2.5v7.5M4.5 6.8 8 10.3l3.5-3.5M3 13.5h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Excel</button></span>
       </div>
       ${T.lessen ? `
       <div class="dt-vz-summary">
         <span class="dt-vz-big" style="color:${pctCol(T.pct)}">${T.pct}%</span>
-        <span class="dt-vz-sumtext">${eigen ? `<b>${esc(eigen.naam)}</b> (${esc(DT.periodeLabel(eigen, true))}) · ` : ""}<b>aanwezig</b> · ${T.telt - T.afwezig} van ${T.telt} lessen · ${T.afwezig} gemist${T.ongeoorloofd ? ` (${T.ongeoorloofd} ongeoorloofd)` : ""}${T.ziek ? ` · ${T.ziek}× ziek` : ""}${T.teLaat ? ` · ${T.teLaat}× te laat` : ""}${T.vrij ? ` · ${T.vrij}× vrijgesteld (telt niet mee)` : ""}${S.onbekend ? ` · ${S.onbekend} lessen zonder vak in het rooster` : ""}</span>
+        <span class="dt-vz-sumtext">${per.label ? `<b>${esc(per.naam)}</b> (${esc(per.label)}) · ` : ""}<b>aanwezig</b> · ${T.telt - T.afwezig} van ${T.telt} lessen · ${T.afwezig} gemist${T.ongeoorloofd ? ` (${T.ongeoorloofd} ongeoorloofd)` : ""}${T.ziek ? ` · ${T.ziek}× ziek` : ""}${T.teLaat ? ` · ${T.teLaat}× te laat` : ""}${T.vrij ? ` · ${T.vrij}× vrijgesteld (telt niet mee)` : ""}${S.onbekend ? ` · ${S.onbekend} lessen zonder vak in het rooster` : ""}</span>
       </div>
       <div class="dt-vz-obs">${obs.map((o) => `<div class="dt-vz-ob">${o}</div>`).join("")}</div>
       <div class="dt-vz-grid">
@@ -363,7 +420,7 @@ DT.register({
         <section class="dt-vz-card"><h4>Per weekdag</h4>${rows(S.dagen, { max: 7 })}</section>
         <section class="dt-vz-card"><h4>Per lesuur (begintijd)</h4>${rows(S.uren, { max: 12 })}</section>
       </div>
-      ${legend}` : `<p class="dt-vz-empty">Geen lessen in deze periode.</p>`}
+      ${legend}` : `<p class="dt-vz-empty">${per.label ? `<b>${esc(per.naam)}</b> (${esc(per.label)}): ` : ""}${buiten ? "dit bereik ligt te ver terug voor dit tabblad. Het tabblad Vergelijken toont de vorige schooljaren." : van > now ? "dit bereik moet nog beginnen." : "geen lessen in deze periode."}</p>`}
       <div class="dt-vz-foot">Uit de registraties en het rooster van Magister. Afwezig = absent, ziek of uitgestuurd; te laat telt als aanwezig. Een vrijstelling is met toestemming: die les telt niet als gemist en valt buiten het percentage. Vak${S.docenten.length ? " en docent" : ""} uit het rooster; ${d.rooster ? `${(d.rooster || []).length} roosteritems` : "rooster niet beschikbaar"}${d.rooster && !S.docenten.length ? "; het rooster van de leerling noemt geen docenten, daarom is er geen blok per docent" : ""}.</div>`;
     p.querySelectorAll(".dt-vz-seg").forEach((b) => b.addEventListener("click", () => { this._periode = b.dataset.periode; this.render(); }));
     p.querySelector(".dt-vz-xls")?.addEventListener("click", () => this.exportExcel());

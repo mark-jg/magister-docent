@@ -86,6 +86,38 @@ test("eigen periode: mislukt één week, dan geen halve som maar een melding en 
   assert.strictEqual(fetched.length, 1, "de periode is losgelaten");
 });
 
+test("eigen periode: het percentage wordt opnieuw berekend over de opgetelde aantallen, niet overgenomen uit de eerste week", async () => {
+  await zetPeriode();
+  /* Drie weken: 9 van 10, 5 van 10 en 2 van 20 lessen aanwezig. Over de periode is dat 16 van 40 = 40%, niet 90%. */
+  const wk = [[9, 10], [5, 10], [2, 20]].map(([p, t]) => ({ totals: { present: p + 8, total: t + 10, presencePercentage: Math.round(100 * (p + 8) / (t + 10)) },
+    items: [{ student: { id: 1 }, present: p, total: t, presencePercentage: Math.round(100 * p / t), reasons: [{ code: "ZK", count: 1 }, ...(t === 20 ? [{ code: "AB", count: 4 }] : [])] },
+      { student: { id: 2 }, present: 8, total: 10, presencePercentage: 80, reasons: [] }] }));
+  let n = 0; fetchImpl = async () => new Response(JSON.stringify(wk[n++]), { status: 200 });
+  const j = await (await win.fetch(WEEK45, {})).json();
+  const a = j.items.find((x) => x.student.id === 1);
+  assert.deepStrictEqual([a.present, a.total, a.presencePercentage], [16, 40, 40]);
+  assert.deepStrictEqual([j.totals.present, j.totals.total, j.totals.presencePercentage], [40, 70, 57]);
+  assert.deepStrictEqual(a.reasons, [{ code: "ZK", count: 3 }, { code: "AB", count: 4 }], "lijsten per soort worden per onderdeel opgeteld");
+  assert.strictEqual(posted.find((p) => p.m.type === "dt:periode:som").m.pct, "berekend");
+});
+
+test("eigen periode: is de deling niet af te leiden, dan het gemiddelde van de weken in plaats van de eerste week", async () => {
+  await zetPeriode();
+  const wk = [90, 50, 10].map((p) => ({ totals: {}, items: [{ student: { id: 1 }, lessons: 10, score: p }].map((x) => ({ student: x.student, lessons: x.lessons, percentage: x.score })) }));
+  let n = 0; fetchImpl = async () => new Response(JSON.stringify(wk[n++]), { status: 200 });
+  const j = await (await win.fetch(WEEK45, {})).json();
+  assert.deepStrictEqual([j.items[0].lessons, j.items[0].percentage], [30, 50]);
+  assert.strictEqual(posted.find((p) => p.m.type === "dt:periode:som").m.pct, "gemiddeld");
+});
+
+test("het bereik van Magisters werkbalk is op te vragen", async () => {
+  document.querySelector = (s) => (s === "att-dk-attendance" ? { selectedPeriod: "month", selectedDateRange: { start: new Date(2026, 10, 1), end: new Date(2026, 10, 30) } } : null);
+  const r = await stuur({ type: "dt:periode:get", id: "b", target: "att-dk-attendance" });
+  assert.deepStrictEqual([r[0].m.type, r[0].m.ok, r[0].m.unit, r[0].m.start, r[0].m.end], ["dt:periode:bereik", true, "month", new Date(2026, 10, 1).getTime(), new Date(2026, 10, 30).getTime()]);
+  document.querySelector = () => null;
+  assert.strictEqual((await stuur({ type: "dt:periode:get", id: "c", target: "att-dk-attendance" }))[0].m.ok, false);
+});
+
 test("een periode loslaten lukt ook als het onderdeel al van de pagina is", async () => {
   const r = await stuur({ type: "dt:periode:set", id: "p", target: "att-insights-page", herstel: false, periode: null });
   assert.strictEqual(r[0].m.ok, true);
