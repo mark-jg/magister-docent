@@ -27,11 +27,13 @@ DT.register({
     this._open = new Set(); this._uit = new Set();
     try { const j = localStorage.getItem("dt-opl-jaren"); if (j != null && j !== "") this._jaren = Number(j) || 0; } catch {}
     this._stop = DT.observe(() => this.menu(DT), { debounce: 300, poll: 2000 });
-    this._hash = () => this.sluit();
+    /* Een ander adres: de pagina sluit, behalve als we met Terug of Vooruit juist op deze pagina uitkomen. */
+    this._hash = () => { if (!DT.route.nu("opleidingen")) this.sluit(true); };
     window.addEventListener("hashchange", this._hash);
+    this._routeStop = DT.route.luister("opleidingen", (r) => this.vanRoute(DT, r));
   },
   destroy() {
-    this._stop && this._stop(); window.removeEventListener("hashchange", this._hash);
+    this._stop && this._stop(); window.removeEventListener("hashchange", this._hash); this._routeStop && this._routeStop();
     this.sluit(); document.querySelectorAll("#dt-menu-opleidingen").forEach((el) => el.remove());
   },
 
@@ -41,15 +43,34 @@ DT.register({
     if (!ul._dtOpl) {
       ul._dtOpl = true;
       /* Een ander menu-item gekozen: de pagina sluit, ook als Magister daarbij niet van adres wisselt. */
-      ul.addEventListener("click", (e) => { if (this._pagina && e.target.closest?.("a") && !e.target.closest("#dt-menu-opleidingen")) this.sluit(); }, true);
+      ul.addEventListener("click", (e) => { if (this._pagina && e.target.closest?.("a") && !e.target.closest("#dt-menu-opleidingen")) this.sluitNaKlik(); }, true);
     }
+    /* Na herladen: de geschiedenis weet nog dat deze pagina open stond. */
+    if (!this._routeGestart) { this._routeGestart = true; const r = DT.route.nu("opleidingen"); if (r) this.vanRoute(DT, r); }
     if (ul.querySelector(":scope > #dt-menu-opleidingen")) return;
     const li = DT.menuItem({ id: "dt-menu-opleidingen", titel: "Opleidingen", tip: "Opleidingen (Docent Tools)", icoon: this.ICOON, href: "#/opleidingen", klik: () => this.open(DT) });
     if (li && this._pagina) li.classList.add("active");
   },
 
+  /* ---------- route: Terug en Vooruit in de browser ---------- */
+  /* Elke weergave (tabblad, details van een klas) is een stap in de geschiedenis van de browser. */
+  route(vervang = false) { DT.route.zet("opleidingen", { tab: this._tab || "overzicht", zoom: this._zoom || null }, vervang); },
+  /* Terug of Vooruit: r is de route van deze pagina, of null als de stap bij een andere pagina hoort. */
+  vanRoute(DT, r) {
+    if (!r) { this.sluit(true); return; }
+    this._tab = r.tab || "overzicht"; this._zoom = r.zoom || null;
+    if (!this._pagina) this.open(DT, true);
+    else { this.teken(DT); this._pagina.scrollTop = 0; }
+  },
+  /* Gesloten door een klik in het menu. Wisselt Magister daarbij niet van adres, dan krijgt de geschiedenis zelf
+   * een stap "geen eigen pagina", zodat Terug weer hier uitkomt. */
+  sluitNaKlik() {
+    this.sluit(true);
+    setTimeout(() => { if (!this._pagina && DT.route.nu("opleidingen")) DT.route.zet(null); }, 300);
+  },
+
   /* ---------- pagina ---------- */
-  open(DT) {
+  open(DT, vanRoute = false) {
     if (this._pagina) return;
     this.css();
     const view = document.querySelector('ui-view[name="main"]') || document.querySelector(".container > ui-view") || document.querySelector("ui-view");
@@ -91,10 +112,12 @@ DT.register({
     pagina.addEventListener("mousemove", (e) => this.tip(e));
     pagina.addEventListener("mouseleave", () => this._tip.classList.remove("is-aan"));
     pagina.focus({ preventScroll: true });
+    if (!vanRoute) this.route();
     this.laad(DT);
   },
-  sluit() {
+  sluit(vanRoute = false) {
     if (!this._pagina) return;
+    if (!vanRoute && DT.route.nu("opleidingen")) DT.route.zet(null);
     this._run++; this._stopAanw = true;
     this._ro?.disconnect(); window.removeEventListener("resize", this._plaats);
     this._view?.classList.remove("dt-opl-achter");
@@ -298,12 +321,12 @@ DT.register({
       case "map-los": this.mapLos(DT); break;
       case "filter": { const o = d?.boom[+el.dataset.s]; if (o) { this._uit.has(o.studie) ? this._uit.delete(o.studie) : this._uit.add(o.studie); this.teken(DT); } break; }
       case "filter-alles": this._uit.clear(); this.teken(DT); break;
-      case "ga": case "zoom": if (knoop) { if (!this._zoom) this._terug = this._pagina.scrollTop; this._zoom = knoop.id; this.teken(DT); this._pagina.scrollTop = 0; } break;
-      case "terug": this._zoom = null; this.teken(DT); this._pagina.scrollTop = this._terug || 0; break;
+      case "ga": case "zoom": if (knoop) { if (!this._zoom) this._terug = this._pagina.scrollTop; this._zoom = knoop.id; this.route(); this.teken(DT); this._pagina.scrollTop = 0; } break;
+      case "terug": this._zoom = null; this.route(); this.teken(DT); this._pagina.scrollTop = this._terug || 0; break;
       case "keuze-ok": this.keuzeBewaar(DT); break;
       case "keuze-alles": case "keuze-niets": for (const x of this._pagina.querySelectorAll("input[data-groep]")) x.checked = el.dataset.act === "keuze-alles"; this.keuzeTotaal(); break;
-      case "keuze-open": this._tab = "opslag"; this._zoom = null; this.teken(DT); this._pagina.scrollTop = 0; break;
-      case "tab": this._tab = el.dataset.t; this._zoom = null; this.teken(DT); this._pagina.scrollTop = 0; break;
+      case "keuze-open": this._tab = "opslag"; this._zoom = null; this.route(); this.teken(DT); this._pagina.scrollTop = 0; break;
+      case "tab": this._tab = el.dataset.t; this._zoom = null; this.route(); this.teken(DT); this._pagina.scrollTop = 0; break;
       case "mut-soort": this._mutSoort = el.dataset.w || null; this._mutAlles = false; this.teken(DT); break;
       case "mut-alles": this._mutAlles = !this._mutAlles; this.teken(DT); break;
       case "stop": this._stopAanw = true; this.status("Stoppen…"); break;

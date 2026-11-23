@@ -2,10 +2,10 @@
 const { test } = require("node:test"), assert = require("node:assert");
 const { laad, metRegister } = require("./hulp");
 
-function kern({ opslaan = async () => {}, bewaard = {} } = {}) {
+function kern({ opslaan = async () => {}, bewaard = {}, extra = {} } = {}) {
   const chrome = { runtime: { getManifest: () => ({ version: "test" }) }, storage: { sync: { get: async () => bewaard, set: opslaan } } };
   const document = { getElementById: () => null, body: { append() {} }, createElement: () => ({ append() {}, classList: { add() {}, remove() {} }, setAttribute() {}, remove() {} }) };
-  const ctx = laad(["content/defaults.js", "content/core.js"], { window: "zelf", chrome, document, location: { host: "school.magister.net", origin: "https://school.magister.net" }, requestAnimationFrame() {}, navigator: {}, addEventListener() {}, postMessage() {}, console: { warn() {}, info() {} } });
+  const ctx = laad(["content/defaults.js", "content/core.js"], { window: "zelf", chrome, document, location: { host: "school.magister.net", origin: "https://school.magister.net" }, requestAnimationFrame() {}, navigator: {}, addEventListener() {}, postMessage() {}, console: { warn() {}, info() {} }, ...extra });
   return ctx.DT;
 }
 
@@ -151,4 +151,27 @@ test("waarnemer: na herladen van de extensie stopt het oude script, in plaats va
   assert.strictEqual(p.waarnemers.length, 0, "MutationObserver losgekoppeld");
   let later = 0; p.DT.observe(() => { later++; });
   assert.strictEqual(later, 0, "nieuwe waarnemers starten niet meer");
+});
+
+test("routes voor eigen pagina's: een stap in de geschiedenis zonder het adres te wijzigen, en Terug of Vooruit meldt de route", () => {
+  const stappen = [{ state: null }], luisteraars = []; let nu = 0;
+  const history = { get state() { return stappen[nu].state; },
+    pushState(s) { stappen.length = nu + 1; stappen.push({ state: JSON.parse(JSON.stringify(s)) }); nu++; },
+    replaceState(s) { stappen[nu] = { state: JSON.parse(JSON.stringify(s)) }; } };
+  const ga = (d) => { nu += d; luisteraars.forEach((fn) => fn({ state: stappen[nu].state })); };
+  const DT = kern({ extra: { history, addEventListener: (soort, fn) => { if (soort === "popstate") luisteraars.push(fn); }, removeEventListener: (soort, fn) => { const i = luisteraars.indexOf(fn); if (i >= 0) luisteraars.splice(i, 1); } } });
+  const gezien = [], stop = DT.route.luister("opleidingen", (r) => gezien.push(r && r.tab));
+  stappen[0].state = { vanMagister: 1 };
+  DT.route.zet("opleidingen", { tab: "overzicht" });
+  DT.route.zet("opleidingen", { tab: "overzicht" });
+  assert.strictEqual(stappen.length, 2, "dezelfde route geeft geen dubbele stap");
+  assert.strictEqual(history.state.vanMagister, 1, "wat Magister in de toestand zette blijft staan");
+  DT.route.zet("opleidingen", { tab: "mutaties" });
+  assert.strictEqual(DT.route.nu("opleidingen").tab, "mutaties"); assert.strictEqual(DT.route.nu("cb"), null);
+  ga(-1); ga(-1); ga(1);
+  assert.deepStrictEqual(gezien, ["overzicht", null, "overzicht"]);
+  DT.route.zet("opleidingen", { tab: "verloop" }, true);
+  assert.strictEqual(stappen.length, 3, "vervangen maakt geen nieuwe stap"); assert.strictEqual(stappen[1].state.dt.tab, "verloop");
+  stop(); ga(-1);
+  assert.strictEqual(gezien.length, 3, "na stoppen komt er niets meer binnen");
 });

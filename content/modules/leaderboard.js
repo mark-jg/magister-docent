@@ -34,13 +34,20 @@ DT.register({
   init(DT) {
     if (!DT.isTop) return;
     this._stop = DT.observe(() => this.mount(DT), { debounce: 300, poll: 1500 });
-    this._hash = () => { if (this._view && !/^#\/aanwezigheid\/?$/.test(location.hash)) this.sluit(); };
+    this._hash = () => { if (this._view && !/^#\/aanwezigheid\/?$/.test(location.hash)) this.sluit(true); };
     window.addEventListener("hashchange", this._hash);
+    /* Terug en Vooruit in de browser: de pagina, de klas en de week zijn stappen in de geschiedenis (DT.route). */
+    this._routeStop = DT.route.luister("leaderboard", (r) => {
+      if (!r) return this.sluit(true);
+      if (!this._view) return this.mount(DT);
+      if (r.klas && this._klas) this.kies(DT, { klas: r.klas, week: this.vanYmd(r.week) || this._ma });
+    });
   },
+  vanYmd(s) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || "")); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; },
 
   destroy() {
     this._stop && this._stop();
-    window.removeEventListener("hashchange", this._hash);
+    window.removeEventListener("hashchange", this._hash); this._routeStop && this._routeStop();
     this.sluit();
     DT.deepQueryAll("#dt-lb-tegel").forEach((el) => el.remove());
     document.getElementById("dt-lb-style")?.remove();
@@ -50,8 +57,10 @@ DT.register({
   mount(DT) {
     const dash = DT.deepQuery("att-attendance-dashboard");
     const wrap = dash?.shadowRoot?.querySelector(".wrapper");
-    if (this._view && !this._view.isConnected) this.sluit();
-    if (this._view && !document.querySelector("mg-att-tiles")) this.sluit();
+    if (this._view && !this._view.isConnected) this.sluit(true);
+    if (this._view && !document.querySelector("mg-att-tiles")) this.sluit(true);
+    /* Na Terug, Vooruit of herladen: de geschiedenis zegt dat het leaderboard open staat. */
+    if (!this._view && DT.route.nu("leaderboard") && /^#\/aanwezigheid\/?$/.test(location.hash) && document.querySelector("mg-att-tiles")) this.open(DT);
     DT.navTegel(wrap, {
       id: "dt-lb-tegel", titel: "Leaderboard", tekst: "Wie was er per week het meest aanwezig in een klas",
       icoon: `<path fill="var(--sl-icon-fill-accent)" d="M144 40h224v120c0 61.9-50.1 112-112 112S144 221.9 144 160V40z"/><path fill="var(--sl-icon-fill-default)" fill-rule="evenodd" d="M136 24h240a16 16 0 0 1 16 16v16h72a16 16 0 0 1 16 16v32c0 61-46.6 111.2-106.2 116.5A136.6 136.6 0 0 1 288 284.4V352h48a40 40 0 0 1 40 40v64a16 16 0 0 1-16 16H152a16 16 0 0 1-16-16v-64a40 40 0 0 1 40-40h48v-67.6a136.6 136.6 0 0 1-85.8-63.9C78.6 215.2 32 165 32 104V72a16 16 0 0 1 16-16h72V40a16 16 0 0 1 16-16zM80 104c0 30.4 19.6 56.3 46.9 65.7A135.4 135.4 0 0 1 120 128v-24H80zm312 24c0 14.4-2.4 28.3-6.9 41.7 27.3-9.4 46.9-35.3 46.9-65.7h-40v24zM256 72l-14.4 29.2-32.2 4.7 23.3 22.7-5.5 32.1L256 145.6l28.8 15.1-5.5-32.1 23.3-22.7-32.2-4.7L256 72z"/>`,
@@ -112,11 +121,17 @@ DT.register({
     uv.classList.add("dt-lb-open");
     tiles.after(v);
     this._view = v;
-    this._ma = this.maandag(new Date());
+    /* De route: na Terug, Vooruit of herladen de klas en week van toen; anders een nieuwe stap in de geschiedenis. */
+    const r = DT.route.nu("leaderboard");
+    this._ma = this.vanYmd(r?.week) || this.maandag(new Date());
+    this._routeKlas = r?.klas || null; this._eersteKeuze = true;
+    if (!r) DT.route.zet("leaderboard", {});
     this.laadKlassen(DT);
   },
 
-  sluit() {
+  /* stil: niets aan de geschiedenis doen (de pagina verdween of het adres wisselde). */
+  sluit(stil = false) {
+    if (!stil && this._view && DT.route.nu("leaderboard")) DT.route.zet(null);
     this._gen++;
     this._bord?.sluit();
     this._view?.remove(); this._view = null;
@@ -135,13 +150,16 @@ DT.register({
       b.addEventListener("click", () => this.kies(DT, { klas: k.naam }));
       return b;
     }));
-    this.kies(DT, { klas: kl.some((k) => k.naam === bewaard) ? bewaard : kl[0].naam });
+    const wil = kl.some((k) => k.naam === this._routeKlas) ? this._routeKlas : bewaard;
+    this.kies(DT, { klas: kl.some((k) => k.naam === wil) ? wil : kl[0].naam });
   },
 
   kies(DT, { klas = this._klas, week = this._ma } = {}) {
     const vandaag = this.maandag(new Date());
     if (week > vandaag) week = vandaag;
     this._klas = klas; this._ma = week;
+    /* De eerste keuze na openen hoort bij de stap van het openen zelf. */
+    DT.route.zet("leaderboard", { klas, week: this.ymd(week) }, this._eersteKeuze); this._eersteKeuze = false;
     try { localStorage.setItem("dt-lb-klas", klas); } catch {}
     for (const b of this._klassen.children) b.setAttribute("aria-selected", String(b.dataset.klas === klas));
     const zo = this.plus(week, 6), wk = isoWeek(week).w;

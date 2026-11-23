@@ -34,13 +34,19 @@ var DtCb = {
     }
     this._stop = DT.observe(() => { this.tegel(DT); this.menu(); this.vulAfspraak(); }, { debounce: 300, poll: 1500, ookVerborgen: true });
     /* Weg van Aanwezigheid: de balie sluit, net als elke andere subpagina. */
-    this._hash = () => { if (this._scherm && !/^#\/aanwezigheid\/?$/.test(location.hash)) this.sluit(); };
+    this._hash = () => { if (this._scherm && !/^#\/aanwezigheid\/?$/.test(location.hash)) this.sluit(true); };
     window.addEventListener("hashchange", this._hash);
+    /* Terug en Vooruit in de browser: de balie en zijn tabbladen zijn stappen in de geschiedenis (DT.route). */
+    this._routeStop = DT.route.luister("cb", (r) => {
+      if (!r) { this.sluit(true); return; }
+      if (!this._scherm) this.open(DT, true);
+      else if (r.view && r.view !== this._view && this.VIEWS.some(([id]) => id === r.view)) { this._view = r.view; this.teken(); }
+    });
   },
 
   destroy() {
     this._stop && this._stop();
-    window.removeEventListener("hashchange", this._hash);
+    window.removeEventListener("hashchange", this._hash); this._routeStop && this._routeStop();
     this.sluit();
     DT.deepQueryAll("#dt-cb-tegel").forEach((el) => el.remove());
     document.querySelectorAll("#dt-menu-cb").forEach((el) => el.remove());
@@ -57,7 +63,12 @@ var DtCb = {
     if (!ul._dtCb) {
       ul._dtCb = true;
       /* Een ander menu-item gekozen: de balie sluit, ook als Magister daarbij niet van adres wisselt (Aanwezigheid). */
-      ul.addEventListener("click", (e) => { if (this._scherm && e.target.closest?.("a") && !e.target.closest("#dt-menu-cb")) this.sluit(); }, true);
+      ul.addEventListener("click", (e) => {
+        if (!this._scherm || !e.target.closest?.("a") || e.target.closest("#dt-menu-cb")) return;
+        this.sluit(true);
+        /* Wisselt Magister niet van adres (Aanwezigheid), dan krijgt de geschiedenis zelf een stap zonder balie. */
+        setTimeout(() => { if (!this._scherm && DT.route.nu("cb")) DT.route.zet(null); }, 300);
+      }, true);
     }
     if (this._scherm) {
       for (const x of ul.querySelectorAll(":scope > li.active")) if (x !== li) { x.classList.remove("active"); this._wasActief = x; }

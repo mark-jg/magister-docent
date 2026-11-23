@@ -14,11 +14,11 @@ Object.assign(DtCb, {
       attr: ["heading", "invert", "orientation", "variant", "fill", "size"] }, "*");
   },
 
-  async open(DT) {
+  async open(DT, vanRoute = false) {
     if (this._scherm) return;
     try { sessionStorage.setItem("dt-cb-open", "1"); } catch {}
     const tiles = document.querySelector("mg-att-tiles"), uv = tiles?.parentElement;
-    if (!uv || !/^#\/aanwezigheid\/?$/.test(location.hash)) { location.hash = "#/aanwezigheid"; return; }   // tegel() opent zodra de pagina er is
+    if (!uv || !/^#\/aanwezigheid\/?$/.test(location.hash)) { if (!/^#\/aanwezigheid\/?$/.test(location.hash)) this._navigeerde = !vanRoute; location.hash = "#/aanwezigheid"; return; }   // tegel() opent zodra de pagina er is
     this.css();
     const K = TardyKern;
     K.H.bewaar = () => this.bewaar();
@@ -43,7 +43,7 @@ Object.assign(DtCb, {
       tabs.append(DT.el("dna-tab", { slot: "tab", "data-view": id }, DT.el("div", { class: "dt-cb-tabblad" }, inhoud)));
       panelen[id] = inhoud;
     }
-    bar.addEventListener("click", (e) => { const b = e.target.closest("dna-tab-button"); if (b && b.dataset.view !== this._view) { this._view = b.dataset.view; this.teken(); } });
+    bar.addEventListener("click", (e) => { const b = e.target.closest("dna-tab-button"); if (b && b.dataset.view !== this._view) { this._view = b.dataset.view; DT.route.zet("cb", { view: this._view }); this.teken(); } });
     /* Balk boven elk tabblad: stand van de gedeelde map en de periode */
     this._stand = DT.el("span", { class: "dt-cb-stand" });
     this._periode = DT.el("select", { class: "dt-cb-veld dt-cb-periode", "aria-label": "Periode" });
@@ -67,7 +67,12 @@ Object.assign(DtCb, {
     }
     uv.classList.add("dt-cb-open");
     uv.append(pagina);
-    this._view = "melden";
+    /* De route: na herladen of Vooruit het tabblad van toen; anders een nieuwe stap in de geschiedenis. Kwamen we
+     * van een andere pagina, dan vervangt de balie de stap "Aanwezigheid", zodat Terug daar weer uitkomt. */
+    const r = DT.route.nu("cb");
+    this._view = r && this.VIEWS.some(([id]) => id === r.view) ? r.view : "melden";
+    if (!r) DT.route.zet("cb", { view: this._view }, !!this._navigeerde);
+    this._navigeerde = false;
     this._scherm = { laag: pagina, uv, bar, panelen, hoofd: panelen.melden };
     this.componenten();
     this.menu();
@@ -75,9 +80,10 @@ Object.assign(DtCb, {
   },
 
   /* Terug naar Aanwezigheid (kruimelpad), of weg van de pagina. */
-  sluit() {
+  sluit(vanRoute = false) {
     try { sessionStorage.removeItem("dt-cb-open"); } catch {}
     if (!this._scherm) return;
+    if (!vanRoute && DT.route.nu("cb")) DT.route.zet(null);
     clearInterval(this._timer);
     if (this._map && !this._kijkt) { this.schrijfNu().finally(() => this.bezettingVrij()); }
     this.scanStop();
