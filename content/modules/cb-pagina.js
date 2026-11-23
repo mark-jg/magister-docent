@@ -126,13 +126,16 @@ Object.assign(DtCb, {
     }
     try { this.laadStand(JSON.parse(tekst)); }
     catch { return this.mapScherm(DT, "tardy-gegevens.json is niet te lezen", "Het bestand is beschadigd of nog niet helemaal gesynchroniseerd. Wacht even op OneDrive en probeer het opnieuw.", () => this.koppel(DT), "Opnieuw proberen"); }
+    await this.apparaatLaden();
     const b = await this.bezetting();
     this._kijkt = false; this._ander = null;
     if (this.bezetDoorAnder(b)) {
       this._ander = b; this._kijkt = true;
       this.modal("Tardy is in gebruik", [
         DT.el("p", { html: `<b>${TardyKern.esc(b.naam || "Een collega")}</b> werkt sinds ${TardyKern.esc(this.moment(b.sinds))} in Tardy${b.apparaatNaam ? `, op ${TardyKern.esc(b.apparaatNaam)}` : ""}.` }),
-        DT.el("p", { class: "dt-cb-zacht", text: "Jullie werken om de beurt. Kijk je mee, dan zie je alles en blijft het bijgewerkt, maar bewaart de balie geen wijzigingen." }),
+        DT.el("p", { class: "dt-cb-zacht", text: b.naam && b.naam === this.mijnNaam()
+          ? "Dat is je eigen naam: je hebt Tardy nog open in de Tardy-app, in een andere browser of op een andere computer, of het is daar net gesloten. Werk je daar niet meer, kies dan \"Toch zelf verder\"."
+          : "Jullie werken om de beurt. Kijk je mee, dan zie je alles en blijft het bijgewerkt, maar bewaart de balie geen wijzigingen." }),
       ], [["Alleen bekijken", () => this.sluitModal()], ["Toch zelf verder", async () => { this._kijkt = false; this._ander = null; await this.herlaad(); await this.bezettingZet(); this.sluitModal(); this.teken(); }, true]]);
     } else await this.bezettingZet();
     clearInterval(this._timer); this._timer = setInterval(() => this.controle(), 30000);
