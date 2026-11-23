@@ -13,19 +13,28 @@ DT.register({
   init(DT) {
     if (!DT.isTop) return;
     this._stop = DT.observe(() => this.mount(DT), { debounce: 300, poll: 1500 });
-    this._hash = () => { if (this._dlg && !/^#\/aanwezigheid\/?$/.test(location.hash)) this.sluit(); };
+    this._hash = () => { if (this._dlg && !/^#\/aanwezigheid\/?$/.test(location.hash)) this.sluit(true); };
     window.addEventListener("hashchange", this._hash);
+    /* Terug en Vooruit in de browser: de pagina en het gekozen tabblad zijn stappen in de geschiedenis (DT.route). */
+    this._routeStop = DT.route.luister("lesreg", (r) => {
+      if (!r) return this.sluit(true);
+      if (!this._dlg) return this.mount(DT);
+      if (r.weergave && this._filter && r.weergave !== this._filter.weergave) this._bar?.querySelector(`dna-tab-button[data-view="${r.weergave}"]`)?.click();
+    });
   },
   destroy() {
-    this._stop && this._stop(); window.removeEventListener("hashchange", this._hash);
+    this._stop && this._stop(); window.removeEventListener("hashchange", this._hash); this._routeStop && this._routeStop();
     this.sluit(); DT.deepQueryAll("#dt-lr-tegel").forEach((el) => el.remove());
   },
-  sluit() { this._dlg?.remove(); this._dlg = null; document.querySelectorAll(".dt-lr-open").forEach((el) => el.classList.remove("dt-lr-open")); },
+  /* stil: niets aan de geschiedenis doen (de pagina verdween of het adres wisselde). */
+  sluit(stil = false) { if (!stil && this._dlg && DT.route.nu("lesreg")) DT.route.zet(null); this._bar = null; this._dlg?.remove(); this._dlg = null; document.querySelectorAll(".dt-lr-open").forEach((el) => el.classList.remove("dt-lr-open")); },
 
   /* ---------- tegel op Aanwezigheid ---------- */
   mount(DT) {
     const wrap = DT.deepQuery("att-attendance-dashboard")?.shadowRoot?.querySelector(".wrapper");
-    if (this._dlg && (!this._dlg.isConnected || !document.querySelector("mg-att-tiles"))) this.sluit();
+    if (this._dlg && (!this._dlg.isConnected || !document.querySelector("mg-att-tiles"))) this.sluit(true);
+    /* Na Terug, Vooruit of herladen: de geschiedenis zegt dat Lesregistraties open staat. */
+    if (!this._dlg && Date.now() - (this._opentOp || 0) > 15000 && DT.route.nu("lesreg") && /^#\/aanwezigheid\/?$/.test(location.hash) && document.querySelector("mg-att-tiles")) this.open(DT, true);
     let wil = false; try { wil = sessionStorage.getItem("dt-lr-open") === "1"; } catch {}
     if (wil && document.querySelector("mg-att-tiles") && !this._dlg) { try { sessionStorage.removeItem("dt-lr-open"); } catch {} this.open(DT, true); }
     DT.navTegel(wrap, {
@@ -66,6 +75,7 @@ DT.register({
       }
       pagina = true;
     }
+    this._opentOp = Date.now();   // het openen wacht op Magister; mount() probeert het in de tussentijd niet opnieuw
     this.css();
     const peil = this.ymd(new Date());
     let r = await DT.api(`/api/leerlingen/zoeken/filters?q=**&peildatum=${peil}`, { full: true, timeout: 12000 });
@@ -134,6 +144,7 @@ DT.register({
     if (!uv) return;
     uv.classList.add("dt-lr-open"); tiles.after(pagina_);
     this._dlg = pagina_;
+    if (!DT.route.nu("lesreg")) DT.route.zet("lesreg", {});
     this.componenten();
   },
   /* Magisters onderdelen negeren attributen die de extensie zet; het netwerk-script in de pagina zet ze opnieuw. */
@@ -303,7 +314,8 @@ DT.register({
       bar.append(DT.el("dna-tab-button", { "data-view": id }, naam));
       tabs.append(DT.el("dna-tab", { slot: "tab", "data-view": id }, DT.el("div", { class: "dt-lr-scroll" }, tabel[id])));
     }
-    bar.addEventListener("click", (e) => { const b = e.target.closest("dna-tab-button"); if (b) f.weergave = b.dataset.view; });
+    bar.addEventListener("click", (e) => { const b = e.target.closest("dna-tab-button"); if (b) { f.weergave = b.dataset.view; DT.route.zet("lesreg", { weergave: f.weergave }); } });
+    this._bar = bar;
     const kaartkop = (titel, sub, ...rechts) => DT.el("div", { class: "dt-lr-kaartkop" }, [DT.el("div", { class: "dt-lr-wie" }, [DT.el("h2", { text: titel }), sub ? DT.el("small", { text: sub }) : null].filter(Boolean)), ...rechts]);
     const grafiek = this.weekGrafiek(DT);
     doel.replaceChildren(...[

@@ -20,10 +20,15 @@ DT.register({
   init(DT) {
     if (!DT.isTop) return;
     this._stop = DT.observe(() => this.mount(DT), { debounce: 500, poll: 2500 });
+    /* Terug en Vooruit in de browser: de tabbladen Inzicht en Vergelijken zijn stappen in de geschiedenis (DT.route). */
+    this._routeStop = DT.route.luister("inzicht", (r) => {
+      if (r && r.id === this.leerlingId() && this._root) this.activate(DT, r.view === "vergelijk" ? "vergelijk" : "inzicht", true);
+      else this.deactivate(true);
+    });
   },
 
   destroy() {
-    this._stop && this._stop();
+    this._stop && this._stop(); this._routeStop && this._routeStop();
     this.deactivate();
     this._btn?.remove(); this._btn2?.remove(); this._panel?.remove();
     this._btn = this._btn2 = this._panel = this._root = null;
@@ -42,14 +47,14 @@ DT.register({
     const tabs = root && (root.querySelector("sl-tab-group") || root.querySelector("dna-tabs"));
     const sl = tabs?.localName === "sl-tab-group";
     const bar = sl ? tabs : tabs && tabs.querySelector("dna-tab-bar");
-    if (!bar) { if (this._btn) { this.deactivate(); this._btn.remove(); this._btn2?.remove(); this._panel?.remove(); this._btn = this._btn2 = this._panel = null; } return; }
+    if (!bar) { if (this._btn) { this.deactivate(true); this._btn.remove(); this._btn2?.remove(); this._panel?.remove(); this._btn = this._btn2 = this._panel = null; } return; }
     /* Het paginascript vervangt onze sl-tabs door echte (zie netlog.js, dt:upgrade): dan de nieuwe overnemen. */
     if (sl && this._root === root && this._btn && !this._btn.isConnected) {
       const ins = bar.querySelector(':scope > sl-tab[data-view="inzicht"]'), verg = bar.querySelector(':scope > sl-tab[data-view="vergelijk"]');
       if (ins) { this._btn = ins; this._btn2 = verg; }
     }
     if (this._root !== root || !this._btn || !this._btn.isConnected) {
-      this.deactivate();
+      this.deactivate(true);
       this._root = root;
       this.css(root);
       this._sl = sl;
@@ -86,13 +91,16 @@ DT.register({
       tabs.after(this._panel);
       /* Zelfde tabblad onthouden per sessie */
       const bewaard = sessionStorage.getItem("dt-vz-active");
-      if (bewaard) this.activate(DT, bewaard === "vergelijk" ? "vergelijk" : "inzicht");
+      if (bewaard) this.activate(DT, bewaard === "vergelijk" ? "vergelijk" : "inzicht", true);
     }
-    if (this._data && this._data.id !== id) { this._data = null; if (this._active) this.activate(DT, this._view); }
+    if (this._data && this._data.id !== id) { this._data = null; if (this._active) this.activate(DT, this._view, true); }
   },
 
-  activate(DT, view = "inzicht") {
+  /* vanzelf: niet door een klik (onthouden tabblad, andere leerling, Terug of Vooruit); dan komt er geen nieuwe stap
+   * in de geschiedenis bij, de huidige stap krijgt de route. */
+  activate(DT, view = "inzicht", vanzelf = false) {
     if (!this._root) return;
+    DT.route.zet("inzicht", { view, id: this.leerlingId() }, vanzelf);
     if (this._sl) { const g = this._root.querySelector("sl-tab-group"); this._btn = g?.querySelector(':scope > sl-tab[data-view="inzicht"]') || this._btn; this._btn2 = g?.querySelector(':scope > sl-tab[data-view="vergelijk"]') || this._btn2; }
     this._active = true; this._view = view; sessionStorage.setItem("dt-vz-active", view);
     this._btn.classList.toggle("is-active", view === "inzicht");
@@ -111,8 +119,10 @@ DT.register({
     this.load(DT);
   },
 
-  deactivate() {
+  /* stil: niets aan de geschiedenis doen (de pagina wisselde, of Terug of Vooruit). */
+  deactivate(stil = false) {
     if (!this._active) return;
+    if (!stil && DT.route.nu("inzicht")) DT.route.zet(null);
     this._active = false; sessionStorage.removeItem("dt-vz-active");
     this._btn?.classList.remove("is-active"); this._btn2?.classList.remove("is-active");
     if (this._sl) {

@@ -208,6 +208,28 @@
     },
     deepQuery(selector, root = document) { return DT.deepQueryAll(selector, root)[0] || null; },
 
+    /* Routes voor de eigen pagina's (Opleidingen, Te laat-balie), zodat Terug en Vooruit in de browser ermee
+     * werken. Magister kent die pagina's niet, dus het adres blijft zoals het is: de route staat in de toestand
+     * van de geschiedenis (history.state.dt = { p: pagina, … }). Die blijft ook na herladen staan.
+     *   zet(p, extra, vervang)  een nieuwe stap in de geschiedenis (of de huidige vervangen); p null = geen eigen pagina
+     *   nu(p)                   de route van pagina p als die nu geldt, anders null
+     *   luister(p, fn)          fn(route of null) bij Terug of Vooruit; geeft een functie om te stoppen */
+    route: {
+      nu(p) { let s = null; try { s = history.state?.dt; } catch {} return s && s.p === p ? s : null; },
+      zet(p, extra = {}, vervang = false) {
+        try {
+          const oud = history.state && typeof history.state === "object" ? history.state : {}, dt = p ? { p, ...extra } : null;
+          if (JSON.stringify(oud.dt ?? null) === JSON.stringify(dt)) return;
+          history[vervang ? "replaceState" : "pushState"]({ ...oud, dt }, "");
+        } catch (e) { console.warn("[DT] route zetten mislukt", e); }
+      },
+      luister(p, fn) {
+        const h = (e) => { const s = e.state?.dt; fn(s && s.p === p ? s : null); };
+        window.addEventListener("popstate", h);
+        return () => window.removeEventListener("popstate", h);
+      },
+    },
+
     /* Een eigen item onderaan Magisters hoofdmenu: een kopie van een bestaand item (zo klopt de opmaak in elk
      * thema), met eigen icoon, tekst en klik. Aanroepen bij elke ronde van DT.observe: het item wordt één keer
      * gemaakt (Magister bouwt het menu soms opnieuw op). Geeft het <li>, of null als het menu er nog niet is.

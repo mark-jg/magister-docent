@@ -40,7 +40,7 @@ Object.assign(DT.module("opleidingen"), {
     if (!aan.length) return DT.toast("Kies minstens één opleiding.", "err", 3500);
     if (this._aanwBezig) { this._stopAanw = true; while (this._aanwBezig) await this.wacht(150); }
     await this.bewaar("keuze", { gezien: true, groepen: aan.length === vakjes.length ? null : aan });
-    this._autoUit = false; this._tab = "overzicht"; this._zoom = null;
+    this._autoUit = false; this._tab = "overzicht"; this._zoom = null; this.route();
     this.laad(DT);
   },
   /* eerst: de pagina heeft nog niets opgehaald en wacht op de keuze. */
