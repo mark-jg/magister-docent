@@ -15,7 +15,7 @@ const GEDEELD = {
   DTForms: "writable",                    // modules/magisterforms.js
   PvaDocx: "writable",                    // modules/pva-docx.js
   XlsxVisueel: "writable",                // modules/xlsx-visueel.js
-  vzStats: "writable", vzLosseLessen: "writable", docentenVan: "writable", isoWeek: "writable",   // modules/verzuiminzicht.js
+  vzStats: "writable", vzLosseLessen: "writable", vzBron: "writable", docentenVan: "writable", isoWeek: "writable",   // modules/verzuiminzicht.js
   openLeerling: "writable", klasOf: "writable", jarigList: "writable", jarigCardHtml: "writable",   // modules/jarig.js
   dtWeekNummer: "writable",               // sidepanel/paneel.js
   DtKolom: "writable",                    // sidepanel/sidepanel.js

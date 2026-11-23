@@ -103,6 +103,8 @@ DT.register({
     this._vorige.addEventListener("click", () => this.kies(DT, { week: this.plus(this._ma, -7) }));
     this._volgende.addEventListener("click", () => this.kies(DT, { week: this.plus(this._ma, 7) }));
     this._nu.addEventListener("click", () => this.kies(DT, { week: this.maandag(new Date()) }));
+    this._ververs = DT.el("button", { class: "dt-lb-nu dt-lb-fotoknop", type: "button", text: "Vernieuwen", title: "De registraties van deze week opnieuw ophalen uit Magister" });
+    this._ververs.addEventListener("click", () => this.laad(DT, true));
     this._status = DT.el("div", { class: "dt-lb-status", "aria-live": "polite" });
     this._podium = DT.el("div", { class: "dt-lb-podium dt-lb-card" });
     this._lijst = DT.el("ol", { class: "dt-lb-lijst" });
@@ -110,7 +112,7 @@ DT.register({
       DT.el("div", { class: "dt-lb-kop dt-lb-card" }, [
         DT.el("nav", { class: "dt-lb-crumbs", "aria-label": "Kruimelpad" }, [terug, DT.el("span", { "aria-hidden": "true", text: "›" }), DT.el("span", { text: "Leaderboard" })]),
         DT.el("h1", { html: `Leaderboard<span class="dt-lb-punt">.</span>` }),
-        DT.el("div", { class: "dt-lb-bediening" }, [this._klassen, DT.el("div", { class: "dt-lb-weeknav" }, [this._nu, this._vorige, this._week, this._volgende, this._fotoKnop, this._ziekKnop, this._bordKnop])]),
+        DT.el("div", { class: "dt-lb-bediening" }, [this._klassen, DT.el("div", { class: "dt-lb-weeknav" }, [this._nu, this._vorige, this._week, this._volgende, this._ververs, this._fotoKnop, this._ziekKnop, this._bordKnop])]),
       ]),
       this._status, this._podium,
       DT.el("div", { class: "dt-lb-card dt-lb-tabel" }, [
@@ -172,26 +174,30 @@ DT.register({
   },
 
   /* ---------- gegevens ---------- */
-  async laad(DT) {
+  async laad(DT, vers = false) {
     const gen = ++this._gen, klas = this._klas, ma = this._ma;
     const key = `${klas}|${this.ymd(ma)}`;
     let c = this._cache.get(key);
+    /* Een stand van meer dan tien minuten oud wordt opnieuw opgehaald; met vers (knop Vernieuwen) meteen. */
+    if (c && c.klaar && (vers || Date.now() - (c.at || 0) > 10 * 60e3)) c = null;
     if (c && (c.klaar || c.bezig)) { this.teken(c); if (c.klaar) return; }
     if (!c || !c.bezig) {
-      c = { lln: null, rijen: [], klaar: false, bezig: true };
+      c = { lln: null, rijen: [], klaar: false, bezig: true, vers };
       this._cache.set(key, c);
       this.vul(DT, c, klas, ma).catch((e) => { c.fout ||= `Ophalen lukte niet: ${e?.message || e}`; }).finally(() => { c.bezig = false; });
     }
     /* Tekent mee zolang deze klas en week gekozen zijn. */
+    /* Alleen opnieuw tekenen als er iets bij is gekomen: elke hertekening zet ook de andere onderdelen van de plugin aan het werk. */
+    let stand = "";
     while (gen === this._gen && this._view) {
-      this.teken(c);
+      const nu = `${c.lln ? c.lln.length : -1}|${c.rijen.length}|${c.klaar}|${c.fout || ""}`;
+      if (nu !== stand) { stand = nu; this.teken(c); }
       if (c.klaar || c.fout) break;
       await new Promise((r) => setTimeout(r, 400));
     }
   },
 
   async vul(DT, c, klas, ma) {
-    const wacht = (ms) => new Promise((r) => setTimeout(r, ms));
     /* Magister begrenst het aantal aanvragen (429): na elkaar, met korte pauzes, en bij 429/503 langer wachten. */
     const api = (url) => DT.apiRetry(url);
     const lijst = (r) => (r && r.status === 200 && r.json) ? (Array.isArray(r.json) ? r.json : r.json.items || []) : null;
@@ -206,14 +212,10 @@ DT.register({
     const doe = async () => {
       while (werk.length) {
         const l = werk.shift();
-        const v = await api(`/api/m6/leerlingen/${l.id}/verantwoordingen?begin=${this.ymd(vorigVan)}&einde=${this.ymd(zo)}`);
-        await wacht(120);
-        const a = await api(`/api/leerlingen/${l.id}/afspraken?status=actief&begin=${this.ymd(vorigVan)}&einde=${this.ymd(zo)}`);
-        await wacht(120);
-        const regs = lijst(v), rooster = lijst(a);
+        /* Alleen de totalen zijn nodig: lessen buiten het rooster hoeven niet te worden nagezocht (los: 0). */
+        const { regs, rooster } = await vzBron.haal(l.id, vorigVan, tot, { api, pauze: 120, los: 0, vers: c.vers === true });
         let T = null, Tv = null;
         if (regs && rooster) {
-          rooster.push(...await vzLosseLessen(l.id, regs, rooster, api, 30));
           T = vzStats(regs, rooster, ma, tot).totaal;
           Tv = vzStats(regs, rooster, vorigVan, vorigTot).totaal;
         }
@@ -221,7 +223,7 @@ DT.register({
       }
     };
     await Promise.all([doe(), doe()]);
-    c.klaar = true;
+    c.klaar = true; c.at = Date.now();
   },
 
   /* Volgorde en plaatsen; gelijke cijfers delen een plaats (1, 1, 2). */

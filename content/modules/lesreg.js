@@ -162,7 +162,6 @@ DT.register({
   async ophalen(DT, klassen, per, voortgang) {
     const peil = this.ymd(new Date());
     const lijst = (x) => (x && x.status === 200 && x.json) ? (Array.isArray(x.json) ? x.json : x.json.items || []) : null;
-    const wacht = (ms) => new Promise((r) => setTimeout(r, ms));
     const api = (url) => DT.apiRetry(url, { opWachten: () => voortgang(klaar, lln.length, "Even wachten: Magister vraagt om rustiger aan te doen…") });
     const lln = [];
     let klaar = 0;
@@ -178,12 +177,9 @@ DT.register({
       while (werk.length) {
         const l = werk.shift();
         voortgang(klaar, lln.length, `Student ${klaar + 1} van ${lln.length}: ${l.naam}`);
-        const v = await api(`/api/m6/leerlingen/${l.id}/verantwoordingen?begin=${this.ymd(per.van)}&einde=${this.ymd(per.tot)}`); await wacht(120);
-        const a = await api(`/api/leerlingen/${l.id}/afspraken?status=actief&begin=${this.ymd(per.van)}&einde=${this.ymd(per.tot)}`); await wacht(120);
-        const regs = lijst(v), rooster = lijst(a);
-        if (regs && rooster && typeof vzLosseLessen === "function") rooster.push(...await vzLosseLessen(l.id, regs, rooster, api));
+        const { regs, rooster, status } = await vzBron.haal(l.id, per.van, per.tot, { api, pauze: 120, vers: true });
         const S = regs && rooster ? vzStats(regs, rooster, per.van, per.tot) : null;
-        uit.push({ l, lessen: S ? S.lessen : [], fout: S ? null : (v.status !== 200 ? v.status : a.status) });
+        uit.push({ l, lessen: S ? S.lessen : [], fout: S ? null : (status.regs !== 200 ? status.regs : status.rooster) });
         klaar++;
       }
     };

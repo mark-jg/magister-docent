@@ -25,7 +25,6 @@ Object.assign(DtCb, {
     if (this._kijkt) return this.melding("Je kijkt mee; ophalen kan pas als jij in Tardy werkt.", "err");
     const per = K.periodes().slice().sort((a, b) => a.start.localeCompare(b.start));
     const van = new Date(per[0].start + "T00:00:00"), nu = new Date(), vandaag = this.ymd(nu);
-    const lijst = (r) => (r && r.status === 200 && r.json) ? (Array.isArray(r.json) ? r.json : r.json.items || []) : null;
     const H = this._haal = { klaar: 0, totaal: stamnrs.length, fout: 0 };
     const rijen = {};   // periodeId -> { stamnr: {…} }
     const werk = stamnrs.slice();
@@ -36,9 +35,7 @@ Object.assign(DtCb, {
           let id = st.magisterId;
           if (!id) { const hit = (await this.zoekMagister(sn)).find((x) => x.stamnr === String(sn)); id = hit?.magisterId; if (id) st.magisterId = id; }
           if (!id) { H.fout++; continue; }
-          const v = await this.apiOpnieuw(`/api/m6/leerlingen/${id}/verantwoordingen?begin=${this.ymd(van)}&einde=${vandaag}`);
-          const a = await this.apiOpnieuw(`/api/leerlingen/${id}/afspraken?status=actief&begin=${this.ymd(van)}&einde=${vandaag}`);
-          const regs = lijst(v), rooster = lijst(a);
+          const { regs, rooster } = await vzBron.haal(id, van, nu, { api: (u) => this.apiOpnieuw(u), pauze: 1, los: 0, vers: true });
           if (!regs || !rooster) { H.fout++; continue; }
           /* Lessen met hun categorie via dezelfde berekening als Inzicht (vzStats) */
           const jaar = vzStats(regs, rooster, van, nu);

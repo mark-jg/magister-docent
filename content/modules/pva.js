@@ -214,13 +214,9 @@ DT.register({
     const nu = new Date(), per = (DT.periodes?.() || []).find((p) => p.begin <= nu && nu <= p.einde);
     const jaarBegin = new Date(nu.getMonth() >= 7 ? nu.getFullYear() : nu.getFullYear() - 1, 7, 1);
     const van = per ? per.begin : jaarBegin, label = per ? per.naam.toLowerCase() : "dit schooljaar";
-    const lijst = (r) => (r && r.status === 200 && r.json) ? (Array.isArray(r.json) ? r.json : r.json.items || []) : null;
-    const [v, a] = await Promise.all([
-      DT.api(`/api/m6/leerlingen/${id}/verantwoordingen?begin=${this.ymd(van)}&einde=${this.ymd(nu)}`, { full: true, timeout: 25000 }),
-      DT.api(`/api/leerlingen/${id}/afspraken?status=actief&begin=${this.ymd(van)}&einde=${this.ymd(nu)}`, { full: true, timeout: 25000 }),
-    ]);
-    const regs = lijst(v), rooster = lijst(a);
-    if (!regs || !rooster || typeof vzStats !== "function") return { tekst: "", pct: null };
+    if (typeof vzStats !== "function") return { tekst: "", pct: null };
+    const { regs, rooster } = await vzBron.haal(id, van, nu, { los: 0 });
+    if (!regs || !rooster) return { tekst: "", pct: null };
     const T = vzStats(regs, rooster, van, nu).totaal;
     const ong = Math.max(0, (T.ongeoorloofd || 0));
     return { pct: T.telt ? T.pct : null,

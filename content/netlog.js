@@ -20,15 +20,17 @@
     for (const k of Object.keys(data)) { if (n++ > 60) { out["…"] = "meer velden"; break; } out[k] = shape(data[k], depth + 1); }
     return out;
   };
+  const lui = typeof window.requestIdleCallback === "function" ? (f) => window.requestIdleCallback(f, { timeout: 4000 }) : (f) => setTimeout(f, 0);
   const raw = []; // exacte URL's, blijven in de pagina en komen nooit in een rapport
   const record = (method, url, status, text, ms, error) => {
     if (raw.length >= MAX) raw.shift();
     raw.push({ method, url: String(url), status });
     if (log.length >= MAX) log.shift();
-    let fields = null;
-    // Grote antwoorden niet parsen (kost tijd op de hoofddraad); de structuur is dan niet nodig.
-    try { if (text && text.length < 400000 && /^[\[{]/.test(text.trim())) fields = shape(JSON.parse(text)); } catch {}
-    log.push({ t: Date.now(), method, url: anon(url), status, fields, ms: ms == null ? undefined : Math.round(ms), size: text ? text.length : undefined, error });
+    const regel = { t: Date.now(), method, url: anon(url), status, fields: null, ms: ms == null ? undefined : Math.round(ms), size: text ? text.length : undefined, error };
+    log.push(regel);
+    /* De structuur is alleen voor de Inspector: ontleden zodra de pagina niets te doen heeft, niet midden in het
+     * laden. Grote antwoorden niet (kost tijd op de hoofddraad); de structuur is dan niet nodig. */
+    if (text && text.length < 400000) lui(() => { try { if (/^\s*[\[{]/.test(text)) regel.fields = shape(JSON.parse(text)); } catch {} });
   };
   const of = window.fetch;
   window.fetch = async function (input, init) {
