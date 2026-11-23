@@ -34,7 +34,7 @@ var DtCb = {
     }
     this._stop = DT.observe(() => { this.tegel(DT); this.menu(); this.vulAfspraak(); }, { debounce: 300, poll: 1500, ookVerborgen: true });
     /* Weg van Aanwezigheid: de balie sluit, net als elke andere subpagina. */
-    this._hash = () => { if (this._scherm && !/^#\/aanwezigheid\/?$/.test(location.hash)) this.sluit(true); };
+    this._hash = () => { if (this._scherm && !/^#\/aanwezigheid\/?$/.test(DT.route.pad())) this.sluit(true); };
     window.addEventListener("hashchange", this._hash);
     /* Terug en Vooruit in de browser: de balie en zijn tabbladen zijn stappen in de geschiedenis (DT.route). */
     this._routeStop = DT.route.luister("cb", (r) => {
@@ -86,7 +86,7 @@ var DtCb = {
     if (!wrap) return;
     /* Na herladen of via het zijpaneel: de balie staat nog open voor deze sessie. */
     let nogOpen = false; try { nogOpen = sessionStorage.getItem("dt-cb-open") === "1"; } catch {}
-    if (nogOpen && !this._scherm && /^#\/aanwezigheid\/?$/.test(location.hash) && document.querySelector("mg-att-tiles")) this.open(DT);
+    if (nogOpen && !this._scherm && /^#\/aanwezigheid\/?$/.test(DT.route.pad()) && document.querySelector("mg-att-tiles")) this.open(DT);
     DT.navTegel(wrap, {
       id: "dt-cb-tegel", titel: "Te laat-balie", tekst: "Melden, briefjes, meldafspraken en signalen volgens het verzuimprotocol (Tardy)",
       viewBox: "0 0 32 32",

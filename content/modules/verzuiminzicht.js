@@ -22,7 +22,8 @@ DT.register({
     this._stop = DT.observe(() => this.mount(DT), { debounce: 500, poll: 2500 });
     /* Terug en Vooruit in de browser: de tabbladen Inzicht en Vergelijken zijn stappen in de geschiedenis (DT.route). */
     this._routeStop = DT.route.luister("inzicht", (r) => {
-      if (r && r.id === this.leerlingId() && this._root) this.activate(DT, r.view === "vergelijk" ? "vergelijk" : "inzicht", true);
+      const view = r?.view === "vergelijk" ? "vergelijk" : "inzicht";
+      if (r && r.id === this.leerlingId() && this._root) { if (!this._active || this._view !== view) this.activate(DT, view, true); }
       else this.deactivate(true);
     });
   },
