@@ -233,3 +233,9 @@ ul.main-menu.dt-menu-pas > li { position: relative; }
 .dt-menu-knoppen { position: absolute; right: 6px; top: 7px; display: flex; gap: 3px; z-index: 2; }
 .dt-menu-knop { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 6px; background: rgba(127, 127, 127, .45); color: #fff; font-size: 10px; line-height: 22px; cursor: pointer; }
 .dt-menu-knop:hover { background: rgba(127, 127, 127, .8); } .dt-menu-knop:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+/* "Meer" en "Minder": een rustige, kleinere regel; het pijltje draait om als de verborgen items open staan. */
+ul.main-menu.dt-menu-eigen > li#dt-menu-meer > a { height: 26px !important; min-height: 0 !important; font-size: 12px !important; font-weight: 400 !important; opacity: .55; background: transparent !important; }
+ul.main-menu.dt-menu-eigen > li#dt-menu-meer > a:hover, ul.main-menu.dt-menu-eigen > li#dt-menu-meer > a:focus-visible { opacity: 1; }
+ul.main-menu.dt-menu-eigen > li#dt-menu-meer > a span.caption { font-size: 12px !important; font-weight: 400 !important; }
+ul.main-menu.dt-menu-eigen > li#dt-menu-meer .dt-menu-ico svg { max-width: 14px !important; max-height: 14px !important; transition: transform .15s; }
+ul.main-menu.dt-menu-meer-open > li#dt-menu-meer .dt-menu-ico svg { transform: rotate(180deg); }
