@@ -153,25 +153,53 @@ test("waarnemer: na herladen van de extensie stopt het oude script, in plaats va
   assert.strictEqual(later, 0, "nieuwe waarnemers starten niet meer");
 });
 
-test("routes voor eigen pagina's: een stap in de geschiedenis zonder het adres te wijzigen, en Terug of Vooruit meldt de route", () => {
-  const stappen = [{ state: null }], luisteraars = []; let nu = 0;
+/* Een nagemaakte browser: adres met hash, geschiedenis met toestand, en de gebeurtenissen bij Terug en Vooruit. */
+function browser(begin = "#/vandaag") {
+  const stappen = [{ hash: begin, state: null }], luisteraars = { popstate: [], hashchange: [] }; let nu = 0;
+  const meld = () => { for (const soort of ["popstate", "hashchange"]) luisteraars[soort].slice().forEach((fn) => fn({ state: stappen[nu].state })); };
+  const kopie = (s) => (s == null ? null : JSON.parse(JSON.stringify(s)));
+  const location = { host: "school.magister.net", origin: "https://school.magister.net",
+    get hash() { return stappen[nu].hash; }, set hash(h) { stappen.length = nu + 1; stappen.push({ hash: h, state: null }); nu++; },
+    get href() { return `https://school.magister.net/magister/${stappen[nu].hash}`; },
+    replace(url) { stappen[nu] = { hash: url.slice(url.indexOf("#")), state: null }; } };
   const history = { get state() { return stappen[nu].state; },
-    pushState(s) { stappen.length = nu + 1; stappen.push({ state: JSON.parse(JSON.stringify(s)) }); nu++; },
-    replaceState(s) { stappen[nu] = { state: JSON.parse(JSON.stringify(s)) }; } };
-  const ga = (d) => { nu += d; luisteraars.forEach((fn) => fn({ state: stappen[nu].state })); };
-  const DT = kern({ extra: { history, addEventListener: (soort, fn) => { if (soort === "popstate") luisteraars.push(fn); }, removeEventListener: (soort, fn) => { const i = luisteraars.indexOf(fn); if (i >= 0) luisteraars.splice(i, 1); } } });
-  const gezien = [], stop = DT.route.luister("opleidingen", (r) => gezien.push(r && r.tab));
-  stappen[0].state = { vanMagister: 1 };
+    pushState(s) { const hash = stappen[nu].hash; stappen.length = nu + 1; stappen.push({ hash, state: kopie(s) }); nu++; },
+    replaceState(s) { stappen[nu].state = kopie(s); } };
+  const opslag = {}, sessionStorage = { getItem: (k) => (k in opslag ? opslag[k] : null), setItem: (k, v) => { opslag[k] = String(v); } };
+  return { stappen, ga: (d) => { nu += d; meld(); }, zetHash: (h) => { location.hash = h; meld(); }, opslag,
+    extra: { location, history, sessionStorage, URLSearchParams, addEventListener: (soort, fn) => luisteraars[soort]?.push(fn), removeEventListener: (soort, fn) => { const l = luisteraars[soort] || [], i = l.indexOf(fn); if (i >= 0) l.splice(i, 1); } } };
+}
+
+test("routes voor eigen pagina's: de route staat achter Magisters adres, en Terug of Vooruit meldt hem", () => {
+  const b = browser("#/vandaag"), DT = kern({ extra: b.extra });
+  const gezien = [], stop = DT.route.luister("opleidingen", (r) => gezien.push(r && (r.tab + (r.zoom ? `/${r.zoom}` : ""))));
+  DT.route.zet("opleidingen", { tab: "overzicht", zoom: null });
+  assert.strictEqual(b.extra.location.hash, "#/vandaag?dt=opleidingen&dt.tab=overzicht", "lege waarden komen niet in het adres");
   DT.route.zet("opleidingen", { tab: "overzicht" });
-  DT.route.zet("opleidingen", { tab: "overzicht" });
-  assert.strictEqual(stappen.length, 2, "dezelfde route geeft geen dubbele stap");
-  assert.strictEqual(history.state.vanMagister, 1, "wat Magister in de toestand zette blijft staan");
-  DT.route.zet("opleidingen", { tab: "mutaties" });
-  assert.strictEqual(DT.route.nu("opleidingen").tab, "mutaties"); assert.strictEqual(DT.route.nu("cb"), null);
-  ga(-1); ga(-1); ga(1);
-  assert.deepStrictEqual(gezien, ["overzicht", null, "overzicht"]);
+  assert.strictEqual(b.stappen.length, 2, "dezelfde route geeft geen dubbele stap");
+  DT.route.zet("opleidingen", { tab: "overzicht", zoom: "k:MIP1A" });
+  assert.strictEqual(b.extra.location.hash, "#/vandaag?dt=opleidingen&dt.tab=overzicht&dt.zoom=k:MIP1A");
+  assert.strictEqual(DT.route.pad(), "#/vandaag"); assert.strictEqual(DT.route.nu("opleidingen").zoom, "k:MIP1A"); assert.strictEqual(DT.route.nu("cb"), null);
+  b.ga(-1); b.ga(-1); b.ga(1);
+  assert.deepStrictEqual(gezien, ["overzicht", "overzicht", null, null, "overzicht", "overzicht"], "elke stap meldt zich via popstate en hashchange");
   DT.route.zet("opleidingen", { tab: "verloop" }, true);
-  assert.strictEqual(stappen.length, 3, "vervangen maakt geen nieuwe stap"); assert.strictEqual(stappen[1].state.dt.tab, "verloop");
-  stop(); ga(-1);
-  assert.strictEqual(gezien.length, 3, "na stoppen komt er niets meer binnen");
+  assert.strictEqual(b.stappen.length, 3, "vervangen maakt geen nieuwe stap"); assert.strictEqual(b.stappen[1].hash, "#/vandaag?dt=opleidingen&dt.tab=verloop");
+  DT.route.zet(null);
+  assert.strictEqual(b.extra.location.hash, "#/vandaag", "sluiten haalt de toevoeging weg");
+  stop(); const n = gezien.length; b.ga(-1);
+  assert.strictEqual(gezien.length, n, "na stoppen komt er niets meer binnen");
+});
+
+test("routes: Magisters eigen toevoegingen blijven staan, en zonder adres werkt het via de geschiedenis", () => {
+  const b = browser("#/begeleiding/123?innerUrl=abc"), DT = kern({ extra: b.extra });
+  DT.route.zet("inzicht", { view: "vergelijk", id: 123 });
+  assert.strictEqual(b.extra.location.hash, "#/begeleiding/123?innerUrl=abc&dt=inzicht&dt.id=123&dt.view=vergelijk");
+  assert.strictEqual(DT.route.pad(), "#/begeleiding/123"); assert.strictEqual(DT.route.nu("inzicht").id, "123", "waarden komen als tekst terug");
+  DT.route.zet(null);
+  assert.strictEqual(b.extra.location.hash, "#/begeleiding/123?innerUrl=abc");
+  /* Magister haalde de toevoeging weg: voor deze sessie alleen nog via de geschiedenis. */
+  b.opslag["dt-route-adres"] = "uit";
+  DT.route.zet("cb", { view: "signalen" });
+  assert.strictEqual(b.extra.location.hash, "#/begeleiding/123?innerUrl=abc", "het adres blijft staan");
+  assert.strictEqual(DT.route.nu("cb").view, "signalen"); assert.strictEqual(b.stappen.length, 4);
 });

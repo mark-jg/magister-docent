@@ -208,25 +208,71 @@
     },
     deepQuery(selector, root = document) { return DT.deepQueryAll(selector, root)[0] || null; },
 
-    /* Routes voor de eigen pagina's (Opleidingen, Te laat-balie), zodat Terug en Vooruit in de browser ermee
-     * werken. Magister kent die pagina's niet, dus het adres blijft zoals het is: de route staat in de toestand
-     * van de geschiedenis (history.state.dt = { p: pagina, … }). Die blijft ook na herladen staan.
-     *   zet(p, extra, vervang)  een nieuwe stap in de geschiedenis (of de huidige vervangen); p null = geen eigen pagina
+    /* Routes voor de eigen pagina's (Opleidingen, Te laat-balie, Leaderboard, …), zodat Terug en Vooruit in de
+     * browser ermee werken en de adresbalk laat zien waar je bent. Magister kent die pagina's niet en zou bij een
+     * eigen adres terugspringen naar zijn startpagina. De route staat daarom als toevoeging achter Magisters eigen
+     * adres, zoals Magister dat zelf ook doet (#/begeleiding/…?innerUrl=…):
+     *     #/vandaag?dt=opleidingen&dt.tab=mutaties
+     * dt is de pagina, dt.<naam> de rest (tabblad, klas, week). Dezelfde route staat ook in history.state.dt, voor
+     * het geval het adres niet mag: haalt Magister de toevoeging weg, dan schakelt de plugin voor deze sessie terug
+     * naar alleen de geschiedenis (het adres blijft dan staan, Terug en Vooruit werken nog).
+     *   zet(p, extra, vervang)  een nieuwe stap (of de huidige vervangen); p null = geen eigen pagina
      *   nu(p)                   de route van pagina p als die nu geldt, anders null
-     *   luister(p, fn)          fn(route of null) bij Terug of Vooruit; geeft een functie om te stoppen */
+     *   pad()                   Magisters eigen adres (#/aanwezigheid), zonder toevoegingen
+     *   luister(p, fn)          fn(route of null) bij Terug, Vooruit of een ander adres; geeft een functie om te stoppen */
     route: {
-      nu(p) { let s = null; try { s = history.state?.dt; } catch {} return s && s.p === p ? s : null; },
+      delen() { const h = location.hash || "", i = h.indexOf("?"); return { pad: i < 0 ? h : h.slice(0, i), q: new URLSearchParams(i < 0 ? "" : h.slice(i + 1)) }; },
+      pad() { return this.delen().pad; },
+      uitAdres() {
+        const q = this.delen().q, p = q.get("dt"); if (!p) return null;
+        const r = { p };
+        for (const [k, v] of q) if (k.startsWith("dt.") && k.length > 3) r[k.slice(3)] = v;
+        return r;
+      },
+      huidig() { let s = null; try { s = history.state?.dt || null; } catch {} return this.uitAdres() || s; },
+      nu(p) { const s = this.huidig(); return s && s.p === p ? s : null; },
+      adresAan() { try { return sessionStorage.getItem("dt-route-adres") !== "uit"; } catch { return true; } },
+      /* Alles als tekst, zonder lege waarden, op vaste volgorde: zo zijn twee routes te vergelijken. */
+      vorm(p, extra) { if (!p) return null; const r = { p: String(p) }; for (const k of Object.keys(extra || {}).sort()) if (extra[k] != null && extra[k] !== "") r[k] = String(extra[k]); return r; },
       zet(p, extra = {}, vervang = false) {
         try {
-          const oud = history.state && typeof history.state === "object" ? history.state : {}, dt = p ? { p, ...extra } : null;
-          if (JSON.stringify(oud.dt ?? null) === JSON.stringify(dt)) return;
+          const dt = this.vorm(p, extra), nu = this.huidig();
+          if (JSON.stringify(nu ? this.vorm(nu.p, Object.fromEntries(Object.entries(nu).filter(([k]) => k !== "p"))) : null) === JSON.stringify(dt)) return;
+          const oud = history.state && typeof history.state === "object" ? history.state : {};
+          if (this.adresAan()) {
+            /* Magisters eigen toevoegingen blijven letterlijk staan; alleen die van ons (dt en dt.*) worden vervangen. */
+            const h = location.hash || "", i = h.indexOf("?"), pad = i < 0 ? h : h.slice(0, i);
+            const delen = (i < 0 ? "" : h.slice(i + 1)).split("&").filter((x) => x && !/^dt(=|\.|$)/.test(x));
+            const code = (v) => encodeURIComponent(v).replace(/%3A/gi, ":").replace(/%2F/gi, "/").replace(/%2C/gi, ",");
+            if (dt) { delen.push(`dt=${code(dt.p)}`); for (const [k, v] of Object.entries(dt)) if (k !== "p") delen.push(`dt.${k}=${code(v)}`); }
+            const hash = (pad || "#/") + (delen.length ? `?${delen.join("&")}` : "");
+            if (hash !== (location.hash || "")) {
+              /* Via het adres zelf, zodat Magister de wijziging ziet (een stille wijziging draait het terug). */
+              /* De browser meldt deze stap soms meteen (popstate), midden in het werk van de aanroeper: die melding
+               * slaan we over. De module weet het al. */
+              this._zelf = true;
+              try { if (vervang) location.replace(location.href.split("#")[0] + hash); else location.hash = hash; history.replaceState({ ...oud, dt }, ""); }
+              finally { this._zelf = false; }
+              if (dt) this.controle(hash);
+              return;
+            }
+          }
           history[vervang ? "replaceState" : "pushState"]({ ...oud, dt }, "");
         } catch (e) { console.warn("[DT] route zetten mislukt", e); }
       },
+      /* Staat de toevoeging er even later niet meer terwijl wij niets veranderden, dan heeft Magister hem weggehaald. */
+      controle(hash) {
+        clearTimeout(this._timer); this._verwacht = hash;
+        this._timer = setTimeout(() => {
+          if (this._verwacht !== hash || location.hash === hash || this.uitAdres()) return;
+          try { sessionStorage.setItem("dt-route-adres", "uit"); } catch {}
+          console.warn("[DT] Magister haalde de route uit het adres; verder alleen via de geschiedenis");
+        }, 900);
+      },
       luister(p, fn) {
-        const h = (e) => { const s = e.state?.dt; fn(s && s.p === p ? s : null); };
-        window.addEventListener("popstate", h);
-        return () => window.removeEventListener("popstate", h);
+        const h = () => { if (!this._zelf) fn(this.nu(p)); };
+        window.addEventListener("popstate", h); window.addEventListener("hashchange", h);
+        return () => { window.removeEventListener("popstate", h); window.removeEventListener("hashchange", h); };
       },
     },
 

@@ -18,7 +18,11 @@ Object.assign(DtCb, {
     if (this._scherm) return;
     try { sessionStorage.setItem("dt-cb-open", "1"); } catch {}
     const tiles = document.querySelector("mg-att-tiles"), uv = tiles?.parentElement;
-    if (!uv || !/^#\/aanwezigheid\/?$/.test(location.hash)) { if (!/^#\/aanwezigheid\/?$/.test(location.hash)) this._navigeerde = !vanRoute; location.hash = "#/aanwezigheid"; return; }   // tegel() opent zodra de pagina er is
+    if (!uv || !/^#\/aanwezigheid\/?$/.test(DT.route.pad())) {
+      /* Nog niet op Aanwezigheid: erheen. Staan we er al (de pagina bouwt nog op), dan blijft het adres met zijn route staan. */
+      if (!/^#\/aanwezigheid\/?$/.test(DT.route.pad())) { this._navigeerde = !vanRoute; location.hash = "#/aanwezigheid"; }
+      return;
+    }   // tegel() opent zodra de pagina er is
     this.css();
     const K = TardyKern;
     K.H.bewaar = () => this.bewaar();

@@ -58,7 +58,9 @@ DT.register({
   /* Terug of Vooruit: r is de route van deze pagina, of null als de stap bij een andere pagina hoort. */
   vanRoute(DT, r) {
     if (!r) { this.sluit(true); return; }
-    this._tab = r.tab || "overzicht"; this._zoom = r.zoom || null;
+    const tab = r.tab || "overzicht", zoom = r.zoom || null;
+    if (this._pagina && tab === (this._tab || "overzicht") && zoom === (this._zoom || null)) return;   // onze eigen stap: er verandert niets
+    this._tab = tab; this._zoom = zoom;
     if (!this._pagina) this.open(DT, true);
     else { this.teken(DT); this._pagina.scrollTop = 0; }
   },

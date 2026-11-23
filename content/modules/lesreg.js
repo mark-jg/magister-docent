@@ -13,7 +13,7 @@ DT.register({
   init(DT) {
     if (!DT.isTop) return;
     this._stop = DT.observe(() => this.mount(DT), { debounce: 300, poll: 1500 });
-    this._hash = () => { if (this._dlg && !/^#\/aanwezigheid\/?$/.test(location.hash)) this.sluit(true); };
+    this._hash = () => { if (this._dlg && !/^#\/aanwezigheid\/?$/.test(DT.route.pad())) this.sluit(true); };
     window.addEventListener("hashchange", this._hash);
     /* Terug en Vooruit in de browser: de pagina en het gekozen tabblad zijn stappen in de geschiedenis (DT.route). */
     this._routeStop = DT.route.luister("lesreg", (r) => {
@@ -34,7 +34,7 @@ DT.register({
     const wrap = DT.deepQuery("att-attendance-dashboard")?.shadowRoot?.querySelector(".wrapper");
     if (this._dlg && (!this._dlg.isConnected || !document.querySelector("mg-att-tiles"))) this.sluit(true);
     /* Na Terug, Vooruit of herladen: de geschiedenis zegt dat Lesregistraties open staat. */
-    if (!this._dlg && Date.now() - (this._opentOp || 0) > 15000 && DT.route.nu("lesreg") && /^#\/aanwezigheid\/?$/.test(location.hash) && document.querySelector("mg-att-tiles")) this.open(DT, true);
+    if (!this._dlg && Date.now() - (this._opentOp || 0) > 15000 && DT.route.nu("lesreg") && /^#\/aanwezigheid\/?$/.test(DT.route.pad()) && document.querySelector("mg-att-tiles")) this.open(DT, true);
     let wil = false; try { wil = sessionStorage.getItem("dt-lr-open") === "1"; } catch {}
     if (wil && document.querySelector("mg-att-tiles") && !this._dlg) { try { sessionStorage.removeItem("dt-lr-open"); } catch {} this.open(DT, true); }
     DT.navTegel(wrap, {
@@ -69,9 +69,10 @@ DT.register({
     if (this._dlg) return;
     /* Vanuit het zijpaneel: naar Aanwezigheid en daar de subpagina openen. */
     if (pagina === null) {
-      if (!/^#\/aanwezigheid\/?$/.test(location.hash) || !document.querySelector("mg-att-tiles")) {
+      if (!/^#\/aanwezigheid\/?$/.test(DT.route.pad()) || !document.querySelector("mg-att-tiles")) {
         try { sessionStorage.setItem("dt-lr-open", "1"); } catch {}
-        location.hash = "#/aanwezigheid"; return;
+        if (!/^#\/aanwezigheid\/?$/.test(DT.route.pad())) location.hash = "#/aanwezigheid";
+        return;
       }
       pagina = true;
     }
