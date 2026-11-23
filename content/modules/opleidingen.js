@@ -36,7 +36,6 @@ DT.register({
   },
 
   /* ---------- menu-item ---------- */
-  /* Een kopie van een bestaand menu-item (zo klopt de opmaak in elk thema), met eigen icoon, tekst en klik. */
   menu(DT) {
     const ul = document.querySelector("ul.main-menu"); if (!ul) return;
     if (!ul._dtOpl) {
@@ -45,25 +44,8 @@ DT.register({
       ul.addEventListener("click", (e) => { if (this._pagina && e.target.closest?.("a") && !e.target.closest("#dt-menu-opleidingen")) this.sluit(); }, true);
     }
     if (ul.querySelector(":scope > #dt-menu-opleidingen")) return;
-    const items = [...ul.querySelectorAll(":scope > li")].filter((li) => [...li.children].some((c) => c.localName === "a"));
-    const bron = items.filter((li) => !li.querySelector("ul")).pop() || items.pop(); if (!bron) return;
-    const li = bron.cloneNode(true);
-    for (const n of [li, ...li.querySelectorAll("*")]) for (const a of [...n.attributes]) if (/^(id|ng-|data-ng-|ui-|data-ui-|target|title|aria-current)/.test(a.name)) n.removeAttribute(a.name);
-    li.querySelectorAll("ul, .popup-menu, .dot, .badge").forEach((x) => x.remove());
-    li.id = "dt-menu-opleidingen"; li.classList.remove("active", "expanded", "selected");
-    const a = [...li.children].find((c) => c.localName === "a");
-    a.setAttribute("href", "#/opleidingen"); a.setAttribute("title", "Opleidingen (Docent Tools)"); a.classList.remove("active", "selected");
-    const tekst = a.querySelector("span.caption") || [...a.children].find((c) => c.localName === "span");
-    if (tekst) tekst.textContent = "Opleidingen"; else a.append(DT.el("span", { class: "caption", text: "Opleidingen" }));
-    /* Icoon: op de plek en in de maat van het icoon van het voorbeeld. */
-    const oud = [...a.children].find((c) => c !== tekst), maat = [...bron.querySelectorAll(":scope > a > *")].find((c) => !c.matches("span.caption"));
-    const ico = DT.el("i", { class: "dt-opl-ico", "aria-hidden": "true", html: this.ICOON });
-    const r = maat?.getBoundingClientRect(), cs = maat ? getComputedStyle(maat) : null;
-    ico.style.cssText = `display:inline-flex;align-items:center;justify-content:center;flex:none;vertical-align:middle;width:${Math.round(r?.width || 20)}px;height:${Math.round(r?.height || 20)}px;${cs ? `margin:${cs.margin};float:${cs.float};` : ""}`;
-    if (oud) oud.replaceWith(ico); else a.prepend(ico);
-    a.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); this.open(DT); }, true);
-    ul.append(li);
-    if (this._pagina) li.classList.add("active");
+    const li = DT.menuItem({ id: "dt-menu-opleidingen", titel: "Opleidingen", tip: "Opleidingen (Docent Tools)", icoon: this.ICOON, href: "#/opleidingen", klik: () => this.open(DT) });
+    if (li && this._pagina) li.classList.add("active");
   },
 
   /* ---------- pagina ---------- */
@@ -721,7 +703,6 @@ DT.register({
      * kleuren van de reeksen (--opl-s1…8) zijn een vast palet met een eigen stap voor donker. */
     st.textContent = `
       .dt-opl-achter { visibility: hidden !important; }
-      #dt-menu-opleidingen .dt-opl-ico svg { width: 100%; height: 100%; max-width: 20px; max-height: 20px; }
       #dt-oplp {
         --opl-fg: var(--sl-color-tab-default-foreground, #233243); --opl-zacht: color-mix(in srgb, var(--opl-fg) 64%, transparent);
         --opl-lijn: var(--sl-color-card-border, #bcbcbc); --opl-lijnzacht: color-mix(in srgb, var(--opl-lijn) 45%, transparent);

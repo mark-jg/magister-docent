@@ -32,7 +32,7 @@ var DtCb = {
       else if (/^\/magister-berichten\//.test(location.pathname)) this._stop = DT.observe(() => DTForms.vulBericht("dt-cb-bericht"), { debounce: 400, poll: 1000, ookVerborgen: true });
       return;
     }
-    this._stop = DT.observe(() => { this.tegel(DT); this.vulAfspraak(); }, { debounce: 300, poll: 1500, ookVerborgen: true });
+    this._stop = DT.observe(() => { this.tegel(DT); this.menu(); this.vulAfspraak(); }, { debounce: 300, poll: 1500, ookVerborgen: true });
     /* Weg van Aanwezigheid: de balie sluit, net als elke andere subpagina. */
     this._hash = () => { if (this._scherm && !/^#\/aanwezigheid\/?$/.test(location.hash)) this.sluit(); };
     window.addEventListener("hashchange", this._hash);
@@ -43,6 +43,30 @@ var DtCb = {
     window.removeEventListener("hashchange", this._hash);
     this.sluit();
     DT.deepQueryAll("#dt-cb-tegel").forEach((el) => el.remove());
+    document.querySelectorAll("#dt-menu-cb").forEach((el) => el.remove());
+  },
+
+  /* ---------- item in het hoofdmenu ---------- */
+  /* Staat de balie aan, dan staat hij ook in Magisters hoofdmenu. Het item opent de balie (via Aanwezigheid, waar
+   * de pagina onder hangt) en is het actieve item zolang de balie open is; Aanwezigheid is dat dan even niet. */
+  MENU_ICOON: `<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M9 1h6v2H9V1zm10.03 6.39 1.42-1.42-1.41-1.41-1.42 1.42A8.96 8.96 0 0 0 12 4a9 9 0 1 0 7.03 3.39zM12 20a7 7 0 1 1 0-14 7 7 0 0 1 0 14zm1-11h-2v5.41l3.3 3.3 1.4-1.42-2.7-2.7V9z"/></svg>`,
+  menu() {
+    const li = DT.menuItem({ id: "dt-menu-cb", titel: "Te laat-balie", tip: "Te laat-balie (Docent Tools)", icoon: this.MENU_ICOON, href: "#/aanwezigheid", klik: () => this.open(DT) });
+    if (!li) return;
+    const ul = li.parentElement;
+    if (!ul._dtCb) {
+      ul._dtCb = true;
+      /* Een ander menu-item gekozen: de balie sluit, ook als Magister daarbij niet van adres wisselt (Aanwezigheid). */
+      ul.addEventListener("click", (e) => { if (this._scherm && e.target.closest?.("a") && !e.target.closest("#dt-menu-cb")) this.sluit(); }, true);
+    }
+    if (this._scherm) {
+      for (const x of ul.querySelectorAll(":scope > li.active")) if (x !== li) { x.classList.remove("active"); this._wasActief = x; }
+      li.classList.add("active");
+    } else if (li.classList.contains("active")) {
+      li.classList.remove("active");
+      if (this._wasActief?.isConnected && /^#\/aanwezigheid/.test(location.hash) && !ul.querySelector(":scope > li.active")) this._wasActief.classList.add("active");
+      this._wasActief = null;
+    }
   },
 
   /* ---------- tegel op Aanwezigheid ---------- */

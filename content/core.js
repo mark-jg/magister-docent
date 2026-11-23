@@ -208,6 +208,35 @@
     },
     deepQuery(selector, root = document) { return DT.deepQueryAll(selector, root)[0] || null; },
 
+    /* Een eigen item onderaan Magisters hoofdmenu: een kopie van een bestaand item (zo klopt de opmaak in elk
+     * thema), met eigen icoon, tekst en klik. Aanroepen bij elke ronde van DT.observe: het item wordt één keer
+     * gemaakt (Magister bouwt het menu soms opnieuw op). Geeft het <li>, of null als het menu er nog niet is.
+     *   icoon: een <svg> van 24 bij 24 met fill of stroke "currentColor". */
+    menuItem({ id, titel, tip = titel, icoon, href = "#", klik }) {
+      const ul = document.querySelector("ul.main-menu"); if (!ul) return null;
+      const al = ul.querySelector(`:scope > #${id}`); if (al) return al;
+      const items = [...ul.querySelectorAll(":scope > li:not([id^='dt-menu-'])")].filter((li) => [...li.children].some((c) => c.localName === "a"));
+      const bron = items.filter((li) => !li.querySelector("ul")).pop() || items.pop(); if (!bron) return null;
+      const li = bron.cloneNode(true);
+      for (const n of [li, ...li.querySelectorAll("*")]) for (const a of [...n.attributes]) if (/^(id|ng-|data-ng-|ui-|data-ui-|target|title|aria-current)/.test(a.name)) n.removeAttribute(a.name);
+      li.querySelectorAll("ul, .popup-menu, .dot, .badge").forEach((x) => x.remove());
+      li.id = id; li.classList.remove("active", "expanded", "selected");
+      const a = [...li.children].find((c) => c.localName === "a");
+      a.setAttribute("href", href); a.setAttribute("title", tip); a.classList.remove("active", "selected");
+      const tekst = a.querySelector("span.caption") || [...a.children].find((c) => c.localName === "span");
+      if (tekst) tekst.textContent = titel; else a.append(DT.el("span", { class: "caption", text: titel }));
+      /* Icoon: op de plek en in de maat van het icoon van het voorbeeld. */
+      const oud = [...a.children].find((c) => c !== tekst), maat = [...bron.querySelectorAll(":scope > a > *")].find((c) => !c.matches("span.caption"));
+      const ico = DT.el("i", { class: "dt-menu-ico", "aria-hidden": "true", html: icoon });
+      const r = maat?.getBoundingClientRect(), cs = maat ? getComputedStyle(maat) : null;
+      ico.style.cssText = `display:inline-flex;align-items:center;justify-content:center;flex:none;vertical-align:middle;width:${Math.round(r?.width || 20)}px;height:${Math.round(r?.height || 20)}px;${cs ? `margin:${cs.margin};float:${cs.float};` : ""}`;
+      const svg = ico.querySelector("svg"); if (svg) svg.style.cssText = "width:100%;height:100%;max-width:20px;max-height:20px;";
+      if (oud) oud.replaceWith(ico); else a.prepend(ico);
+      a.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); klik(); }, true);
+      ul.append(li);
+      return li;
+    },
+
     /* Eigen tegel tussen Magisters tegels (bv. op Aanwezigheid). Magister bouwt die met mc-nav-tile uit een eigen
      * (scoped) registry: een element dat de extensie zelf maakt wordt daar niet opgebouwd. Daarom zetten we een
      * leeg element met data-dt-upgrade neer en laat netlog.js (in de pagina) het via de shadow root opnieuw maken;

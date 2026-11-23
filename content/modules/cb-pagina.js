@@ -70,6 +70,7 @@ Object.assign(DtCb, {
     this._view = "melden";
     this._scherm = { laag: pagina, uv, bar, panelen, hoofd: panelen.melden };
     this.componenten();
+    this.menu();
     await this.koppel(DT);
   },
 
@@ -85,6 +86,7 @@ Object.assign(DtCb, {
     this._scherm.uv.classList.remove("dt-cb-open");
     this._scherm.laag.remove(); this._toast?.remove(); this._toast = null;
     this._scherm = null;
+    this.menu();
   },
 
   /* Map openen of kiezen; daarna gegevens laden en de bezetting regelen. */

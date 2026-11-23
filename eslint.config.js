@@ -10,6 +10,7 @@ const GEDEELD = {
   XLSX: "readonly",                       // lib/xlsx.full.min.js
   TardyKern: "writable",                  // modules/cb-kern.js
   OplReken: "writable",                   // modules/opleidingen-reken.js
+  MenuReken: "writable",                  // modules/hoofdmenu.js
   DtCb: "writable",                       // modules/cb.js, aangevuld door modules/cb-*.js
   DTForms: "writable",                    // modules/magisterforms.js
   PvaDocx: "writable",                    // modules/pva-docx.js

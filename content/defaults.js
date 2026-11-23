@@ -26,6 +26,8 @@ globalThis.DT_DEFAULTS = {
   leaderboard: { enabled: true, zonderGeoorloofd: false },
   /* Opleidingen: menu-item met inschrijvingen en aanwezigheid per opleiding, leerjaar en klas. */
   opleidingen: { enabled: true },
+  /* volgorde en verborgen: de namen van de menu-items (hun tekst in kleine letters), gezet met "Menu aanpassen". */
+  hoofdmenu: { enabled: true, volgorde: [], verborgen: [] },
   lestools: { enabled: true },
   /* Plan van aanpak bij Begeleiding › Logboek van een student (SLB). Concepten blijven in deze browser. */
   pva: { enabled: true },
@@ -94,6 +96,7 @@ globalThis.DT_MODULES_LIST = [
   ["melding", "Mail bij melding", "Concept naar de coach", "#FF3B30"],
   ["ai", "AI-hulp", "Prompt uit tabel of selectie", "#A2845E"],
   ["opleidingen", "Opleidingen", "Inschrijvingen en aanwezigheid per opleiding", "#5856D6"],
+  ["hoofdmenu", "Hoofdmenu aanpassen", "Menu-items rangschikken of verbergen", "#8E8E93"],
   ["leaderboard", "Leaderboard", "Meest aanwezig per week", "#FF9500"],
   ["lestools", "Hulpmiddelen in de les", "Stille safari, kaartenpakje, lesbord", "#30B0C7"],
   ["cb", "Te laat-balie", "Tardy in Magister", "#FF3B30"],

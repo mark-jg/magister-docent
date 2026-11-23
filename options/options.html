@@ -176,6 +176,12 @@
     <p>Menu-item "Opleidingen" onderaan Magisters hoofdmenu: hoeveel studenten er per opleiding, leerjaar en klas zijn ingeschreven (met het verloop over de schooljaren), de aanwezigheid op die niveaus, aandachtspunten en een export naar Excel. Je ziet de klassen die jij in Magister mag zien. Aanwezigheid en lessen blijven bewaard (per student de naam en de lessen per week, voor de mutaties) en worden bij het openen één keer per dag bijgewerkt; op de pagina kies je een map voor de back-up.</p>
     </div>
   </section>
+  <section class="mod" id="hoofdmenu" data-blad="modules">
+    <div class="modkop"><button type="button" class="modnaam" aria-expanded="false" aria-controls="hoofdmenu-inhoud"><span>Hoofdmenu aanpassen</span><small>Menu-items rangschikken of verbergen</small></button><label class="switch"><input type="checkbox" data-path="hoofdmenu.enabled"><span></span></label></div>
+    <div class="inhoud" id="hoofdmenu-inhoud" hidden>
+    <p>Onderaan Magisters hoofdmenu staat "Menu aanpassen". Daarmee krijgt elk item pijltjes om het hoger of lager te zetten en een knop om het te verbergen. Verborgen items staan onder het uitklapbare item "Meer" en zijn daar weer zichtbaar te maken. Het geldt ook voor Opleidingen en de Te laat-balie. Zet je deze module uit, dan staat het menu weer zoals Magister het geeft; je keuze blijft bewaard.</p>
+    </div>
+  </section>
   <section class="mod" id="jarig" data-blad="modules">
     <div class="modkop"><button type="button" class="modnaam" aria-expanded="false" aria-controls="jarig-inhoud"><span>Jarig op het startscherm</span><small>Kaart met jarige leerlingen op Vandaag</small></button><label class="switch"><input type="checkbox" data-path="jarig.enabled"><span></span></label></div>
     <div class="inhoud" id="jarig-inhoud" hidden>
@@ -207,7 +213,7 @@
   <section class="mod" id="cb" data-blad="modules">
     <div class="modkop"><button type="button" class="modnaam" aria-expanded="false" aria-controls="cb-inhoud"><span>Community builder: Te laat-balie</span><small>Tardy in Magister, voor de community builder</small></button><label class="switch"><input type="checkbox" data-path="cb.enabled"><span></span></label></div>
     <div class="inhoud" id="cb-inhoud" hidden>
-    <p>Voor de community builder (CB'er): de functies van Tardy in Magister. Tegel "Te laat-balie" op Aanwezigheid: melden met naam, stamnummer of gescande pas, de reden erbij, het gevolg volgens het verzuimprotocol, te-laat-briefjes (gewone printer of het Bluetooth-bonprintertje), meldafspraken met mails en signalen per trede van de ladder. Werkt in dezelfde gedeelde map als de Tardy-app (OneDrive of Teams), om de beurt. Er wordt niets in Magister geschreven: de balie zegt wat je in Magister zet en opent de verzuimpagina.</p>
+    <p>Voor de community builder (CB'er): de functies van Tardy in Magister. Item "Te laat-balie" in het hoofdmenu en tegel op Aanwezigheid: melden met naam, stamnummer of gescande pas, de reden erbij, het gevolg volgens het verzuimprotocol, te-laat-briefjes (gewone printer of het Bluetooth-bonprintertje), meldafspraken met mails en signalen per trede van de ladder. Werkt in dezelfde gedeelde map als de Tardy-app (OneDrive of Teams), om de beurt. Er wordt niets in Magister geschreven: de balie zegt wat je in Magister zet en opent de verzuimpagina.</p>
     <label class="row">Naam <input type="text" data-path="cb.naam"></label>
     <label class="row">Paraaf <input type="text" data-path="cb.paraaf"></label>
     <label class="row">E-mail <input type="email" data-path="cb.email"></label>
