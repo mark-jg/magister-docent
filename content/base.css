@@ -223,3 +223,13 @@ html.dt-dark .dt-jarig-row { border-bottom-color: #2b313b; } html.dt-dark .dt-ja
 .dt-xk-knoppen { justify-content: flex-end; gap: 8px; }
 .dt-xk-knoppen .dt-btn { height: 34px; padding: 0 16px; border-radius: 999px; }
 .dt-xk-knoppen .dt-btn[disabled] { opacity: .5; cursor: default; }
+
+/* Hoofdmenu (modules/hoofdmenu.js): eigen volgorde, verborgen items onder "Meer", en de aanpasstand. */
+ul.main-menu.dt-menu-kolom { display: flex; flex-direction: column; }
+ul.main-menu.dt-menu-eigen > li.dt-menu-verborgen { display: none; }
+ul.main-menu.dt-menu-eigen.dt-menu-meer-open > li.dt-menu-verborgen, ul.main-menu.dt-menu-eigen > li.dt-menu-verborgen.active { display: revert; }
+ul.main-menu.dt-menu-meer-open > li.dt-menu-verborgen:not(.active) > a { opacity: .65; }
+ul.main-menu.dt-menu-pas > li { position: relative; }
+.dt-menu-knoppen { position: absolute; right: 6px; top: 7px; display: flex; gap: 3px; z-index: 2; }
+.dt-menu-knop { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 6px; background: rgba(127, 127, 127, .45); color: #fff; font-size: 10px; line-height: 22px; cursor: pointer; }
+.dt-menu-knop:hover { background: rgba(127, 127, 127, .8); } .dt-menu-knop:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
