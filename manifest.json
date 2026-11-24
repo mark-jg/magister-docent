@@ -64,6 +64,7 @@
         "content/modules/periodes.js",
         "content/modules/aanwezigexport.js",
         "content/modules/xlsx-visueel.js",
+        "content/modules/lesopslag.js",
         "content/modules/lesreg.js",
         "content/modules/leaderboard.js",
         "content/modules/opleidingen-reken.js",

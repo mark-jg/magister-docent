@@ -9,6 +9,7 @@ const GEDEELD = {
   DT: "writable", DT_DEFAULTS: "writable", DT_PRESETS_LIST: "writable", DT_MODULES_LIST: "writable", DT_ICONS: "readonly",
   XLSX: "readonly",                       // lib/xlsx.full.min.js
   TardyKern: "writable",                  // modules/cb-kern.js
+  LesOpslag: "writable",                  // modules/lesopslag.js
   OplReken: "writable",                   // modules/opleidingen-reken.js
   MenuReken: "writable",                  // modules/hoofdmenu.js
   DtCb: "writable",                       // modules/cb.js, aangevuld door modules/cb-*.js
