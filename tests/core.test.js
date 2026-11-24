@@ -87,7 +87,7 @@ function kernMetPagina(t) {
   const chrome = { runtime: { id: "test", getManifest: () => ({ version: "test" }) }, storage: { sync: { get: async () => ({}), set: async () => {} } } };
   const ctx = laad(["content/defaults.js", "content/core.js"], { window: "zelf", chrome, document, MutationObserver, location: { host: "h", origin: "https://h" }, addEventListener() {}, removeEventListener() {}, postMessage() {}, navigator: {}, console: { warn() {}, info() {} },
     setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout, setInterval: globalThis.setInterval, clearInterval: globalThis.clearInterval, Date: globalThis.Date });
-  return { DT: ctx.DT, chrome, document, waarnemers, luisteraars, muteer: () => waarnemers.forEach((w) => w.cb()), tijd: (ms) => t.mock.timers.tick(ms) };
+  return { DT: ctx.DT, ctx, chrome, document, waarnemers, luisteraars, muteer: () => waarnemers.forEach((w) => w.cb()), tijd: (ms) => t.mock.timers.tick(ms) };
 }
 
 test("waarnemer: alle modules delen één MutationObserver, die verdwijnt als de laatste stopt", (t) => {
@@ -217,4 +217,22 @@ test("tempo: aanvragen starten met tussenpozen, en na een 429 houdt alles in en 
   const na = starts.map((s) => s[1] - t0).filter((x) => x >= 4000).sort((a, b) => a - b);
   assert.ok(na[1] - na[0] >= 300 && na[2] - na[1] >= 300, "daarna met dubbele tussenpozen");
   assert.strictEqual(p.DT.tempo.tussen, 300); assert.ok(p.DT.tempo.vloer > 150, "het te snelle tempo wordt onthouden");
+});
+
+test("statusblok in het hoofdmenu: de tekstkleur komt van een gewoon menu-item, en blijft leesbaar", (t) => {
+  const p = kernMetPagina(t), DT = p.DT;
+  const stijlen = new Map(), stijl = (el, s) => { stijlen.set(el, s); return el; };
+  const item = (kleur, klasse = "") => { const li = { matches: (sel) => !!klasse && sel.includes(`.${klasse}`) }; return stijl({ parentElement: li, matches: (sel) => !!klasse && sel.includes(`.${klasse}`) }, { color: kleur }); };
+  const menu = (achtergrond, items) => { const nav = stijl({ parentElement: null }, { backgroundColor: achtergrond }); return { host: { parentElement: stijl({ parentElement: nav }, { backgroundColor: "rgba(0, 0, 0, 0)" }) }, ul: { querySelectorAll: () => items } }; };
+  p.ctx.getComputedStyle = (el) => stijlen.get(el) || {};
+  const kleur = (m) => DT.taakKleur(m.host, m.ul);
+  assert.strictEqual(DT.contrast(DT.rgb("rgb(255, 255, 255)"), DT.rgb("rgb(0,0,0)")), 21);
+  /* Licht menu, het eerste item is de pagina waar je bent (wit op de accentkleur): het gewone item telt. */
+  assert.strictEqual(kleur(menu("rgb(246, 248, 250)", [item("rgb(255, 255, 255)", "active"), item("rgb(35, 50, 67)")])), "rgb(35, 50, 67)");
+  /* Donker menu met lichte items. */
+  assert.strictEqual(kleur(menu("rgb(22, 48, 79)", [item("rgb(232, 240, 250)"), item("rgb(255, 255, 255)", "active")])), "rgb(232, 240, 250)");
+  /* Geen bruikbaar item, of een kleur die op deze achtergrond niet te lezen is: donker of licht naar de achtergrond. */
+  assert.strictEqual(kleur(menu("rgb(246, 248, 250)", [item("rgb(255, 255, 255)", "active")])), "#1d1d1f");
+  assert.strictEqual(kleur(menu("rgb(246, 248, 250)", [item("rgb(220, 226, 232)")])), "#1d1d1f");
+  assert.strictEqual(kleur(menu("rgb(22, 48, 79)", [])), "#ffffff");
 });
