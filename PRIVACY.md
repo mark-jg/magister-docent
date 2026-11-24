@@ -1,6 +1,6 @@
 # Privacyverklaring Docentdeck voor Magister
 
-*Concept, laatst bijgewerkt: 24 november 2026 (versie 0.69.0). Controleer dit met de functionaris gegevensbescherming van je school voordat je het publiceert.*
+*Laatst bijgewerkt: 24 november 2026 (versie 0.69.0).*
 
 Docentdeck voor Magister is een browserextensie voor docenten en ander personeel dat met Magister werkt. De extensie draait helemaal in je eigen browser. De maker verzamelt geen gegevens, krijgt er ook geen binnen en gebruikt geen analyse- of advertentiediensten.
 
@@ -29,4 +29,4 @@ Als je de extensie verwijdert, verwijdert de browser ook alle opgeslagen instell
 
 ## Contact
 
-[naam en e-mailadres van de maker invullen]
+Vragen over Docentdeck of over deze verklaring? Mail Mark: mark.jgr@gmail.com
