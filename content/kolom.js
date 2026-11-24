@@ -37,7 +37,7 @@
       /* De back-upmap (Instellingen › Meer › Back-up en opslag). */
       case "map": {
         if (typeof LesOpslag === "undefined") return { ok: false, fout: "Onbekende vraag." };
-        if (msg.actie === "status") return LesOpslag.map().then(({ h, mag }) => ({ ok: true, kan: !!window.showDirectoryPicker, naam: h?.name || null, mag }));
+        if (msg.actie === "status") return LesOpslag.map().then(({ h, mag, wacht }) => ({ ok: true, kan: !!window.showDirectoryPicker, naam: h?.name || null, mag, wacht: !!wacht }));
         if (msg.actie === "vergeet") return LesOpslag.vergeet().then(() => ({ ok: true }));
         if (msg.actie === "kies" || msg.actie === "toegang") {
           if (!window.showDirectoryPicker) return { ok: false, fout: "Deze browser kan geen map openen. Gebruik Chrome of Edge op een computer." };

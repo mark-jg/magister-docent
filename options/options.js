@@ -170,6 +170,7 @@ async function toonMap() {
   kies.textContent = r.naam ? "Andere map kiezen" : "Map kiezen";
   status.textContent = !r.naam ? "Nog geen map gekozen: er wordt niets buiten de browser bewaard."
     : r.mag ? `Map: "${r.naam}". Toegang is gegeven voor deze sessie.`
+    : r.wacht ? `Map: "${r.naam}". Chrome wacht op je antwoord in de adresbalk van het Magister-tabblad: klik daar op het map-icoontje en kies Toestaan.`
     : `Map: "${r.naam}". Chrome vraagt deze sessie nog om toegang (dat gebeurt ook vanzelf bij Ophalen).`;
   toegang.hidden = !r.naam || r.mag; vergeet.hidden = !r.naam;
 }

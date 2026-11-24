@@ -344,13 +344,11 @@ Object.assign(DT.module("opleidingen"), {
   bestand() { return `docent-tools-opleidingen-${location.host.replace(/[^a-z0-9.-]/gi, "_")}.json`; },
   /* De gekozen map: _map als Chrome toegang geeft, anders _mapWacht (toegang vraagt een klik, eens per sessie). */
   async mapLaden() {
-    this._map = null; this._mapWacht = null;
+    this._map = null; this._mapWacht = null; this._mapAdresbalk = false;
     try {
-      /* Met tijdslimiet (LesOpslag.metLimiet): Chrome geeft op queryPermission soms nooit antwoord. */
-      const h = await LesOpslag.metLimiet(this.kv("map"), 3000, null); if (!h) return;
-      const mag = await LesOpslag.metLimiet(h.queryPermission({ mode: "readwrite" }), 3000, "geen antwoord");
-      if (mag === "geen antwoord") return;   // onbruikbare map (van een andere versie van de extensie): kies een nieuwe
-      if (mag === "granted") this._map = h; else this._mapWacht = h;
+      /* Via LesOpslag, met tijdslimiet: met een open vraag in de adresbalk geeft Chrome geen antwoord. */
+      const { h, mag, wacht } = await LesOpslag.map(); if (!h) return;
+      if (mag) this._map = h; else { this._mapWacht = h; this._mapAdresbalk = wacht; }
     } catch {}
   },
   /* Het bestand in de map samenvoegen met wat er in de extensie staat. */
@@ -379,7 +377,7 @@ Object.assign(DT.module("opleidingen"), {
   },
   async mapToegang(DT) {
     const h = this._mapWacht; if (!h) return;
-    if (await h.requestPermission({ mode: "readwrite" }).catch(() => "denied") !== "granted") return DT.toast("Zonder toegang tot de map is er geen back-up.", "err", 4000);
+    if (!(await LesOpslag.toegang(h))) return DT.toast(this._mapAdresbalk ? LesOpslag.WACHT : "Zonder toegang tot de map is er geen back-up.", "err", 6000);
     this._map = h; this._mapWacht = null;
     await this.backupLezen(); await this.backupSchrijven();
     this.laad(DT);
@@ -399,7 +397,7 @@ Object.assign(DT.module("opleidingen"), {
     const moment = (t) => new Date(t).toLocaleString("nl-NL", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }), uit = this._aanwBezig ? " disabled" : "";
     const stand = !met.length ? "Nog niets opgehaald." : `${met.length} van ${namen.length} klassen bewaard, laatst bijgewerkt op ${E(moment(Math.max(...met.map((k) => d.jaar[k].op))))}.${oud.length ? ` ${oud.length} ${oud.length === 1 ? "klas is" : "klassen zijn"} vandaag nog niet bijgewerkt.` : ""}`;
     const map = this._map ? `Back-up in de map "${E(this._map.name)}" (${E(this.bestand())})${this._mapFout ? `: schrijven mislukte (${E(this._mapFout)})` : this._mapOp ? `, laatst geschreven op ${E(moment(this._mapOp))}` : ""}. <button type="button" class="dt-opl-knop is-stil" data-act="map-instellen">Instellen</button>`
-      : this._mapWacht ? `Back-up in de map "${E(this._mapWacht.name)}": Chrome vraagt per sessie één keer toestemming. <button type="button" class="dt-opl-knop" data-act="map-toegang">Map openen</button>`
+      : this._mapWacht ? `Back-up in de map "${E(this._mapWacht.name)}": ${this._mapAdresbalk ? E(LesOpslag.WACHT) : "Chrome vraagt per sessie één keer toestemming."} <button type="button" class="dt-opl-knop" data-act="map-toegang">Map openen</button>`
       : `Nog geen back-up. Kies in de zijkolom bij Meer › Back-up en opslag een map op deze computer of in OneDrive; dan staat daar na elke update een kopie, en kan een andere computer met dezelfde map verder. <button type="button" class="dt-opl-knop" data-act="map-instellen">Map instellen</button>`;
     return `<dna-card class="dt-opl-kaart"><h2>Opslag en back-up</h2>
       <p class="dt-opl-zacht">Aanwezigheid en lessen blijven bewaard en worden bij het openen van deze pagina één keer per dag bijgewerkt (alleen de laatste weken). ${stand}

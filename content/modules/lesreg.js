@@ -138,7 +138,7 @@ DT.register({
     const mapRegel = DT.el("p", { class: "dt-lr-zacht dt-lr-mapregel" });
     const toonMap = () => {
       if (!map) return mapRegel.replaceChildren();
-      if (map.h) return mapRegel.replaceChildren(`Lijsten worden bewaard in de map "${map.h.name}" (submap ${O.SUB}); een volgende keer worden alleen de laatste weken bijgewerkt.${map.mag ? "" : " Chrome vraagt bij Ophalen om toegang tot de map."}`);
+      if (map.h) return mapRegel.replaceChildren(`Lijsten worden bewaard in de map "${map.h.name}" (submap ${O.SUB}); een volgende keer worden alleen de laatste weken bijgewerkt.${map.mag ? "" : map.wacht ? ` ${O.WACHT}` : " Chrome vraagt bij Ophalen om toegang tot de map."}`);
       mapRegel.replaceChildren("Kies een map (op de computer of in OneDrive) om lijsten te bewaren: een volgende keer wordt dan alleen bijgewerkt wat nieuw is. Dezelfde map dient voor de back-up van Opleidingen. ", instellen);
     };
     /* De map kies je in de zijkolom (Meer › Back-up en opslag); hier alleen de stand en een knop daarheen. */
@@ -155,7 +155,11 @@ DT.register({
     const draai = async (klasNamen, p, wijze, klasTekst) => {
       if (this._ronde?.bezig) return;
       /* Toegang tot de map vraagt een klik; dit is er een. */
-      if (map?.h && !map.mag) { map.mag = await O.toegang(map.h); toonMap(); }
+      if (map?.h && !map.mag) {
+        status.textContent = "Toegang tot de map vragen…";
+        map.mag = await O.toegang(map.h); toonMap();
+        if (!map.mag) DT.toast(`Geen toegang tot de map: er wordt nu niets bewaard. ${map.wacht ? O.WACHT : ""}`.trim(), "err", 7000);
+      }
       resultaat.replaceChildren(); kaart.style.display = ""; toonBezig(true);
       this.ronde(DT, klasNamen, p, { map: map?.mag ? map.h : null, vol: wijze === "vol", vers: wijze === "aanvullen", klasTekst });
     };
