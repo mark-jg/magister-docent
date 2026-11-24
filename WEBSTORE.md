@@ -104,9 +104,9 @@ De drie verklaringen aanvinken:
 - Ik gebruik of draag geen gebruikersgegevens over voor doelen die niets met het hoofddoel van het item te maken hebben.
 - Ik gebruik of draag geen gebruikersgegevens over om kredietwaardigheid te bepalen of voor leningen.
 
-**URL privacybeleid (Privacy policy URL):** de online versie van `PRIVACY.md`. Vul eerst de contactgegevens onderaan in. Het kan als link naar het bestand op GitHub:
+**URL privacybeleid (Privacy policy URL):** de webpagina `docs/privacy.html`, gemaakt uit `PRIVACY.md` en gepubliceerd via GitHub Pages (branch `webstore`, map `docs`). Vul eerst de contactgegevens onderaan in en maak de pagina dan opnieuw.
 ```
-https://github.com/mark-jg/magister-docent/blob/webstore/PRIVACY.md
+https://mark-jg.github.io/magister-docent/privacy.html
 ```
 
 ## 4. Distributie (Distribution)
