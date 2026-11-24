@@ -59,3 +59,17 @@ test("andere berichten en frames: geen antwoord (zodat er precies één antwoord
   assert.strictEqual(geantwoord, false);
   assert.strictEqual(pagina({ isTop: false }).luisteraars.length, 0, "een iframe luistert niet");
 });
+
+test("back-upmap: de stand komt later (asynchroon) en kiezen opent een venstertje op de pagina", async () => {
+  const gedaan = [], luisteraars = [];
+  const LesOpslag = { map: async () => ({ h: { name: "Back-up" }, mag: false, wacht: true }), vergeet: async () => gedaan.push("vergeet"), opPagina: (_dt, soort) => gedaan.push(`venster ${soort}`) };
+  const DT = { version: "9.9.9", module: () => null, actief: () => true, toast: () => {} };
+  laad("content/kolom.js", { DT, LesOpslag, chrome: { runtime: { onMessage: { addListener: (f) => luisteraars.push(f) } } }, document: {}, showDirectoryPicker() {}, window: "zelf" });
+  const vraag = (actie) => new Promise((ok) => { luisteraars[0]({ type: "dt:kolom", vraag: "map", actie }, {}, (r) => ok({ r: kaal(r) })); });
+  const status = await vraag("status");
+  assert.deepStrictEqual(status.r, { ok: true, kan: true, naam: "Back-up", mag: false, wacht: true });
+  assert.strictEqual((await vraag("kies")).r.ok, true);
+  await vraag("vergeet");
+  assert.deepStrictEqual(gedaan, ["venster kies", "vergeet"]);
+  assert.strictEqual(luisteraars[0]({ type: "dt:kolom", vraag: "map", actie: "status" }, {}, () => {}), true, "het kanaal blijft open voor het late antwoord");
+});

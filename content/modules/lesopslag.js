@@ -65,31 +65,82 @@ const LesOpslag = {
       r.onerror = () => nee(r.error);
       r.onsuccess = () => {
         const st = r.result.transaction("kv", waarde === undefined ? "readonly" : "readwrite").objectStore("kv");
-        const q = waarde === undefined ? st.get(sleutel) : st.put(waarde, sleutel);
+        const q = waarde === undefined ? st.get(sleutel) : waarde === null ? st.delete(sleutel) : st.put(waarde, sleutel);
         q.onsuccess = () => ok(q.result); q.onerror = () => nee(q.error);
       };
     });
   },
-  /* { h, mag }: de gekozen map (of null) en of Chrome er nu in mag schrijven. Toegang vraagt een klik. */
+  /* Een vraag aan de map met een tijdslimiet. Staat er in de adresbalk nog een vraag van Chrome over de map open
+   * (bijvoorbeeld "Deze site mag bestanden bewerken"), dan geeft Chrome op queryPermission pas antwoord als je die
+   * hebt beantwoord; zonder limiet bleven Lesregistraties en Opleidingen dan eindeloos wachten. Na de limiet geldt
+   * de terugvalwaarde. */
+  metLimiet(belofte, ms, terug) {
+    return Promise.race([Promise.resolve(belofte).catch(() => terug), new Promise((ok) => setTimeout(() => ok(terug), ms))]);
+  },
+  /* { h, mag, wacht }: de gekozen map (of null), of Chrome er nu in mag schrijven, en of Chrome nog op een antwoord
+   * in de adresbalk wacht (dan is er voorlopig geen toegang). Toegang vraagt een klik. */
   async map() {
     try {
-      const h = await this.kv("map"); if (!h) return { h: null, mag: false };
-      return { h, mag: await h.queryPermission({ mode: "readwrite" }) === "granted" };
-    } catch { return { h: null, mag: false }; }
+      const h = await this.metLimiet(this.kv("map"), 3000, null); if (!h) return { h: null, mag: false, wacht: false };
+      const mag = await this.metLimiet(h.queryPermission({ mode: "readwrite" }), 3000, "geen antwoord");
+      return { h, mag: mag === "granted", wacht: mag === "geen antwoord" };
+    } catch { return { h: null, mag: false, wacht: false }; }
   },
-  async toegang(h) { try { return await h.requestPermission({ mode: "readwrite" }) === "granted"; } catch { return false; } },
+  async toegang(h) { return await this.metLimiet(h.requestPermission({ mode: "readwrite" }), 20000, "denied") === "granted"; },
+  WACHT: "Chrome wacht op je antwoord in de adresbalk: klik daar op het map-icoontje en kies Toestaan.",
   /* Een map kiezen; die geldt daarna ook voor de back-up van Opleidingen. Geeft { h, mag } of null bij annuleren. */
   async kies() {
     const h = await window.showDirectoryPicker({ id: "dt-opl", mode: "readwrite" });
     await this.kv("map", h);
+    this.gewijzigd();
     return { h, mag: true };
+  },
+  async vergeet() { await this.metLimiet(this.kv("map", null), 3000, null); this.gewijzigd(); },
+  /* Na kiezen, toegang of vergeten: de open pagina's (Opleidingen, Lesregistraties) en de instellingen bijwerken. */
+  gewijzigd() {
+    try { document.dispatchEvent(new CustomEvent("dt:map")); } catch {}
+    try { chrome.runtime.sendMessage({ type: "dt:map" }).catch(() => {}); } catch {}
+  },
+
+  /* De map instellen vanuit de zijkolom (Instellingen › Meer › Back-up en opslag). Kiezen en toegang geven mogen
+   * alleen direct na een klik op de pagina zelf; een klik in de zijkolom telt daar niet voor. Daarom verschijnt
+   * op de pagina een venstertje met één knop. soort: "kies" of "toegang". */
+  opPagina(DT, soort) {
+    document.getElementById("dt-map-vraag")?.remove();
+    const kies = soort === "kies";
+    const dlg = DT.el("dialog", { id: "dt-map-vraag", style: "border:0;border-radius:14px;padding:20px 22px;max-width:420px;width:90vw;font:14px var(--dt-font, system-ui);color:var(--dt-fg, #1d1d1f);background:var(--dt-bg, #fff);box-shadow:0 18px 50px rgba(0,0,0,.3)" });
+    const sluit = () => { dlg.close(); dlg.remove(); };
+    const knop = DT.el("button", { type: "button", class: "dt-btn dt-btn-primary", text: kies ? "Map kiezen" : "Toegang geven" });
+    knop.addEventListener("click", async () => {
+      sluit();
+      try {
+        if (kies) { const m = await this.kies(); DT.toast(`Back-up en lijsten staan voortaan in "${m.h.name}"`, "ok", 4000); }
+        else {
+          const { h } = await this.map();
+          if (h && await this.toegang(h)) { this.gewijzigd(); DT.toast(`Toegang tot "${h.name}" gegeven`, "ok", 3000); }
+          else DT.toast("Geen toegang tot de map gekregen.", "err", 4000);
+        }
+      } catch (e) { if (e?.name !== "AbortError") DT.toast(`Map kiezen lukte niet: ${e?.message || e}`, "err", 5000); }
+    });
+    dlg.append(
+      DT.el("h2", { style: "margin:0 0 8px;font-size:17px", text: kies ? "Map voor back-up kiezen" : "Toegang tot de map" }),
+      DT.el("p", { style: "margin:0 0 16px;line-height:1.45", text: kies
+        ? "Kies een map op deze computer of in OneDrive. Opleidingen zet daar een back-up neer en Lesregistraties bewaart er de lijsten per klas. De bestanden bevatten namen van studenten: kies een plek die daarvoor is toegestaan."
+        : "Chrome vraagt één keer per sessie of Docent Tools de gekozen map mag gebruiken." }),
+      DT.el("div", { class: "dt-row", style: "justify-content:flex-end;gap:8px" }, [DT.el("button", { type: "button", class: "dt-btn", text: "Annuleren", onclick: sluit }), knop]));
+    document.body.append(dlg);
+    dlg.showModal(); knop.focus();
   },
   bestand(klas, sj) { return `${location.host}-${klas}-${sj}`.replace(/[^a-z0-9.-]/gi, "_") + ".json"; },
   /* Het bestand van een klas: { tekst, studenten: { id: { naam, van, tot, op, lessen } } }, of null. */
   async lees(map, klas, sj = this.sjJaar()) {
     try {
-      const dir = await map.getDirectoryHandle(this.SUB);
-      const b = JSON.parse(await (await (await dir.getFileHandle(this.bestand(klas, sj))).getFile()).text());
+      const tekst = await this.metLimiet((async () => {
+        const dir = await map.getDirectoryHandle(this.SUB);
+        return (await (await dir.getFileHandle(this.bestand(klas, sj))).getFile()).text();
+      })(), 15000, null);
+      if (tekst == null) return null;
+      const b = JSON.parse(tekst);
       if (!b || b.versie !== this.VERSIE || b.host !== location.host || b.klas !== klas) return null;
       const studenten = {};
       for (const [id, st] of Object.entries(b.studenten || {})) studenten[id] = { naam: st.naam, van: st.van, tot: st.tot, op: st.op, vol: st.vol || 0, lessen: this.uitpak(st.l, b.tekst || []) };

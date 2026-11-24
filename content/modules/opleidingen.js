@@ -31,9 +31,13 @@ DT.register({
     this._hash = () => { if (!DT.route.nu("opleidingen")) this.sluit(true); };
     window.addEventListener("hashchange", this._hash);
     this._routeStop = DT.route.luister("opleidingen", (r) => this.vanRoute(DT, r));
+    /* De back-upmap is in de instellingen gekozen of vergeten (LesOpslag.gewijzigd). */
+    this._mapEvt = () => this.mapGewijzigd(DT);
+    document.addEventListener("dt:map", this._mapEvt);
   },
   destroy() {
     this._stop && this._stop(); window.removeEventListener("hashchange", this._hash); this._routeStop && this._routeStop();
+    document.removeEventListener("dt:map", this._mapEvt);
     this.sluit(); document.querySelectorAll("#dt-menu-opleidingen").forEach((el) => el.remove());
   },
 
@@ -318,9 +322,8 @@ DT.register({
       case "aanw": case "les": if (knoop) this.bijwerken(DT, knoop.klassen); break;
       case "aanw-alles": case "les-alles": case "bijwerk": if (d) this.bijwerken(DT, Object.keys(d.nu)); break;
       case "les-opnieuw": if (d) this.bijwerken(DT, Object.keys(d.nu), { vol: true }); break;
-      case "map-kies": this.kiesMap(DT); break;
+      case "map-instellen": this.mapInstellen(); break;
       case "map-toegang": this.mapToegang(DT); break;
-      case "map-los": this.mapLos(DT); break;
       case "filter": { const o = d?.boom[+el.dataset.s]; if (o) { this._uit.has(o.studie) ? this._uit.delete(o.studie) : this._uit.add(o.studie); this.teken(DT); } break; }
       case "filter-alles": this._uit.clear(); this.teken(DT); break;
       case "ga": case "zoom": if (knoop) { if (!this._zoom) this._terug = this._pagina.scrollTop; this._zoom = knoop.id; this.route(); this.teken(DT); this._pagina.scrollTop = 0; } break;
