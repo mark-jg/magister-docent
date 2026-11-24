@@ -1,7 +1,7 @@
 /* Navigatie voor Magister OP.
  *  - Ctrl+K (of Alt+K): commandopalet. Typ een paar letters en Enter: springt naar
  *    een menu-onderdeel (Leerlingen, Toetsinvoer, Aanwezigheid, Berichten…) of
- *    voert een actie van Docent Tools uit.
+ *    voert een actie van Docentdeck uit.
  *  - Alt+1 t/m Alt+9: direct naar het n-de hoofdmenu-item.
  *  - Alt+S: zoekveld in de appbar (leerling, groep of stamnummer).
  * Leest het menu uit `ul.main-menu` (id's als #menu-leerlingen), dus het blijft
@@ -84,7 +84,7 @@ DT.register({
     const items = this.menuItems();
     const tops = items.filter((x) => x.level === 0);
     const menu = items.map((m) => ({ ...m, group: "Menu", hint: m.level === 0 && tops.indexOf(m) < 9 ? `Alt+${tops.indexOf(m) + 1}` : "" }));
-    const all = [...menu, ...this.actions(DT).map((a) => ({ ...a, group: "Docent Tools" }))];
+    const all = [...menu, ...this.actions(DT).map((a) => ({ ...a, group: "Docentdeck" }))];
 
     const input = DT.el("input", { type: "text", placeholder: "Waar wil je heen? (typ en Enter)", "aria-label": "Zoek in menu", style: "width:100%;box-sizing:border-box;font:16px var(--dt-font);padding:12px 14px;border:0;border-bottom:1px solid var(--dt-line);background:transparent;color:var(--dt-fg);outline:none" });
     const list = DT.el("div", { role: "listbox", style: "max-height:50vh;overflow-y:auto;padding:6px" });

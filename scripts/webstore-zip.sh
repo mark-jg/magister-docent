@@ -18,6 +18,6 @@ rsync -a ./ dist/pakket/ \
   --exclude .git --exclude .github --exclude scripts --exclude dist --exclude tests \
   --exclude node_modules --exclude package.json --exclude package-lock.json --exclude eslint.config.js \
   --exclude .gitignore --exclude '.DS_Store' --exclude README.md --exclude PRIVACY.md --exclude WEBSTORE.md
-(cd dist/pakket && zip -qr "../docent-tools-webstore-v$V.zip" .)
+(cd dist/pakket && zip -qr "../docentdeck-v$V.zip" .)
 rm -rf dist/pakket
-ls -l "dist/docent-tools-webstore-v$V.zip"
+ls -l "dist/docentdeck-v$V.zip"

@@ -57,7 +57,7 @@ DT.register({
         const sel = await this.selectie();
         const lln = await this.aanvullen(DT, sel);
         if (!lln.length) {
-          console.info("[Docent Tools] selectie leerlingenoverzicht", sel);
+          console.info("[Docentdeck] selectie leerlingenoverzicht", sel);
           return DT.toast(sel.zichtbaarAan
             ? `Er zijn ${sel.zichtbaarAan} leerlingen aangevinkt, maar ze konden niet worden opgezocht (zoekresultaten gezien: ${sel.geladen}). Meld dit met een paginarapport van deze lijst (Alt+I, R).`
             : `Vink eerst de leerlingen aan die je in het overzicht wilt hebben. (Zichtbare rijen: ${sel.zichtbaar}, zoekresultaten gezien: ${sel.geladen}.)`, sel.zichtbaarAan ? "err" : "info", 7000);
@@ -120,7 +120,7 @@ DT.register({
     /* Kleurschaal, databalken en grafieken (xlsx-visueel.js); lukt dat niet, dan de gewone export. */
     let klaar = false;
     if (visueel && typeof XlsxVisueel !== "undefined") {
-      try { XlsxVisueel.download(XlsxVisueel.maak(wb, visueel), `${this.bestandsnaam(naam)}.xlsx`); klaar = true; } catch (e) { console.warn("[Docent Tools] Excel-opmaak mislukt", e); }
+      try { XlsxVisueel.download(XlsxVisueel.maak(wb, visueel), `${this.bestandsnaam(naam)}.xlsx`); klaar = true; } catch (e) { console.warn("[Docentdeck] Excel-opmaak mislukt", e); }
     }
     if (!klaar) XLSX.writeFile(wb, `${this.bestandsnaam(naam)}.xlsx`);
     DT.toast("Excel-bestand gedownload", "ok");
@@ -138,7 +138,7 @@ DT.register({
       ["Verschil tussen leerlingen", "Ook binnen één klas kan het aantal lessen verschillen: vrijstellingen, keuzedelen of andere lesgroepen, stage/BPV en later instromen."],
       ["Aanwezig %", "(Lessen − gemist) / lessen."],
       ...extra,
-      ["Gemaakt op", new Date().toLocaleString("nl-NL")], ["Gemaakt met", `Docent Tools voor Magister ${DT.version || ""}`]];
+      ["Gemaakt op", new Date().toLocaleString("nl-NL")], ["Gemaakt met", `Docentdeck voor Magister ${DT.version || ""}`]];
   },
 
   /* ---------- per leerling ---------- */

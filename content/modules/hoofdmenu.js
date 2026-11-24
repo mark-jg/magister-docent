@@ -2,7 +2,7 @@
  *
  * Verborgen items verdwijnen niet: ze staan onder een uitklapbaar item "Meer". Onderaan het menu staat "Menu
  * aanpassen"; daarmee krijgt elk item pijltjes (omhoog, omlaag) en een oogje (verbergen of tonen). Het geldt ook
- * voor de items die Docent Tools zelf toevoegt (zoals Opleidingen).
+ * voor de items die Docentdeck zelf toevoegt (zoals Opleidingen).
  *
  * De items zelf blijven op hun plek in de pagina staan: Magister beheert die lijst. De volgorde komt uit de
  * CSS-eigenschap order en verbergen uit een klasse, zodat Magister er niets van merkt en alles terug is zodra de
@@ -73,7 +73,7 @@ DT.register({
     ul.classList.toggle("dt-menu-pas", this._pas);
     /* "Meer" en "Menu aanpassen": na de eerste ronde, zodat ze niet als voorbeeld voor elkaar dienen. */
     const meer = DT.menuItem({ id: "dt-menu-meer", titel: "Meer", tip: "Verborgen menu-items tonen", icoon: this.MEER, klik: () => { this._open = !this._open; this.teken(DT); } });
-    const pas = DT.menuItem({ id: "dt-menu-pas", titel: "Menu aanpassen", tip: "Menu-items rangschikken of verbergen (Docent Tools)", icoon: this.PAS, klik: () => { this._pas = !this._pas; this.teken(DT); } });
+    const pas = DT.menuItem({ id: "dt-menu-pas", titel: "Menu aanpassen", tip: "Menu-items rangschikken of verbergen (Docentdeck)", icoon: this.PAS, klik: () => { this._pas = !this._pas; this.teken(DT); } });
     if (!meer || !pas) return;
     const zet = (li, tekst) => { const a = [...li.children].find((c) => c.localName === "a"), el = a.querySelector("span.caption") || [...a.children].find((c) => c.localName === "span"); if (el && el.textContent !== tekst) el.textContent = tekst; };
     zet(meer, `${this._open || this._pas ? "Minder" : "Meer"} (${weg.size})`); zet(pas, this._pas ? "Klaar" : "Menu aanpassen");

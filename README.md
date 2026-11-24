@@ -1,4 +1,4 @@
-# Docent Tools voor Magister (v0.68.2)
+# Docentdeck voor Magister (v0.68.2)
 
 Chrome-extensie voor Magister (docenten/personeel). Alles draait lokaal in je browser: er wordt niets naar een server gestuurd.
 
@@ -21,7 +21,7 @@ De extensie zelf heeft geen buildstap. Voor de linter en de tests is Node nodig 
 ## Naar de Chrome Web Store
 
 1. Zet het versienummer in `manifest.json` hoger dan de versie die in de store staat.
-2. `scripts/webstore-zip.sh` draait de controles en maakt `dist/docent-tools-webstore-vX.Y.Z.zip`.
+2. `scripts/webstore-zip.sh` draait de controles en maakt `dist/docentdeck-vX.Y.Z.zip`.
 3. Upload de zip in het [Developer Dashboard](https://chrome.google.com/webstore/devconsole). De teksten voor de winkelpagina en het tabblad Privacy staan in `WEBSTORE.md`, de privacyverklaring in `PRIVACY.md`.
 
 ## Wat zit erin
@@ -30,7 +30,7 @@ De extensie zelf heeft geen buildstap. Voor de linter en de tests is Node nodig 
 |---|---|
 | Jarig: kaart op Vandaag met (aankomende) jarige leerlingen, klikbaar naar de leerlingkaart | automatisch op het startscherm; Instellingen > Jarig voor hoe ver vooruit |
 | Thema's: Magister (het origineel), Minimal, Glass, Paper, Soft en Contrast. Elk thema behalve Magister heeft een lichte en een donkere variant (of volgt je computer), met een accentkleur als tweede keuze; lettertype, lettergrootte, hoeken en dichtheid zijn apart instelbaar | in de zijkolom (Alt+D), Alt+T wisselt tussen licht en donker |
-| Zijkolom: thema, modules, acties, periodes, klok en weeknummer, snelle links, notities, de tabellen van de pagina en alle instellingen. Staat naast Magister in de zijkolom van de browser, valt dus niet over de pagina en is in breedte te verstellen | Alt+D, het icoon van Docent Tools in de werkbalk, of het handvat aan de rand van de pagina |
+| Zijkolom: thema, modules, acties, periodes, klok en weeknummer, snelle links, notities, de tabellen van de pagina en alle instellingen. Staat naast Magister in de zijkolom van de browser, valt dus niet over de pagina en is in breedte te verstellen | Alt+D, het icoon van Docentdeck in de werkbalk, of het handvat aan de rand van de pagina |
 | Tabellen: zwevend knopje "Exporteren" bij hover over een datatabel (kalenders en roosters worden overgeslagen), en een overzicht van alle tabellen in de zijkolom. Naar Excel, CSV of klembord (plakt als cellen), sorteerbare koppen; per soort tabel instelbaar welke kolommen meegaan, kopregel, namen maskeren, lege rijen en kolommen weglaten | knoppen boven elke tabel, "Instellen" voor de opties; Alt+E exporteert alle tabellen op de pagina |
 | Sneller invoeren: Enter springt naar de volgende rij, Ctrl+Shift+V plakt een kolom uit Excel in opeenvolgende velden | automatisch in invoertabellen |
 | Opgeruimde interface: verberg elementen die je niet gebruikt | Inspector (Alt+I), beweeg over een element en druk op H |
@@ -80,7 +80,7 @@ scripts/webstore-zip.sh  Zip voor de Chrome Web Store bouwen
 ## Wijzigingen
 
 - 0.19.3: standaard Magister-thema: de samenvattingschips op Vandaag en de kaart Jarig hebben nu een eigen neutrale opmaak, het leerlingoverzicht en het tabblad Inzicht volgen het lettertype van de pagina, en de knop Inzicht ziet er standaard uit als Magisters tabbladen (onderstreping); de Apple-thema's kleuren alles verder in.
-- 0.19.4: Apple-thema's: het zijpaneel "details" in het lesdashboard is opnieuw opgemaakt. De leerlingpas is een nette kaart met foto, naam, klaschip en "meer details", registraties staan in gegroepeerde rijen, en de agenda van de leerling toont tijd en badges op de eerste regel en lesuur met omschrijving op de tweede. Het lipje "Docent Tools" is een smal randje dat bij aanwijzen uitschuift en de zijbalk niet meer overlapt.
+- 0.19.4: Apple-thema's: het zijpaneel "details" in het lesdashboard is opnieuw opgemaakt. De leerlingpas is een nette kaart met foto, naam, klaschip en "meer details", registraties staan in gegroepeerde rijen, en de agenda van de leerling toont tijd en badges op de eerste regel en lesuur met omschrijving op de tweede. Het lipje "Docentdeck" is een smal randje dat bij aanwijzen uitschuift en de zijbalk niet meer overlapt.
 - 0.19.5: Apple-thema's: de leerlinglijst van de les is opgeschoond. De vinkjes worden niet meer afgesneden in de smalle kolommen, Magisters eigen rijranden en schaduwen zijn weg (één dunne lijn per rij), de groene en grijze achtergronden zijn verdwenen, en te laat is oranje. De schuifbalk is smal en afgerond.
 - 0.19.6: leerlinglijst in de Apple-thema's: de zwevende lijn is weg (scheidingslijnen staan nu op de rij en cellen worden op rijhoogte afgekapt), Magisters eigen kop- en kolomlijnen zijn verborgen, in Apple Glass is de tabel een doorschijnende glaskaart met vervaging, en de vinkjes zijn iOS-achtige gevulde vakjes met een zachte glans als ze aan staan.
 - 0.19.7: lesdashboard in de Apple-thema's: de lestitel is donker zonder Magisters oranje stip, "Les verantwoord" is een groen label, de tabbladen (fotoboek, leerlinglijst, ...) zijn een segmentknop, en "Deze les" in de zijbalk toont label boven waarde zonder afkappen met ronde vorige/volgende-knoppen. De werkbalk boven de leerlinglijst is vernieuwd (ook in het standaardthema): knoppen met icoon, een zoekveld met vergrootglas en een legenda met toetsen. De sneltoets Alt+A (⌥A) werkt nu ook op de Mac.

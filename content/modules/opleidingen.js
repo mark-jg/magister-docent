@@ -48,7 +48,7 @@ DT.register({
     /* Na herladen: de geschiedenis weet nog dat deze pagina open stond. */
     if (!this._routeGestart) { this._routeGestart = true; const r = DT.route.nu("opleidingen"); if (r) this.vanRoute(DT, r); }
     if (ul.querySelector(":scope > #dt-menu-opleidingen")) return;
-    const li = DT.menuItem({ id: "dt-menu-opleidingen", titel: "Opleidingen", tip: "Opleidingen (Docent Tools)", icoon: this.ICOON, href: "#/opleidingen", klik: () => this.open(DT) });
+    const li = DT.menuItem({ id: "dt-menu-opleidingen", titel: "Opleidingen", tip: "Opleidingen (Docentdeck)", icoon: this.ICOON, href: "#/opleidingen", klik: () => this.open(DT) });
     if (li && this._pagina) li.classList.add("active");
   },
 
@@ -617,7 +617,7 @@ DT.register({
     const y = R.sjStart().getFullYear(), datums = [d.vandaag, `${y}-10-01`, `${y - 1}-10-01`, `${y - 1}-03-01`].filter((x, i) => i === 0 || x < d.vandaag);
     const som = (o) => Object.values(o || {}).reduce((a, b) => a + (b || 0), 0), vorm = (v) => JSON.stringify(v ?? null);
     let klas = d.klassen.slice().sort((a, b) => b.aantal - a.aantal)[0]?.naam, velden = false;
-    const uit = [`Diagnose Opleidingen (Docent Tools ${DT.version}), ${d.vandaag}`, `Klassen vandaag: ${d.klassen.length}, studenten: ${som(d.nu)}, alleen eigen klassen: ${this._rol ? "ja" : "nee"}`, ""];
+    const uit = [`Diagnose Opleidingen (Docentdeck ${DT.version}), ${d.vandaag}`, `Klassen vandaag: ${d.klassen.length}, studenten: ${som(d.nu)}, alleen eigen klassen: ${this._rol ? "ja" : "nee"}`, ""];
     let eerste = null;
     for (const peil of datums) {
       const f = await DT.api(`/api/leerlingen/zoeken/filters?q=**${this._rol ? "&rol=Docent" : ""}&peildatum=${peil}`, { full: true, timeout: 20000 });

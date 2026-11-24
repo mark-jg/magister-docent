@@ -4,7 +4,7 @@ Te plakken in het Developer Dashboard. Het is een concept; pas het aan waar nodi
 
 ## Winkelpagina
 
-**Naam:** Docent Tools voor Magister
+**Naam:** Docentdeck voor Magister
 
 **Korte beschrijving** (uit `manifest.json`, maximaal 132 tekens):
 Extra functies voor docenten in Magister: thema’s, zijkolom, tabellen naar Excel, sneller invoeren en aanwezigheidsoverzichten.
@@ -14,7 +14,7 @@ Extra functies voor docenten in Magister: thema’s, zijkolom, tabellen naar Exc
 
 **Uitgebreide beschrijving:**
 
-Docent Tools voor Magister maakt Magister prettiger en sneller voor docenten en ander onderwijspersoneel. Alles draait lokaal in je browser.
+Docentdeck voor Magister maakt Magister prettiger en sneller voor docenten en ander onderwijspersoneel. Alles draait lokaal in je browser.
 
 • Thema's: Minimal, Glass, Paper, Soft en Contrast, elk in licht en donker, met een eigen accentkleur
 • Zijkolom naast Magister: acties, notities, snelle links, klok en weeknummer
@@ -26,7 +26,7 @@ Docent Tools voor Magister maakt Magister prettiger en sneller voor docenten en 
 • Jarige leerlingen op Vandaag, een overzicht op de leerlingkaart en een commandopalet (Ctrl+K)
 • Hulpmiddelen voor het digibord: geluidsmeter, kaartenpakje en lesbord
 
-Docent Tools is niet gemaakt door Iddink of Magister en heeft er geen band mee. Magister is een merk van zijn eigenaar.
+Docentdeck is niet gemaakt door Iddink of Magister en heeft er geen band mee. Magister is een merk van zijn eigenaar.
 
 ## Privacy (tabblad Privacy)
 

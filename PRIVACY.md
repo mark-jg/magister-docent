@@ -1,8 +1,8 @@
-# Privacyverklaring Docent Tools voor Magister
+# Privacyverklaring Docentdeck voor Magister
 
 *Concept, laatst bijgewerkt: 24 november 2026. Controleer dit met de functionaris gegevensbescherming van je school voordat je het publiceert.*
 
-Docent Tools voor Magister is een browserextensie voor docenten en ander personeel dat met Magister werkt. De extensie draait helemaal in je eigen browser. De maker verzamelt geen gegevens, krijgt er ook geen binnen en gebruikt geen analyse- of advertentiediensten.
+Docentdeck voor Magister is een browserextensie voor docenten en ander personeel dat met Magister werkt. De extensie draait helemaal in je eigen browser. De maker verzamelt geen gegevens, krijgt er ook geen binnen en gebruikt geen analyse- of advertentiediensten.
 
 ## Welke gegevens de extensie leest
 

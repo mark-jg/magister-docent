@@ -1,4 +1,4 @@
-/* Zijkolom: het handvat "Docent Tools" aan de rand van de pagina.
+/* Zijkolom: het handvat "Docentdeck" aan de rand van de pagina.
  * Het paneel zelf staat sinds 0.61 in de zijkolom van de browser (sidepanel/), zodat het niet meer over de pagina
  * valt en in breedte te verstellen is. Deze module opent die kolom: via het handvat, Alt+D of het commandopalet.
  * Wat de kolom van de pagina nodig heeft (tabellen, exports) regelt content/kolom.js. */
@@ -9,7 +9,7 @@ DT.register({
   init(DT) {
     if (!DT.isTop) return;
     const pos = DT.settings.panel.position === "left" ? "dt-left" : "";
-    this._handle = DT.el("button", { id: "dt-handle", class: pos, type: "button", text: "Docent Tools", title: "Zijkolom openen of sluiten (Alt+D)", onclick: () => this.toggle() });
+    this._handle = DT.el("button", { id: "dt-handle", class: pos, type: "button", text: "Docentdeck", title: "Zijkolom openen of sluiten (Alt+D)", onclick: () => this.toggle() });
     document.body.append(this._handle);
     this._handle.hidden = DT.settings.panel.handle === false;
     this._unsub = DT.onSettingsChange(() => { if (this._handle) this._handle.hidden = DT.settings.panel.handle === false; });
@@ -30,7 +30,7 @@ DT.register({
     if (force === false) return;
     if (!DT.isTop) { try { window.top.postMessage({ type: "dt:cmd", command: "toggle-panel" }, location.origin); } catch {} return; }
     try {
-      chrome.runtime.sendMessage({ type: "zijkolom", alleenOpenen: force === true }).catch(() => DT.toast("De zijkolom openen lukte niet. Klik op het icoon van Docent Tools in de werkbalk.", "err", 5000));
+      chrome.runtime.sendMessage({ type: "zijkolom", alleenOpenen: force === true }).catch(() => DT.toast("De zijkolom openen lukte niet. Klik op het icoon van Docentdeck in de werkbalk.", "err", 5000));
     } catch { DT.toast("De extensie is bijgewerkt: herlaad dit tabblad.", "err", 5000); }
   }
 });

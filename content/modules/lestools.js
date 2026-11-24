@@ -708,7 +708,7 @@ DT.register({
           DT.el("div", { class: "dt-pk-kraam" }, [this.gezicht(DT, l, "dt-pk-gezicht"), DT.el("span", { class: "dt-pk-kraamholo" })]),
           DT.el("div", { class: "dt-pk-kstrip", text: strip }),
           DT.el("div", { class: "dt-pk-kvak" }, [DT.el("b", {}, [DT.el("span", { class: "dt-pk-kpunt", text: emoji }), DT.el("span", { text: vakTitel })]), tekst ? DT.el("span", { text: tekst }) : null]),
-          DT.el("div", { class: "dt-pk-kvoet" }, [DT.el("span", { text: `Docent Tools${set ? ` · ${set}` : ""}` }), DT.el("span", { text: `${nummer} ${zeldzaam ? "★" : "●"}` })]),
+          DT.el("div", { class: "dt-pk-kvoet" }, [DT.el("span", { text: `Docentdeck${set ? ` · ${set}` : ""}` }), DT.el("span", { text: `${nummer} ${zeldzaam ? "★" : "●"}` })]),
         ]),
         DT.el("span", { class: "dt-pk-holo" }),
         DT.el("span", { class: "dt-pk-kglans" }),

@@ -1,7 +1,7 @@
 {
   "name": "magister-docent-tools",
   "private": true,
-  "description": "Ontwikkelhulpmiddelen (tests en linter) voor Docent Tools voor Magister. De extensie zelf heeft geen buildstap.",
+  "description": "Ontwikkelhulpmiddelen (tests en linter) voor Docentdeck voor Magister. De extensie zelf heeft geen buildstap.",
   "scripts": {
     "test": "node --test tests/*.test.js",
     "lint": "eslint .",

@@ -271,7 +271,7 @@ Object.assign(DT.module("opleidingen"), {
     const tel = (lijst) => { const t = {}; for (const x of lijst) t[x] = (t[x] || 0) + 1; return Object.keys(t).sort().map((k) => `${k}: ${t[k]}`).join(", ") || "geen"; };
     const klas = Object.keys(d.nu).sort((a, b) => d.nu[b] - d.nu[a])[0], sjVan = R.sjStart(), nu = new Date();
     const met = Object.keys(d.nu).filter((k) => d.jaar[k]);
-    const uit = [`Diagnose mutaties (Docent Tools ${DT.version}), ${d.vandaag}`, `Vertrekkers zonder naam: ${Object.values(d.jaar).reduce((n, o) => n + Object.values(o.studenten || {}).filter((st) => this.zonderNaam(st)).length, 0)}${this._namenFout ? `; ${this._namenFout}` : ""}`, `Klassen: ${Object.keys(d.nu).length}, met jaaropslag: ${met.length}, vandaag bijgewerkt: ${met.filter((k) => !this.verouderd(d.jaar[k])).length}`,
+    const uit = [`Diagnose mutaties (Docentdeck ${DT.version}), ${d.vandaag}`, `Vertrekkers zonder naam: ${Object.values(d.jaar).reduce((n, o) => n + Object.values(o.studenten || {}).filter((st) => this.zonderNaam(st)).length, 0)}${this._namenFout ? `; ${this._namenFout}` : ""}`, `Klassen: ${Object.keys(d.nu).length}, met jaaropslag: ${met.length}, vandaag bijgewerkt: ${met.filter((k) => !this.verouderd(d.jaar[k])).length}`,
       `Mutaties nu: ${tel(Object.values(d.mut || {}).flat().map((m) => m.soort))}`, `Studenten in de opslag: ${met.reduce((n, k) => n + Object.keys(d.jaar[k].studenten || {}).length, 0)}, waarvan niet meer in de klas: ${met.reduce((n, k) => n + Object.values(d.jaar[k].studenten || {}).filter((s) => !s.nu).length, 0)}`, ""];
     if (!klas) { await DT.copy(uit.join("\n")); return; }
     this.status("Diagnose mutaties: peildatums…", false, 0, false);

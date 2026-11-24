@@ -41,7 +41,7 @@
     try {
       const u = typeof input === "string" ? input : input instanceof URL ? input.href : input?.url;
       if (periode && u && periodeMatch(u)) return await periodeRapport(u, input, init);
-    } catch (err) { console.warn("[Docent Tools] periode", err); }
+    } catch (err) { console.warn("[Docentdeck] periode", err); }
     try { res = await of.apply(this, arguments); }
     catch (err) {
       try { const u = typeof input === "string" ? input : input.url; if (/magister\.net/.test(new URL(u, location.href).host)) record((init && init.method) || "GET", u, 0, null, performance.now() - t0, String(err)); } catch {}
@@ -129,7 +129,7 @@
       const t0 = performance.now();
       const res = await of(doel.href, { method: "GET", credentials: "include", headers: { Accept: "application/json", ...eigen } });
       let json = null, text = ""; try { text = await res.clone().text(); json = JSON.parse(text); } catch {}
-      try { record("GET (Docent Tools)", url, res.status, text, performance.now() - t0); } catch {}
+      try { record("GET (Docentdeck)", url, res.status, text, performance.now() - t0); } catch {}
       reply(e, { type: "dt:api:result", id, status: res.status, retryAfter: res.status === 429 || res.status === 503 ? res.headers.get("Retry-After") : undefined, shape: json ? shape(json) : null, json: full ? json : undefined, hadHeaders: !!lastHeaders, kopnamen: lastHeaders ? Object.keys(lastHeaders) : [] });
     } catch (err) { reply(e, { type: "dt:api:result", id, status: 0, error: String(err) }); }
   });
@@ -331,9 +331,9 @@
     }
     basis = basis || { items: [], totals: {} };
     basis.items = [...per.values()]; basis.itemCount = basis.items.length;
-    let pct = "geen"; try { pct = herrekenPct(basis, out.filter(Boolean)); } catch (err) { console.warn("[Docent Tools] periode, percentages", err); }
+    let pct = "geen"; try { pct = herrekenPct(basis, out.filter(Boolean)); } catch (err) { console.warn("[Docentdeck] periode, percentages", err); }
     try { window.postMessage({ type: "dt:periode:som", target: "att-insights-page", weken: urls.length, pct }, location.origin); } catch {}
-    try { record("GET (Docent Tools, periode)", url, 200, "", 0); } catch {}
+    try { record("GET (Docentdeck, periode)", url, 200, "", 0); } catch {}
     return new Response(JSON.stringify(basis), { status: 200, headers: { "Content-Type": "application/json" } });
   }
   const zoek = (sel) => {

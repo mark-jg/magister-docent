@@ -1,54 +1,68 @@
 import sys, math
-# Maakt icons/icon{16,32,48,128}.png (iOS-tegel in systeemblauw met wit vinkje). Gebruik: python3 scripts/make-icons.py icons  (vereist Pillow)
+# Maakt icons/icon{16,32,48,128}.png voor Docentdeck: een tegel in indigo-violet met een waaier van kaarten.
+# Gebruik: python3 scripts/make-icons.py icons   (vereist Pillow)
 from PIL import Image, ImageDraw, ImageFilter, ImageChops
-out=sys.argv[1]
-N=1024
+out = sys.argv[1]
+N = 1024
+
 def squircle_mask(n, inset, k=5.0):
-    m=Image.new("L",(n,n),0); d=ImageDraw.Draw(m)
-    c=n/2; r=n/2-inset; pts=[]
+    m = Image.new("L", (n, n), 0); d = ImageDraw.Draw(m)
+    c = n / 2; r = n / 2 - inset; pts = []
     for i in range(720):
-        t=2*math.pi*i/720; ct,st=math.cos(t),math.sin(t)
-        x=c+r*math.copysign(abs(ct)**(2/k),ct); y=c+r*math.copysign(abs(st)**(2/k),st)
-        pts.append((x,y))
-    d.polygon(pts,fill=255); return m
-def vgrad(n, top, bot):
-    g=Image.new("RGB",(1,n))
-    for y in range(n):
-        t=y/(n-1); g.putpixel((0,y),tuple(round(top[i]+(bot[i]-top[i])*t) for i in range(3)))
-    return g.resize((n,n))
-def render(size, detail=True):
-    inset = N*0.06 if size>=48 else N*0.02
-    mask=squircle_mask(N, inset)
-    img=Image.new("RGBA",(N,N),(0,0,0,0))
-    bg=vgrad(N,(64,156,255),(0,98,224)).convert("RGBA")
-    img.paste(bg,(0,0),mask)
-    if detail:
-        # zachte glans bovenaan (glasachtig)
-        hl=Image.new("L",(N,N),0); hd=ImageDraw.Draw(hl)
-        hd.ellipse((-N*0.25,-N*0.75,N*1.25,N*0.42),fill=70)
-        hl=hl.filter(ImageFilter.GaussianBlur(N*0.04))
-        hl=ImageChops.multiply(hl,mask)
-        white=Image.new("RGBA",(N,N),(255,255,255,0)); white.putalpha(hl)
-        img=Image.alpha_composite(img,white)
-        # lichtrand binnenin
-        edge=ImageChops.subtract(mask, squircle_mask(N, inset+N*0.008))
-        e=Image.new("RGBA",(N,N),(255,255,255,0)); e.putalpha(edge.point(lambda v: v*0.35))
-        img=Image.alpha_composite(img,e)
-    # vinkje
-    w = N*(0.115 if size>=48 else 0.16)
-    pts=[(N*0.29,N*0.53),(N*0.445,N*0.675),(N*0.72,N*0.355)] if size>=48 else [(N*0.24,N*0.53),(N*0.43,N*0.71),(N*0.77,N*0.32)]
-    if detail:
-        sh=Image.new("L",(N,N),0); sd=ImageDraw.Draw(sh)
-        sd.line([(x,y+N*0.018) for x,y in pts],fill=90,width=int(w),joint="curve")
-        for x,y in (pts[0],pts[-1]): sd.ellipse((x-w/2,y+N*0.018-w/2,x+w/2,y+N*0.018+w/2),fill=90)
-        sh=sh.filter(ImageFilter.GaussianBlur(N*0.02)); sh=ImageChops.multiply(sh,mask)
-        s=Image.new("RGBA",(N,N),(0,40,110,0)); s.putalpha(sh); img=Image.alpha_composite(img,s)
-    ck=Image.new("RGBA",(N,N),(0,0,0,0)); cd=ImageDraw.Draw(ck)
-    cd.line(pts,fill=(255,255,255,255),width=int(w),joint="curve")
-    for x,y in (pts[0],pts[-1]): cd.ellipse((x-w/2,y-w/2,x+w/2,y+w/2),fill=(255,255,255,255))
-    img=Image.alpha_composite(img,ck)
-    return img.resize((size,size),Image.LANCZOS)
-for s in (16,32,48,128):
-    render(s, detail=s>=32).save(f"{out}/icon{s}.png", optimize=True)
-render(512).save(f"{out}/icon512.png")
-print("ok")
+        t = 2 * math.pi * i / 720; ct, st = math.cos(t), math.sin(t)
+        pts.append((c + r * math.copysign(abs(ct) ** (2 / k), ct), c + r * math.copysign(abs(st) ** (2 / k), st)))
+    d.polygon(pts, fill=255); return m
+
+def diaggrad(n, a, b):
+    g = Image.new("RGB", (n, n)); px = g.load()
+    for y in range(0, n, 4):
+        for x in range(0, n, 4):
+            t = (x + y) / (2 * n - 2)
+            col = tuple(round(a[i] + (b[i] - a[i]) * t) for i in range(3))
+            for dy in range(4):
+                for dx in range(4):
+                    if x + dx < n and y + dy < n: px[x + dx, y + dy] = col
+    return g
+
+def kaart(w, h, r, kleur, hoek, inhoud=None):
+    """Afgeronde kaart, gedraaid om haar midden; inhoud tekent op de ongedraaide kaart."""
+    k = Image.new("RGBA", (int(w), int(h)), (0, 0, 0, 0)); d = ImageDraw.Draw(k)
+    d.rounded_rectangle((0, 0, w - 1, h - 1), radius=r, fill=kleur)
+    if inhoud: inhoud(d, w, h)
+    return k.rotate(hoek, resample=Image.BICUBIC, expand=True)
+
+def plak(img, laag, cx, cy, schaduw=True):
+    x, y = int(cx - laag.width / 2), int(cy - laag.height / 2)
+    if schaduw:
+        s = Image.new("RGBA", laag.size, (20, 10, 60, 0)); s.putalpha(laag.getchannel("A").point(lambda v: v * 0.35))
+        s = s.filter(ImageFilter.GaussianBlur(N * 0.02))
+        img.alpha_composite(s, (x, y + int(N * 0.02)))
+    img.alpha_composite(laag, (x, y))
+
+def render(size):
+    klein = size < 48
+    inset = N * 0.06 if not klein else N * 0.02
+    mask = squircle_mask(N, inset)
+    img = Image.new("RGBA", (N, N), (0, 0, 0, 0))
+    img.paste(diaggrad(N, (99, 91, 255), (124, 58, 237)).convert("RGBA"), (0, 0), mask)
+    if not klein:   # zachte glans bovenaan
+        hl = Image.new("L", (N, N), 0); ImageDraw.Draw(hl).ellipse((-N * .25, -N * .8, N * 1.25, N * .38), fill=45)
+        hl = ImageChops.multiply(hl.filter(ImageFilter.GaussianBlur(N * .05)), mask)
+        w = Image.new("RGBA", (N, N), (255, 255, 255, 0)); w.putalpha(hl); img = Image.alpha_composite(img, w)
+    W, H, R = N * (0.40 if not klein else 0.46), N * (0.52 if not klein else 0.58), N * 0.06
+    def voorkant(d, w, h):
+        m = w * 0.14
+        d.rounded_rectangle((m, m, w - m, m + h * 0.16), radius=h * 0.05, fill=(255, 122, 89))   # accentbalk (koraal)
+        if not klein:
+            for i, f in enumerate((0.86, 0.66, 0.76)):
+                y = m + h * 0.30 + i * h * 0.15
+                d.rounded_rectangle((m, y, m + (w - 2 * m) * f, y + h * 0.065), radius=h * 0.03, fill=(205, 200, 235))
+    if not klein:
+        plak(img, kaart(W, H, R, (255, 255, 255, 110), 16), N * 0.40, N * 0.52)
+    plak(img, kaart(W, H, R, (255, 255, 255, 170), 7), N * 0.46, N * 0.51, schaduw=not klein)
+    plak(img, kaart(W, H, R, (255, 255, 255, 255), -6, voorkant), N * 0.55, N * 0.50, schaduw=not klein)
+    return img.resize((size, size), Image.LANCZOS)
+
+for s in (16, 32, 48, 128):
+    render(s).save(f"{out}/icon{s}.png")
+    print("icon", s)

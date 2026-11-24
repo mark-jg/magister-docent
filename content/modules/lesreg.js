@@ -523,7 +523,7 @@ DT.register({
     };
     const naam = `Lesregistraties ${d.klassen.join(" ")} ${d.per.naam}${f.vakken.size === 1 ? ` ${[...f.vakken][0]}` : ""}`.replace(/[\\/:*?"<>|]+/g, "-").slice(0, 120);
     try { XlsxVisueel.download(XlsxVisueel.maak(wb, specs), `${naam}.xlsx`); }
-    catch (e) { console.warn("[Docent Tools] Excel-opmaak mislukt, gewone export", e); XLSX.writeFile(wb, `${naam}.xlsx`); }
+    catch (e) { console.warn("[Docentdeck] Excel-opmaak mislukt, gewone export", e); XLSX.writeFile(wb, `${naam}.xlsx`); }
     DT.toast("Excel-bestand gedownload", "ok");
   },
 

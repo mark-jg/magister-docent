@@ -6,7 +6,7 @@
    * verschijnen. De tweede start niet en meldt het. */
   const eerste = document.documentElement.dataset.dtExt;
   if (eerste && eerste !== chrome.runtime.id) {
-    if (DT.isTop) setTimeout(() => DT.toast(`Er staan twee versies van Docent Tools aan. Versie ${DT.version} is nu niet actief: zet op chrome://extensions één van de twee uit en herlaad dit tabblad.`, "err", 15000), 1500);
+    if (DT.isTop) setTimeout(() => DT.toast(`Er staan twee versies van Docentdeck aan. Versie ${DT.version} is nu niet actief: zet op chrome://extensions één van de twee uit en herlaad dit tabblad.`, "err", 15000), 1500);
     return;
   }
   document.documentElement.dataset.dtExt = chrome.runtime.id;
@@ -19,5 +19,5 @@
     DT.notify();
     document.dispatchEvent(new CustomEvent("dt:settings"));
   });
-  if (DT.isTop) console.info(`[Docent Tools voor Magister] v${DT.version} actief`);
+  if (DT.isTop) console.info(`[Docentdeck voor Magister] v${DT.version} actief`);
 })();

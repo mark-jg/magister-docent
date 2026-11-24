@@ -1,4 +1,4 @@
-/* Docent Tools voor Magister: kern.
+/* Docentdeck voor Magister: kern.
  * Bevat het modulesysteem, instellingenbeheer, en gedeelde helpers.
  * Modules registreren zich via DT.register({ id, init, destroy }).
  */
@@ -41,7 +41,7 @@
     if (waarnemer) { waarnemer.disconnect(); waarnemer = null; }
     window.removeEventListener("hashchange", alleWaarnemers);
     document.removeEventListener("visibilitychange", zichtbaar);
-    if (window === window.top) { try { DT.toast("Docent Tools is bijgewerkt of herladen. Herlaad dit tabblad om verder te werken.", "info", 12000); } catch {} }
+    if (window === window.top) { try { DT.toast("Docentdeck is bijgewerkt of herladen. Herlaad dit tabblad om verder te werken.", "info", 12000); } catch {} }
   };
   const verlopen = (e) => !levend() || /context invalidated/i.test(String(e?.message || e));
 

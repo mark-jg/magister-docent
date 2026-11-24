@@ -9,7 +9,7 @@ async function devLabel() {
   if (!dev) return;
   await chrome.action.setBadgeText({ text: "DEV" });
   await chrome.action.setBadgeBackgroundColor({ color: "#AF52DE" });
-  await chrome.action.setTitle({ title: `Docent Tools voor Magister ${chrome.runtime.getManifest().version} (ontwikkelversie)` });
+  await chrome.action.setTitle({ title: `Docentdeck voor Magister ${chrome.runtime.getManifest().version} (ontwikkelversie)` });
 }
 chrome.runtime.onStartup.addListener(() => { devLabel(); });
 
