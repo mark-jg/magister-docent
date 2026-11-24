@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Docentdeck voor Magister",
-  "version": "0.68.2",
+  "version": "0.69.0",
   "description": "Extra functies voor docenten in Magister: thema’s, zijkolom, tabellen naar Excel, sneller invoeren en aanwezigheidsoverzichten.",
   "icons": {
     "16": "icons/icon16.png",

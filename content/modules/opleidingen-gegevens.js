@@ -339,27 +339,14 @@ Object.assign(DT.module("opleidingen"), {
   },
 
   /* ---------- back-up in een map ---------- */
-  mapDb() {
-    return new Promise((ok, nee) => {
-      const r = indexedDB.open("dt-opl", 1);
-      r.onupgradeneeded = () => r.result.createObjectStore("kv");
-      r.onsuccess = () => ok(r.result); r.onerror = () => nee(r.error);
-    });
-  },
-  async kv(sleutel, waarde) {
-    const db = await this.mapDb();
-    return new Promise((ok, nee) => {
-      const tx = db.transaction("kv", waarde === undefined ? "readonly" : "readwrite"), st = tx.objectStore("kv");
-      const r = waarde === undefined ? st.get(sleutel) : waarde === null ? st.delete(sleutel) : st.put(waarde, sleutel);
-      r.onsuccess = () => ok(r.result); r.onerror = () => nee(r.error);
-    });
-  },
+  /* De map zelf beheert LesOpslag (gedeeld met Lesregistraties); kiezen gebeurt in de instellingen. */
+  kv(sleutel, waarde) { return LesOpslag.kv(sleutel, waarde); },
   bestand() { return `docent-tools-opleidingen-${location.host.replace(/[^a-z0-9.-]/gi, "_")}.json`; },
   /* De gekozen map: _map als Chrome toegang geeft, anders _mapWacht (toegang vraagt een klik, eens per sessie). */
   async mapLaden() {
     this._map = null; this._mapWacht = null;
     try {
-      /* Met tijdslimiet (LesOpslag.binnen): Chrome geeft op queryPermission soms nooit antwoord. */
+      /* Met tijdslimiet (LesOpslag.metLimiet): Chrome geeft op queryPermission soms nooit antwoord. */
       const h = await LesOpslag.metLimiet(this.kv("map"), 3000, null); if (!h) return;
       const mag = await LesOpslag.metLimiet(h.queryPermission({ mode: "readwrite" }), 3000, "geen antwoord");
       if (mag === "geen antwoord") return;   // onbruikbare map (van een andere versie van de extensie): kies een nieuwe
@@ -390,17 +377,6 @@ Object.assign(DT.module("opleidingen"), {
       this._mapOp = b.op; this._mapFout = null;
     } catch (e) { this._mapFout = String(e?.message || e); console.warn("[DT] opleidingen: back-up schrijven mislukt", e); }
   },
-  async kiesMap(DT) {
-    if (!window.showDirectoryPicker) return DT.toast("Deze browser kan geen map openen. Gebruik Chrome of Edge op een computer.", "err", 5000);
-    try {
-      const h = await window.showDirectoryPicker({ id: "dt-opl", mode: "readwrite" });
-      await this.kv("map", h); this._map = h; this._mapWacht = null;
-      const gelezen = await this.backupLezen();
-      await this.backupSchrijven();
-      DT.toast(gelezen ? `Back-up in "${h.name}" ingelezen en bijgewerkt` : `Back-up staat nu in "${h.name}"`, "ok", 4000);
-      this.laad(DT);
-    } catch (e) { if (e?.name !== "AbortError") DT.toast(`Map kiezen lukte niet: ${e?.message || e}`, "err", 5000); }
-  },
   async mapToegang(DT) {
     const h = this._mapWacht; if (!h) return;
     if (await h.requestPermission({ mode: "readwrite" }).catch(() => "denied") !== "granted") return DT.toast("Zonder toegang tot de map is er geen back-up.", "err", 4000);
@@ -408,16 +384,23 @@ Object.assign(DT.module("opleidingen"), {
     await this.backupLezen(); await this.backupSchrijven();
     this.laad(DT);
   },
-  async mapLos(DT) { await this.kv("map", null).catch(() => {}); this._map = this._mapWacht = null; this.teken(DT); },
+  /* De map is in de instellingen gekozen, vergeten of vrijgegeven: opnieuw laden (en de back-up samenvoegen). */
+  async mapGewijzigd(DT) {
+    if (!this._pagina) return;
+    await this.mapLaden();
+    if (this._map) { await this.backupLezen(); await this.backupSchrijven(); }
+    this.laad(DT);
+  },
+  mapInstellen() { chrome.runtime.sendMessage({ type: "openOptions", anker: "backup" }).catch(() => {}); },
 
   /* Kaart onderaan: wanneer is er bijgewerkt en waar staat de back-up. */
   opslagKaart() {
     const d = this._d, E = (s) => this.esc(s), namen = Object.keys(d.nu), met = namen.filter((k) => d.jaar[k]), oud = namen.filter((k) => this.verouderd(d.jaar[k]));
     const moment = (t) => new Date(t).toLocaleString("nl-NL", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }), uit = this._aanwBezig ? " disabled" : "";
     const stand = !met.length ? "Nog niets opgehaald." : `${met.length} van ${namen.length} klassen bewaard, laatst bijgewerkt op ${E(moment(Math.max(...met.map((k) => d.jaar[k].op))))}.${oud.length ? ` ${oud.length} ${oud.length === 1 ? "klas is" : "klassen zijn"} vandaag nog niet bijgewerkt.` : ""}`;
-    const map = this._map ? `Back-up in de map "${E(this._map.name)}" (${E(this.bestand())})${this._mapFout ? `: schrijven mislukte (${E(this._mapFout)})` : this._mapOp ? `, laatst geschreven op ${E(moment(this._mapOp))}` : ""}. <button type="button" class="dt-opl-knop is-stil" data-act="map-kies">Andere map</button><button type="button" class="dt-opl-knop is-stil" data-act="map-los">Ontkoppelen</button>`
+    const map = this._map ? `Back-up in de map "${E(this._map.name)}" (${E(this.bestand())})${this._mapFout ? `: schrijven mislukte (${E(this._mapFout)})` : this._mapOp ? `, laatst geschreven op ${E(moment(this._mapOp))}` : ""}. <button type="button" class="dt-opl-knop is-stil" data-act="map-instellen">Instellen</button>`
       : this._mapWacht ? `Back-up in de map "${E(this._mapWacht.name)}": Chrome vraagt per sessie één keer toestemming. <button type="button" class="dt-opl-knop" data-act="map-toegang">Map openen</button>`
-      : `Nog geen back-up. Kies een map op deze computer of in OneDrive; dan staat daar na elke update een kopie, en kan een andere computer met dezelfde map verder. <button type="button" class="dt-opl-knop" data-act="map-kies">Map kiezen</button>`;
+      : `Nog geen back-up. Kies in de zijkolom bij Meer › Back-up en opslag een map op deze computer of in OneDrive; dan staat daar na elke update een kopie, en kan een andere computer met dezelfde map verder. <button type="button" class="dt-opl-knop" data-act="map-instellen">Map instellen</button>`;
     return `<dna-card class="dt-opl-kaart"><h2>Opslag en back-up</h2>
       <p class="dt-opl-zacht">Aanwezigheid en lessen blijven bewaard en worden bij het openen van deze pagina één keer per dag bijgewerkt (alleen de laatste weken). ${stand}
       <button type="button" class="dt-opl-knop" data-act="bijwerk"${uit}>Nu bijwerken</button><button type="button" class="dt-opl-knop is-stil" data-act="les-opnieuw"${uit} title="Haalt het hele schooljaar opnieuw op: per student twee aanvragen">Alles opnieuw ophalen</button></p>

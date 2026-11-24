@@ -139,11 +139,17 @@ DT.register({
     const toonMap = () => {
       if (!map) return mapRegel.replaceChildren();
       if (map.h) return mapRegel.replaceChildren(`Lijsten worden bewaard in de map "${map.h.name}" (submap ${O.SUB}); een volgende keer worden alleen de laatste weken bijgewerkt.${map.mag ? "" : " Chrome vraagt bij Ophalen om toegang tot de map."}`);
-      const kies = DT.el("button", { type: "button", class: "dt-lr-link", text: "Map kiezen" });
-      kies.addEventListener("click", async () => { try { map = await O.kies(); toonMap(); } catch (e) { if (e?.name !== "AbortError") DT.toast(`Map kiezen lukte niet: ${e?.message || e}`, "err", 5000); } });
-      mapRegel.replaceChildren("Kies een map (op de computer of in OneDrive) om lijsten te bewaren: een volgende keer wordt dan alleen bijgewerkt wat nieuw is. Dezelfde map dient voor de back-up van Opleidingen. ", kies);
+      mapRegel.replaceChildren("Kies een map (op de computer of in OneDrive) om lijsten te bewaren: een volgende keer wordt dan alleen bijgewerkt wat nieuw is. Dezelfde map dient voor de back-up van Opleidingen. ", instellen);
     };
+    /* De map kies je in de zijkolom (Meer › Back-up en opslag); hier alleen de stand en een knop daarheen. */
+    const instellen = DT.el("button", { type: "button", class: "dt-lr-link", text: "Map instellen" });
+    instellen.addEventListener("click", () => chrome.runtime.sendMessage({ type: "openOptions", anker: "backup" }).catch(() => {}));
     toonMap();
+    const opMap = async () => {
+      if (!mapRegel.isConnected) return document.removeEventListener("dt:map", opMap);   // pagina gesloten
+      map = await O.map(); toonMap();
+    };
+    document.addEventListener("dt:map", opMap);
     const toonBezig = (aan) => { if (aan) start.setAttribute("disabled", ""); else start.removeAttribute("disabled"); balk.classList.toggle("is-bezig", aan); stop.style.display = aan ? "" : "none"; };
     /* wijze: "" gewoon ophalen, "aanvullen" ook als dat net nog is gedaan, "vol" alles opnieuw (volledige controle). */
     const draai = async (klasNamen, p, wijze, klasTekst) => {

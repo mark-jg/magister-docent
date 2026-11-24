@@ -139,6 +139,50 @@ document.getElementById("reset").onclick = async () => {
 };
 
 document.getElementById("versionLine").textContent = `Versie ${chrome.runtime.getManifest().version}`;
+/* ---------- Back-up en opslag ----------
+ * De map hoort bij Magister (de pagina bewaart hem), niet bij de extensie: daarom gaan de vragen via het
+ * Magister-tabblad (content/kolom.js, vraag "map"). Kiezen en toegang geven tonen daar een venstertje met een knop. */
+async function magisterTab() {
+  try {
+    const [actief] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (actief && /^https?:\/\/[^/]*\.magister\.net\//.test(actief.url || "")) return actief;
+    const [ander] = await chrome.tabs.query({ url: "*://*.magister.net/*" });
+    return ander || null;
+  } catch { return null; }
+}
+async function mapVraag(actie) {
+  const tab = await magisterTab();
+  if (!tab) return null;
+  try { return await chrome.tabs.sendMessage(tab.id, { type: "dt:kolom", vraag: "map", actie }, { frameId: 0 }); } catch { return null; }
+}
+async function toonMap() {
+  const status = document.getElementById("mapStatus"), kies = document.getElementById("mapKies"), toegang = document.getElementById("mapToegang"), vergeet = document.getElementById("mapVergeet");
+  const r = await mapVraag("status");
+  if (!r) {
+    status.textContent = "Open een Magister-tabblad (en herlaad het als het al open stond) om de map te zien of te kiezen.";
+    kies.disabled = true; toegang.hidden = vergeet.hidden = true; return;
+  }
+  if (r.ok && !r.kan) {
+    status.textContent = "Deze browser kan geen map openen. Gebruik Chrome of Edge op een computer.";
+    kies.disabled = true; toegang.hidden = vergeet.hidden = true; return;
+  }
+  kies.disabled = false;
+  kies.textContent = r.naam ? "Andere map kiezen" : "Map kiezen";
+  status.textContent = !r.naam ? "Nog geen map gekozen: er wordt niets buiten de browser bewaard."
+    : r.mag ? `Map: "${r.naam}". Toegang is gegeven voor deze sessie.`
+    : `Map: "${r.naam}". Chrome vraagt deze sessie nog om toegang (dat gebeurt ook vanzelf bij Ophalen).`;
+  toegang.hidden = !r.naam || r.mag; vergeet.hidden = !r.naam;
+}
+document.getElementById("mapKies").onclick = () => mapVraag("kies");
+document.getElementById("mapToegang").onclick = () => mapVraag("toegang");
+document.getElementById("mapVergeet").onclick = async () => {
+  if (!confirm("De map vergeten? De bestanden in de map blijven staan; Docentdeck schrijft er alleen niet meer in.")) return;
+  await mapVraag("vergeet"); toonMap();
+};
+chrome.runtime.onMessage.addListener((msg) => { if (msg?.type === "dt:map") toonMap(); });
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") toonMap(); });
+toonMap();
+
 function merge(base, patch) {
   for (const [k, v] of Object.entries(patch || {})) {
     if (v && typeof v === "object" && !Array.isArray(v) && base[k] && typeof base[k] === "object" && !Array.isArray(base[k])) merge(base[k], v);

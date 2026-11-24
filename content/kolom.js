@@ -34,6 +34,18 @@
         const hoofd = document.querySelector('ui-view[name="main"]') || document.body;
         return { ok: true, tekst: (hoofd.innerText || hoofd.textContent || "").replace(/\n{3,}/g, "\n\n").trim() };
       }
+      /* De back-upmap (Instellingen › Meer › Back-up en opslag). */
+      case "map": {
+        if (typeof LesOpslag === "undefined") return { ok: false, fout: "Onbekende vraag." };
+        if (msg.actie === "status") return LesOpslag.map().then(({ h, mag }) => ({ ok: true, kan: !!window.showDirectoryPicker, naam: h?.name || null, mag }));
+        if (msg.actie === "vergeet") return LesOpslag.vergeet().then(() => ({ ok: true }));
+        if (msg.actie === "kies" || msg.actie === "toegang") {
+          if (!window.showDirectoryPicker) return { ok: false, fout: "Deze browser kan geen map openen. Gebruik Chrome of Edge op een computer." };
+          LesOpslag.opPagina(DT, msg.actie);
+          return { ok: true };
+        }
+        return { ok: false, fout: "Onbekende actie." };
+      }
       case "actie": {
         const doe = ACTIES[msg.naam];
         if (!doe) return { ok: false, fout: "Onbekende actie." };
@@ -47,10 +59,15 @@
 
   chrome.runtime.onMessage.addListener((msg, _afzender, stuur) => {
     if (msg?.type !== "dt:kolom") return;
+    const klaar = (uit) => {
+      if (uit && uit.ok === false && uit.fout) { try { DT.toast(uit.fout, "err", 4500); } catch {} }
+      stuur(uit);
+    };
     let uit;
     try { uit = antwoord(msg); } catch (e) { uit = { ok: false, fout: String(e?.message || e) }; }
-    if (uit && uit.ok === false && uit.fout) { try { DT.toast(uit.fout, "err", 4500); } catch {} }
-    stuur(uit);
+    /* Sommige antwoorden (de map) komen later: dan blijft het kanaal open tot ze er zijn. */
+    if (uit && typeof uit.then === "function") { uit.then(klaar, (e) => klaar({ ok: false, fout: String(e?.message || e) })); return true; }
+    klaar(uit);
   });
   globalThis.DT_KOLOM_ANTWOORD = antwoord;   // voor de tests
 })();
