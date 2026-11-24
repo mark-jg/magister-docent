@@ -532,7 +532,7 @@ async function vzLosseLessen(id, regs, rooster, api, max = 80) {
 }
 
 /* Eén bron voor de registraties en het rooster van een leerling. Inzicht, de ranglijst, Lesregistraties, de
- * Excel-exports, het Plan van aanpak, Opleidingen en de Te laat-balie halen ze hier op, zodat ze dezelfde
+ * Excel-exports en Opleidingen halen ze hier op, zodat ze dezelfde
  * aanvragen doen en elkaars antwoord kunnen hergebruiken.
  *   vzBron.haal(id, van, tot, { api, pauze, vers, los }) -> { regs, rooster, status: { regs, rooster }, at }
  * regs of rooster is null als het ophalen mislukte. Een antwoord blijft tien minuten bruikbaar voor elk bereik

@@ -14,16 +14,12 @@
     <button role="tab" id="tab-start" aria-controls="blad" aria-selected="true" data-blad="start" title="Acties, tabellen, notities en links">Start</button>
     <button role="tab" id="tab-uiterlijk" aria-controls="blad" aria-selected="false" data-blad="uiterlijk" tabindex="-1" title="Thema, kleur, lettertype">Uiterlijk</button>
     <button role="tab" id="tab-modules" aria-controls="blad" aria-selected="false" data-blad="modules" tabindex="-1" title="Onderdelen aan- en uitzetten en instellen">Modules</button>
-    <button role="tab" id="tab-meer" aria-controls="blad" aria-selected="false" data-blad="meer" tabindex="-1" title="Periodes, zijkolom, updates">Meer</button>
+    <button role="tab" id="tab-meer" aria-controls="blad" aria-selected="false" data-blad="meer" tabindex="-1" title="Periodes, zijkolom, ontwikkelaar">Meer</button>
   </nav>
 </header>
 
 <main id="blad" role="tabpanel" aria-labelledby="tab-start">
   <div id="meldingen">
-    <div class="kolom-melding is-update" id="update" hidden>
-      <div><strong id="updTitel"></strong><span id="updTekst"></span></div>
-      <button class="dt-btn dt-btn-sm dt-btn-primary" id="updKnop">Bijwerken</button>
-    </div>
     <div class="kolom-melding" id="geenMagister" hidden>
       <div><strong>Geen Magister-tabblad in beeld</strong><span>Tabellen en acties gelden voor het Magister-tabblad dat je voor je hebt.</span></div>
     </div>
@@ -37,7 +33,7 @@
   <div id="dt-panel"></div>
   <!-- Daaronder, op Uiterlijk, Modules en Meer: de bijbehorende groep van de instellingenpagina. -->
   <iframe id="instellingen" title="Instellingen" hidden></iframe>
-  <div class="kolom-voet"><span id="versieVoet"></span><button type="button" id="updatesKnop">Updates en bijwerken</button></div>
+  <div class="kolom-voet"><span id="versieVoet"></span></div>
 </main>
 
 <script src="../content/defaults.js"></script>

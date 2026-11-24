@@ -530,7 +530,7 @@ DT.register({
   css() {
     if (document.getElementById("dt-lr-style")) return;
     const st = document.createElement("style"); st.id = "dt-lr-style";
-    /* Alles op Magisters eigen ontwerptokens (--sl-…), net als de Te laat-balie: zo kleurt de pagina mee met Magister
+    /* Alles op Magisters eigen ontwerptokens (--sl-…), zo kleurt de pagina mee met Magister
      * én met elk thema (ook eigen thema's, donker en Apple Glass, die dna-card en de tokens overschrijven). */
     st.textContent = `
       ui-view.dt-lr-open > mg-att-tiles { display: none !important; }

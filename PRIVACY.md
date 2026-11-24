@@ -1,0 +1,33 @@
+# Privacyverklaring Docent Tools voor Magister
+
+*Concept, laatst bijgewerkt: 24 november 2026. Controleer dit met de functionaris gegevensbescherming van je school voordat je het publiceert.*
+
+Docent Tools voor Magister is een browserextensie voor docenten en ander personeel dat met Magister werkt. De extensie draait helemaal in je eigen browser. De maker verzamelt geen gegevens, krijgt er ook geen binnen en gebruikt geen analyse- of advertentiediensten.
+
+## Welke gegevens de extensie leest
+
+- **Gegevens uit Magister**, zoals namen, klassen, roosters, aanwezigheid en verjaardagen van leerlingen. De extensie haalt die op met je eigen, ingelogde Magister-sessie en alleen van het Magister-domein van je school (`*.magister.net`). Zo kan ze overzichten, tabellen en exports maken.
+- **Structuur van de pagina en het netwerkverkeer** (adressen van aanroepen en namen van velden, geen waarden). Dit wordt alleen gebruikt voor de Inspector, een hulpmiddel voor ontwikkelaars dat je zelf moet aanzetten.
+
+## Waar gegevens blijven
+
+- **Instellingen** staan in de opslag van de browser (`chrome.storage`). Als je browsersynchronisatie aan hebt, synchroniseert Google ze tussen je eigen apparaten. Het gaat om bijvoorbeeld het thema, links, notities en periodes.
+- **Opgehaalde aanwezigheidsgegevens** (Opleidingen, Lesregistraties) staan in de lokale opslag van de extensie op je eigen apparaat.
+- **Back-up in een map** gebeurt alleen als je zelf een map kiest. Die bestanden bevatten namen van studenten. Je bent er zelf verantwoordelijk voor dat de map voldoet aan het beleid van je school.
+- **Exports** (Excel, CSV, klembord) maak je zelf. Ze komen in je eigen downloads of op je eigen klembord.
+
+## Wat de extensie verstuurt
+
+Niets. De extensie stuurt geen gegevens naar de maker of naar derden.
+
+**AI-hulp:** hiermee stel je een prompt samen. De extensie kopieert die naar je klembord en opent de AI-dienst die je hebt gekozen (Claude, ChatGPT of Microsoft Copilot) in een nieuw tabblad. Er wordt niets automatisch verstuurd: je plakt de tekst zelf. Met de knop "Namen maskeren" haal je eerst de namen weg. Deel geen herleidbare leerlinggegevens met een AI-dienst als het beleid van je school dat niet toestaat.
+
+**Microfoon:** de lestool "Stille safari" gebruikt de microfoon om het geluidsniveau in de klas te meten. Dat gebeurt alleen nadat je toestemming geeft, het geluid blijft in de browser en er wordt niets opgenomen.
+
+## Verwijderen
+
+Als je de extensie verwijdert, verwijdert de browser ook alle opgeslagen instellingen en gegevens van de extensie. Een back-upmap die je zelf hebt gekozen, verwijder je zelf.
+
+## Contact
+
+[naam en e-mailadres van de maker invullen]

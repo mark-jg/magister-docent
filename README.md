@@ -2,42 +2,27 @@
 
 Chrome-extensie voor Magister (docenten/personeel). Alles draait lokaal in je browser: er wordt niets naar een server gestuurd.
 
-## Installeren (lokaal laden)
+Dit is de **webstore-versie** (branch `webstore`): dezelfde extensie als `main`, zonder de onderdelen die alleen voor één school gelden (Te laat-balie, Plan van aanpak met de eigen Word-sjablonen, Mail bij Melding Expertisecentrum) en zonder de zelf-updater via GitHub. Updates lopen via de Chrome Web Store.
 
-1. Download de nieuwste `magister-docent-tools-vX.Y.Z.zip` van de [Releases-pagina](https://github.com/mark-jg/magister-docent/releases/latest).
-2. Pak de zip uit in een map die je laat staan (bijvoorbeeld `Documenten/magister-docent-tools`).
-3. Open Chrome en ga naar `chrome://extensions`.
-4. Zet rechtsboven **Ontwikkelaarsmodus** aan.
-5. Klik op **Uitgepakte extensie laden** en kies de map met `manifest.json`.
-6. Open (of herlaad) Magister. Klik op het icoon van Docent Tools in de werkbalk (of druk op Alt+D): de zijkolom opent naast Magister. Aan de rand van de pagina staat ook een handvat "Docent Tools".
+## Installeren
 
-Werkt ook in Edge (`edge://extensions`).
+Via de Chrome Web Store (link volgt na publicatie). Werkt ook in Edge (sta extensies uit de Chrome Web Store toe).
 
-## Bijwerken
-
-De extensie kijkt om de 6 uur op GitHub of er een nieuwere release is (alleen versienummer en downloadlink, er gaat niets over jou mee; uit te zetten bij Instellingen > Updates). Is er een nieuwe versie, dan krijgt het extensie-icoon een gele badge en staat bovenin de zijkolom een melding met de knop Bijwerken:
-
-1. **Nu bijwerken**: opent Instellingen > Updates. De eerste keer kies je daar de map waarin je de extensie hebt uitgepakt (de map met `manifest.json`); die keuze wordt onthouden.
-2. Klik op **Nu bijwerken naar X**. Chrome vraagt om toestemming voor de map (één klik). De extensie haalt de zip op van GitHub, schrijft de bestanden in de map en herlaadt zichzelf. Herlaad daarna open Magister-tabbladen.
-3. Handmatig blijft mogelijk: zip downloaden, uitpakken over de extensiemap en op Herladen klikken.
-
-Er worden alleen bestanden geschreven of overschreven, nooit verwijderd. Het manifest wordt als laatste geschreven, zodat een afgebroken update geen half nieuwe extensie achterlaat.
-
-### GitHub-token (optioneel)
-
-De repo is openbaar, dus controleren en bijwerken werkt zonder token. GitHub beperkt anonieme aanroepen wel tot 60 per uur per adres; wie daar tegenaan loopt (bijvoorbeeld op een gedeeld schoolnetwerk) kan een fine-grained token met alleen **Contents: Read-only** invullen bij **Instellingen > Updates > GitHub-token**. Het token staat alleen in de lokale opslag van de extensie op dat apparaat en gaat alleen naar `api.github.com`.
-
-Chrome laat een uitgepakte extensie zijn eigen map alleen beschrijven als de gebruiker die map zelf aanwijst (File System Access API); daarom die eenmalige keuze en de toestemmingsvraag per update. Wie liever met git werkt: `git clone https://github.com/mark-jg/magister-docent`, die map als uitgepakte extensie laden, en bijwerken met `git pull` plus Herladen.
+Zelf testen: `chrome://extensions` › **Ontwikkelaarsmodus** › **Uitgepakte extensie laden** › deze map. De map uit git krijgt het label DEV op het icoon.
 
 ## Ontwikkelen en testen
 
 De extensie zelf heeft geen buildstap. Voor de linter en de tests is Node nodig (eenmalig `npm install`):
 
-- `npm test` draait de tests in `tests/` (rekenfuncties, de brug naar Magister, de Te laat-balie, de updater);
+- `npm test` draait de tests in `tests/`;
 - `npm run lint` controleert alle scripts op onbekende namen en dubbele sleutels;
-- `npm run check` doet allebei. GitHub Actions draait dit bij elke push, en er komt geen release als het faalt.
+- `npm run check` doet allebei. GitHub Actions draait dit bij elke push.
 
-Bij elke release staat naast de zip een bestand `.sha256`; de updater vergelijkt de download daarmee voordat er iets wordt overschreven.
+## Naar de Chrome Web Store
+
+1. Zet het versienummer in `manifest.json` hoger dan de versie die in de store staat.
+2. `scripts/webstore-zip.sh` draait de controles en maakt `dist/docent-tools-webstore-vX.Y.Z.zip`.
+3. Upload de zip in het [Developer Dashboard](https://chrome.google.com/webstore/devconsole). De teksten voor de winkelpagina en het tabblad Privacy staan in `WEBSTORE.md`, de privacyverklaring in `PRIVACY.md`.
 
 ## Wat zit erin
 
@@ -45,7 +30,7 @@ Bij elke release staat naast de zip een bestand `.sha256`; de updater vergelijkt
 |---|---|
 | Jarig: kaart op Vandaag met (aankomende) jarige leerlingen, klikbaar naar de leerlingkaart | automatisch op het startscherm; Instellingen > Jarig voor hoe ver vooruit |
 | Thema's: Magister (het origineel), Minimal, Glass, Paper, Soft en Contrast. Elk thema behalve Magister heeft een lichte en een donkere variant (of volgt je computer), met een accentkleur als tweede keuze; lettertype, lettergrootte, hoeken en dichtheid zijn apart instelbaar | in de zijkolom (Alt+D), Alt+T wisselt tussen licht en donker |
-| Zijkolom: thema, modules, acties, periodes, klok en weeknummer, snelle links, notities, de tabellen van de pagina, updates en alle instellingen. Staat naast Magister in de zijkolom van de browser, valt dus niet over de pagina en is in breedte te verstellen | Alt+D, het icoon van Docent Tools in de werkbalk, of het handvat aan de rand van de pagina |
+| Zijkolom: thema, modules, acties, periodes, klok en weeknummer, snelle links, notities, de tabellen van de pagina en alle instellingen. Staat naast Magister in de zijkolom van de browser, valt dus niet over de pagina en is in breedte te verstellen | Alt+D, het icoon van Docent Tools in de werkbalk, of het handvat aan de rand van de pagina |
 | Tabellen: zwevend knopje "Exporteren" bij hover over een datatabel (kalenders en roosters worden overgeslagen), en een overzicht van alle tabellen in de zijkolom. Naar Excel, CSV of klembord (plakt als cellen), sorteerbare koppen; per soort tabel instelbaar welke kolommen meegaan, kopregel, namen maskeren, lege rijen en kolommen weglaten | knoppen boven elke tabel, "Instellen" voor de opties; Alt+E exporteert alle tabellen op de pagina |
 | Sneller invoeren: Enter springt naar de volgende rij, Ctrl+Shift+V plakt een kolom uit Excel in opeenvolgende velden | automatisch in invoertabellen |
 | AI-hulp: prompt uit tabel of selectie, met sjablonen en knop "Namen maskeren" | knop "Naar AI" boven een tabel of in het paneel |
@@ -53,7 +38,6 @@ Bij elke release staat naast de zip een bestand `.sha256`; de updater vergelijkt
 | Snelle aanwezigheid (Lesdashboard > leerlinglijst): "Iedereen aanwezig", springen naar een naam, toetsenbordmodus met letters per kolom | Alt+A, of de balk boven de registratielijst |
 | Navigatie: commandopalet met alle menu-onderdelen en acties | Ctrl+K (of Alt+K); Alt+1 t/m 9 springt naar hoofdmenu-items; Alt+S naar het zoekveld |
 | Thema bijwerken: elementen die niet meekleuren zelf toevoegen | Alt+I, beweeg over het element, C, kies achtergrond/vlak/accent/tekst |
-| Mail bij Melding Expertisecentrum: controlescherm met naam, studentnummer, klas, "aangemeld voor" en samenvatting, daarna een concept-mail in Outlook naar de begeleidingscoach (niets wordt automatisch verzonden) | knop "Mail coach" naast "Volgende" bij een nieuwe melding, ✉ in de knoppenbalk van een bestaande melding in het logboek, of Alt+M; coaches (naam en e-mail) in de instellingen, in het controlescherm kies je aan wie |
 | Opleidingen: overzicht per opleiding › leerjaar › klas (uitklapbaar) met het aantal ingeschreven studenten, het verloop over de schooljaren als grafiek (per maand, met de teldatum 1 oktober), de aanwezigheid per niveau (aanwezig, te laat, ziek, absent geoorloofd en ongeoorloofd, uitgestuurd, vrijstelling; per week en weekdag, en hoeveel studenten onder de norm zitten), studentmutaties uit de lessen, aandachtspunten waar je op doorklikt en een export naar Excel. Gegevens blijven bewaard en worden bij openen bijgewerkt, met een back-up in een map naar keuze (bevat namen van studenten) | menu-item "Opleidingen" onderaan Magisters hoofdmenu; aanwezigheid haal je op per regel of voor alle klassen |
 | Inspector: selectors vinden, paginarapport (R, nu ook met bovenliggende frames en koppen van de hoofdpagina) en netwerkrapport (N, welke API-calls en velden, zonder waarden) | Alt+I |
 
@@ -70,30 +54,21 @@ De bovenstaande functies werken op elke Magister-pagina zonder kennis van de int
 
 Per pagina volgt dan een module die precies op die structuur werkt.
 
-Voor de mailmodule: klopt de naam, het nummer of de klas niet, klik dan in het controlescherm op **Bronnen**. Dat zet op het klembord welke API-calls en veldnamen gevonden zijn (zonder waarden) en welke teksten op de pagina stonden; plak dat in het gesprek, met de naam weggelakt.
-
 ## Mappen
 
 ```
 manifest.json            Extensiebeschrijving (Manifest V3)
-background.js            Sneltoetsen, eerste installatie, updatecontrole (GitHub Releases)
+background.js            Sneltoetsen, eerste installatie, de zijkolom
 content/defaults.js      Standaardinstellingen (één plek, gedeeld door alles)
 content/core.js          Modulesysteem, instellingen, helpers
 content/base.css         Stijl van de eigen UI (paneel, knoppen, toasts)
 content/modules/*.js     Eén bestand per functie
-options/                 Instellingenpagina en zelf-updater (updater.js)
-sidepanel/               De zijkolom van de browser (paneel, updates, instellingen)
+options/                 Instellingenpagina
+sidepanel/               De zijkolom van de browser (paneel, instellingen)
 lib/xlsx.full.min.js     SheetJS (Excel-export), Apache 2.0
-scripts/release.sh       Nieuwe versie taggen en pushen (zie hieronder)
-.github/workflows/       Bouwt bij elke tag v* de zip en publiceert de release
+scripts/webstore-zip.sh  Zip voor de Chrome Web Store bouwen
+.github/workflows/       Linter en tests bij elke push
 ```
-
-## Nieuwe versie uitbrengen (ontwikkelaar)
-
-1. Pas de code aan en zet een regel `- X.Y.Z: ...` bovenaan **Wijzigingen** hieronder. Commit.
-2. Voer uit: `scripts/release.sh X.Y.Z`. Dat zet het versienummer in `manifest.json` en deze README, commit, maakt tag `vX.Y.Z` en pusht.
-3. GitHub Actions bouwt `magister-docent-tools-vX.Y.Z.zip` en zet die als release op GitHub. Het versienummer in `manifest.json` moet gelijk zijn aan de tag, anders stopt de workflow.
-4. Geïnstalleerde extensies zien de nieuwe versie bij de volgende controle (uiterlijk na 6 uur, of direct via "Controleer op updates" in het menu).
 
 ## Goed om te weten
 

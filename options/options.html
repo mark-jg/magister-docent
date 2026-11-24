@@ -179,7 +179,7 @@
   <section class="mod" id="hoofdmenu" data-blad="modules">
     <div class="modkop"><button type="button" class="modnaam" aria-expanded="false" aria-controls="hoofdmenu-inhoud"><span>Hoofdmenu aanpassen</span><small>Menu-items rangschikken of verbergen</small></button><label class="switch"><input type="checkbox" data-path="hoofdmenu.enabled"><span></span></label></div>
     <div class="inhoud" id="hoofdmenu-inhoud" hidden>
-    <p>Onderaan Magisters hoofdmenu staat "Menu aanpassen". Daarmee krijgt elk item pijltjes om het hoger of lager te zetten en een knop om het te verbergen. Verborgen items staan onder het uitklapbare item "Meer" en zijn daar weer zichtbaar te maken. Het geldt ook voor Opleidingen en de Te laat-balie. Zet je deze module uit, dan staat het menu weer zoals Magister het geeft; je keuze blijft bewaard.</p>
+    <p>Onderaan Magisters hoofdmenu staat "Menu aanpassen". Daarmee krijgt elk item pijltjes om het hoger of lager te zetten en een knop om het te verbergen. Verborgen items staan onder het uitklapbare item "Meer" en zijn daar weer zichtbaar te maken. Het geldt ook voor Opleidingen. Zet je deze module uit, dan staat het menu weer zoals Magister het geeft; je keuze blijft bewaard.</p>
     </div>
   </section>
   <section class="mod" id="jarig" data-blad="modules">
@@ -189,35 +189,6 @@
     <label class="row">Vooruitkijken
       <select data-path="jarig.dagen"><option value="7">1 week</option><option value="14">2 weken</option><option value="30">1 maand</option></select>
     </label>
-    </div>
-  </section>
-  <h3 class="groep" data-blad="modules">Begeleiding</h3>
-  <section class="mod" id="pva" data-blad="modules">
-    <div class="modkop"><button type="button" class="modnaam" aria-expanded="false" aria-controls="pva-inhoud"><span>Plan van aanpak</span><small>Plan van aanpak bij Begeleiding van een student</small></button><label class="switch"><input type="checkbox" data-path="pva.enabled"><span></span></label></div>
-    <div class="inhoud" id="pva-inhoud" hidden>
-    <p>Knop "Plan van aanpak" bij Begeleiding › Logboek van een student: een plan opstellen met profielen en Word-sjablonen, en het als notitie met bijlage of als afspraak in Magister klaarzetten. Concepten blijven in deze browser.</p>
-    </div>
-  </section>
-  <section class="mod" id="melding" data-blad="modules">
-    <div class="modkop"><button type="button" class="modnaam" aria-expanded="false" aria-controls="melding-inhoud"><span>Mail bij Melding Expertisecentrum</span><small>Concept-mail naar de begeleidingscoach</small></button><label class="switch"><input type="checkbox" data-path="melding.enabled"><span></span></label></div>
-    <div class="inhoud" id="melding-inhoud" hidden>
-    <p>Bij een nieuwe melding (knop naast "Volgende") of bij een bestaande melding in het logboek (✉ in de knoppenbalk) opent een controlescherm en daarna een concept-mail in Outlook met naam, studentnummer, klas, "aangemeld voor" en de samenvatting. Er wordt niets automatisch verzonden. Sneltoets <kbd>Alt</kbd>+<kbd>M</kbd>.</p>
-    <p>Begeleidingscoaches: in het controlescherm kies je uit deze lijst aan wie de mail gaat. De naam wordt gebruikt voor de aanhef.</p>
-    <div class="links" id="coaches"></div>
-    <button id="addCoach">Coach toevoegen</button>
-    <label class="row" style="margin-top:14px">Cc (optioneel) <input type="text" data-path="melding.cc" placeholder="collega@school.nl"></label>
-    <label class="row">Je eigen naam onder de mail <input type="text" data-path="melding.afzender" placeholder="Mark"></label>
-    <label class="row"><label class="switch"><input type="checkbox" data-path="melding.extra"><span></span></label> Ook problematiek, hulp binnen/buiten school en "ouders op de hoogte" meesturen</label>
-    </div>
-  </section>
-  <section class="mod" id="cb" data-blad="modules">
-    <div class="modkop"><button type="button" class="modnaam" aria-expanded="false" aria-controls="cb-inhoud"><span>Community builder: Te laat-balie</span><small>Tardy in Magister, voor de community builder</small></button><label class="switch"><input type="checkbox" data-path="cb.enabled"><span></span></label></div>
-    <div class="inhoud" id="cb-inhoud" hidden>
-    <p>Voor de community builder (CB'er): de functies van Tardy in Magister. Item "Te laat-balie" in het hoofdmenu en tegel op Aanwezigheid: melden met naam, stamnummer of gescande pas, de reden erbij, het gevolg volgens het verzuimprotocol, te-laat-briefjes (gewone printer of het Bluetooth-bonprintertje), meldafspraken met mails en signalen per trede van de ladder. Werkt in dezelfde gedeelde map als de Tardy-app (OneDrive of Teams), om de beurt. Er wordt niets in Magister geschreven: de balie zegt wat je in Magister zet en opent de verzuimpagina.</p>
-    <label class="row">Naam <input type="text" data-path="cb.naam"></label>
-    <label class="row">Paraaf <input type="text" data-path="cb.paraaf"></label>
-    <label class="row">E-mail <input type="email" data-path="cb.email"></label>
-    <label class="row">Lokaal <input type="text" data-path="cb.lokaal"></label>
     </div>
   </section>
   <h3 class="groep" data-blad="modules">Gereedschap</h3>
@@ -261,27 +232,14 @@
     <button id="addLink">Link toevoegen</button>
     </div>
   </section>
-  <section class="mod" id="updates" data-blad="meer">
-    <div class="modkop"><button type="button" class="modnaam" aria-expanded="false" aria-controls="updates-inhoud"><span>Updates</span><small>Nieuwe versies ophalen en bijwerken</small></button><label class="switch"><input type="checkbox" data-path="updates.check"><span></span></label></div>
-    <div class="inhoud" id="updates-inhoud" hidden>
-    <p>Controleert om de 6 uur bij GitHub of er een nieuwere versie is (<a href="https://github.com/mark-jg/magister-docent/releases" target="_blank" rel="noopener">mark-jg/magister-docent</a>, openbaar; geen token nodig). Er wordt alleen het versienummer en de downloadlink opgehaald; er gaat niets over jou of je Magister-omgeving mee. Bij een nieuwe versie krijgt het extensie-icoon een gele badge en staat in het bedieningspaneel de knop "Nu bijwerken".</p>
-    <p><strong>Zelf bijwerken.</strong> Kies één keer de map waarin je de extensie hebt uitgepakt (de map met <code>manifest.json</code>). Daarna haalt de extensie bij "Nu bijwerken" de nieuwe versie op, schrijft de bestanden in die map en herlaadt zichzelf. Chrome vraagt bij elke update met één klik om toestemming voor de map. Er wordt niets verwijderd.</p>
-    <label class="row"><button id="pickFolder">Extensiemap kiezen</button> <span id="folderName" style="color:var(--muted);font-size:14px"></span> <button id="forgetFolder" hidden>Vergeten</button></label>
-    <label class="row"><button id="doUpdate" class="primary" disabled>Nu bijwerken</button> <a href="#" id="manualZip" style="font-size:13px;color:var(--muted)">Handmatig: zip downloaden</a></label>
-    <p id="updateProgress" style="min-height:1.4em"></p>
-    <label class="row"><button id="checkUpdate">Nu controleren</button> <span id="updateStatus" style="color:var(--muted);font-size:14px"></span></label>
-    </div>
-  </section>
   <section class="mod" id="developer" data-blad="meer">
-    <div class="modkop"><button type="button" class="modnaam" aria-expanded="false" aria-controls="developer-inhoud"><span>Ontwikkelaar</span><small>Inspector, eigen aanvullingen, GitHub-token</small></button><label class="switch"><input type="checkbox" data-path="developer.enabled"><span></span></label></div>
+    <div class="modkop"><button type="button" class="modnaam" aria-expanded="false" aria-controls="developer-inhoud"><span>Ontwikkelaar</span><small>Inspector en eigen aanvullingen</small></button><label class="switch"><input type="checkbox" data-path="developer.enabled"><span></span></label></div>
     <div class="inhoud" id="developer-inhoud" hidden>
     <p>Hulpmiddelen om de extensie op een Magister-omgeving af te stemmen. Uit voor dagelijks gebruik; aan voor wie meebouwt.</p>
     <div class="dev-only">
       <p><strong>Inspector</strong> (<kbd>Alt</kbd>+<kbd>I</kbd>): beweeg over een element en klik om de selector te kopiëren; <kbd>H</kbd> verbergt het (Opgeruimde interface), <kbd>C</kbd> laat het meekleuren met het thema, <kbd>R</kbd> maakt een paginarapport zonder persoonsgegevens, <kbd>N</kbd> een netwerkrapport. De Inspector staat ook in het bedieningspaneel en het commandopalet.</p>
       <p>Eigen aanvullingen op het thema: elementen die je via de Inspector liet meekleuren. Eén per regel als <code>rol | selector</code>, rol is achtergrond, vlak, accent of tekst. Regel weghalen = ongedaan maken.</p>
       <textarea id="extraList" placeholder="vlak | div.container > header"></textarea>
-      <p style="margin-top:12px">GitHub-token (optioneel): alleen nodig als GitHub de anonieme updatecontrole beperkt (60 aanroepen per uur per adres). Een <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">fine-grained token</a> met <strong>Contents: Read-only</strong> volstaat. Het token blijft op dit apparaat en gaat alleen naar api.github.com.</p>
-      <label class="row">GitHub-token <input type="password" id="ghToken" placeholder="github_pat_…" autocomplete="off" spellcheck="false" style="min-width:320px;font-family:ui-monospace,Consolas,monospace"> <button id="ghTokenClear">Wissen</button></label>
     </div>
     </div>
   </section>
@@ -293,6 +251,5 @@
 <div class="status" id="status">Opgeslagen</div>
 <script src="../content/defaults.js"></script>
 <script src="options.js"></script>
-<script src="updater.js"></script>
 </body>
 </html>

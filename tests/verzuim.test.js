@@ -1,5 +1,5 @@
 /* De aanwezigheidsberekening (vzStats in content/modules/verzuiminzicht.js). Inzicht, Lesregistraties, de
- * ranglijst, de Excel-exports en de Te laat-balie rekenen er allemaal mee. */
+ * ranglijst, de Excel-exports rekenen er allemaal mee. */
 const { test } = require("node:test"), assert = require("node:assert");
 const { laad, metRegister } = require("./hulp");
 

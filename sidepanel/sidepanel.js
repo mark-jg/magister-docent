@@ -22,7 +22,7 @@ const DtKolom = {
     } catch { this.meld("herladen", true); return null; }
   },
 
-  /* Een sneltoets-opdracht (export, mail-coach, inspector) naar alle frames van het tabblad: de melding of de
+  /* Een sneltoets-opdracht (export, inspector) naar alle frames van het tabblad: de melding of de
    * tabel kan in een iframe staan. */
   async opdracht(command) {
     const tab = await this.tab();
@@ -86,17 +86,12 @@ const DtKolom = {
     document.body.style.setProperty("--dt-panel-bg", p.bg); document.body.style.setProperty("--dt-card", p.surface);
   },
 
-  /* Meldingen bovenaan: een nieuwe versie, of net bijgewerkt. */
+  /* Versie onderaan, en bovenaan een melding als de extensie net is bijgewerkt (via de Chrome Web Store). */
   async versie() {
     const versie = chrome.runtime.getManifest().version;
-    const { update, dev, justUpdated } = await chrome.storage.local.get(["update", "dev", "justUpdated"]);
+    const { dev, justUpdated } = await chrome.storage.local.get(["dev", "justUpdated"]);
     document.getElementById("versie").textContent = `v${versie}${dev ? " · dev" : ""}`;
-    document.getElementById("versieVoet").textContent = dev ? "Ontwikkelversie: bijwerken met git" : update?.available ? `Versie ${update.latest} beschikbaar` : update?.error ? "Updatecontrole mislukt" : `Je hebt de nieuwste versie (${versie})`;
-    this.meld("update", !!update?.available);
-    if (update?.available) {
-      document.getElementById("updTitel").textContent = `Versie ${update.latest} beschikbaar`;
-      document.getElementById("updTekst").textContent = `Je gebruikt nu ${versie}.`;
-    }
+    document.getElementById("versieVoet").textContent = dev ? "Ontwikkelversie: bijwerken met git" : `Versie ${versie}`;
     if (justUpdated) {
       if (justUpdated.to === versie) { document.getElementById("bijgewerktTekst").textContent = `Bijgewerkt van ${justUpdated.from} naar ${justUpdated.to}.`; this.meld("bijgewerkt", true); }
       chrome.storage.local.remove("justUpdated");

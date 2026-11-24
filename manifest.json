@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Docent Tools voor Magister",
   "version": "0.68.2",
-  "description": "Verbeteringen voor Magister (docenten/personeel): thema, zijkolom, tabelexport naar Excel, snelle invoer, AI-hulp en een concept-mail naar de begeleidingscoach bij een Melding Expertisecentrum. Draait volledig lokaal.",
+  "description": "Extra functies voor docenten in Magister: thema’s, zijkolom, tabellen naar Excel, sneller invoeren en aanwezigheidsoverzichten.",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -12,7 +12,6 @@
   "permissions": [
     "storage",
     "clipboardWrite",
-    "alarms",
     "sidePanel"
   ],
   "minimum_chrome_version": "116",
@@ -20,10 +19,7 @@
     "default_path": "sidepanel/sidepanel.html"
   },
   "host_permissions": [
-    "*://*.magister.net/*",
-    "https://api.github.com/*",
-    "https://*.githubusercontent.com/*",
-    "https://github.com/*"
+    "*://*.magister.net/*"
   ],
   "action": {
     "default_title": "Docent Tools voor Magister",
@@ -56,7 +52,6 @@
         "content/modules/navigation.js",
         "content/modules/aanwezigheid.js",
         "content/modules/ai.js",
-        "content/modules/melding.js",
         "content/modules/inspector.js",
         "content/modules/jarig.js",
         "content/modules/leerlingdash.js",
@@ -72,22 +67,6 @@
         "content/modules/opleidingen-gegevens.js",
         "content/modules/hoofdmenu.js",
         "content/modules/lestools.js",
-        "content/modules/pva-docx.js",
-        "content/modules/magisterforms.js",
-        "content/modules/pva.js",
-        "content/modules/cb-kern.js",
-        "content/modules/cb.js",
-        "content/modules/cb-opslag.js",
-        "content/modules/cb-pagina.js",
-        "content/modules/cb-melden.js",
-        "content/modules/cb-afspraken.js",
-        "content/modules/cb-signalen.js",
-        "content/modules/cb-magister.js",
-        "content/modules/cb-acties.js",
-        "content/modules/cb-protocol.js",
-        "content/modules/cb-teksten.js",
-        "content/modules/cb-css.js",
-        "content/modules/cb-start.js",
         "content/kolom.js",
         "content/boot.js"
       ],
@@ -110,12 +89,6 @@
       "world": "MAIN"
     }
   ],
-  "web_accessible_resources": [
-    {
-      "resources": ["assets/pva/*.docx"],
-      "matches": ["*://*.magister.net/*"]
-    }
-  ],
   "commands": {
     "toggle-panel": {
       "suggested_key": {
@@ -128,12 +101,6 @@
         "default": "Alt+T"
       },
       "description": "Donker/licht thema wisselen"
-    },
-    "mail-coach": {
-      "suggested_key": {
-        "default": "Alt+M"
-      },
-      "description": "Concept-mail naar begeleidingscoach (bij een Melding Expertisecentrum)"
     }
   },
   "background": {

@@ -2,7 +2,7 @@
  *
  * Verborgen items verdwijnen niet: ze staan onder een uitklapbaar item "Meer". Onderaan het menu staat "Menu
  * aanpassen"; daarmee krijgt elk item pijltjes (omhoog, omlaag) en een oogje (verbergen of tonen). Het geldt ook
- * voor de items die Docent Tools zelf toevoegt (Opleidingen, Te laat-balie).
+ * voor de items die Docent Tools zelf toevoegt (zoals Opleidingen).
  *
  * De items zelf blijven op hun plek in de pagina staan: Magister beheert die lijst. De volgorde komt uit de
  * CSS-eigenschap order en verbergen uit een klasse, zodat Magister er niets van merkt en alles terug is zodra de

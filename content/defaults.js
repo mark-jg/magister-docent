@@ -13,7 +13,6 @@ globalThis.DT_DEFAULTS = {
   aanwezigheid: { enabled: true },
   inspector: { enabled: true },
   developer: { enabled: false },
-  updates: { check: true },
   jarig: { enabled: true, dagen: 14 },
   leerlingdash: { enabled: true },
   verzuiminzicht: { enabled: true },
@@ -29,14 +28,8 @@ globalThis.DT_DEFAULTS = {
   /* volgorde en verborgen: de namen van de menu-items (hun tekst in kleine letters), gezet met "Menu aanpassen". */
   hoofdmenu: { enabled: true, volgorde: [], verborgen: [] },
   lestools: { enabled: true },
-  /* Plan van aanpak bij Begeleiding › Logboek van een student (SLB). Concepten blijven in deze browser. */
-  pva: { enabled: true },
-  /* Community builder: Te laat-balie (Tardy in Magister). Persoonlijke gegevens blijven in de extensie. */
-  cb: { enabled: false, naam: "", paraaf: "", email: "", lokaal: "", zwarting: 3, autoPrint: false, printer: null },
-  melding: { enabled: true, coaches: [], to: "", cc: "", name: "", extra: true, afzender: "" },
   links: [
-    { label: "Magister Web", url: "https://accounts.magister.net" },
-    { label: "Mediacollege Amsterdam", url: "https://www.ma-web.nl" }
+    { label: "Magister Web", url: "https://accounts.magister.net" }
   ]
 };
 
@@ -92,13 +85,10 @@ globalThis.DT_MODULES_LIST = [
   ["periodes", "Periodes", "Eigen periodes in verzuimoverzichten", "#5856D6"],
   ["aanwezigexport", "Aanwezigheid naar Excel", "Per leerling en per klas", "#34C759"],
   ["lesreg", "Lesregistraties", "Klassen per vak of docent", "#30B0C7"],
-  ["pva", "Plan van aanpak", "Bij Begeleiding van een student", "#FF9500"],
-  ["melding", "Mail bij melding", "Concept naar de coach", "#FF3B30"],
   ["ai", "AI-hulp", "Prompt uit tabel of selectie", "#A2845E"],
   ["opleidingen", "Opleidingen", "Inschrijvingen en aanwezigheid per opleiding", "#5856D6"],
   ["hoofdmenu", "Hoofdmenu aanpassen", "Menu-items rangschikken of verbergen", "#8E8E93"],
   ["leaderboard", "Leaderboard", "Meest aanwezig per week", "#FF9500"],
   ["lestools", "Hulpmiddelen in de les", "Stille safari, kaartenpakje, lesbord", "#30B0C7"],
-  ["cb", "Te laat-balie", "Tardy in Magister", "#FF3B30"],
   ["panel", "Handvat", "Opent de zijkolom (Alt+D)", "#636366"]
 ];

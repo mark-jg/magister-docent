@@ -95,7 +95,7 @@ function appleTokens(t) {
     dna-button-bar { --gap-h: .5rem !important; }
     dna-tab-bar { background: ${t.gray6} !important; border-radius: 9px !important; padding: 2px !important; --padding-inline: 0 !important; --indicator-size: 0 !important; --border-width: 0 !important; --border: 0 !important; }
     /* Alleen het oude dna-tab (de knop). In het nieuwe dna-tabs is dna-tab[slot="tab"] het paneel met de inhoud:
-     * dat kreeg hier een schaduw en een vlak, wat een extra kader om de hele pagina gaf (Te laat-balie). */
+     * dat kreeg hier een schaduw en een vlak, wat een extra kader om de hele pagina gaf. */
     dna-tab:not([slot="tab"]) { --border-radius: 7px !important; --padding: .3rem .875rem !important; --active: ${t.hover} !important; --color: ${t.fg} !important; --spacing: .25rem !important; font-weight: 500; }
     dna-tab[selected]:not([slot="tab"]) { --background: ${t.surface} !important; --color: ${t.fg} !important; box-shadow: 0 1px 3px rgba(0,0,0,.14), 0 0 0 .5px rgba(0,0,0,.04) !important; font-weight: 600; }
     dna-select, dna-input, dna-list-box, dna-datepicker, dna-textarea { --border-radius: 8px !important; --box-shadow: ${t.pop} !important; --highlight: ${t.accent} !important; }
@@ -815,7 +815,7 @@ function leerlingkaartCss(t) {
     dk-basisgegevens-page dna-page-header { background: transparent !important; margin: .25rem 1.5rem .5rem !important; --padding-block: .25rem !important; --_padding-block: .25rem !important; }
     dk-basisgegevens-page dna-page-header dna-button { margin-right: 0 !important; }
     dk-basisgegevens-page dna-tab-bar, :is(#dt-cbp, #dt-lrp) dna-tab-bar { background: transparent !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 1.5rem .5rem !important; --padding-inline: 0 !important; --_padding-inline: 0 !important; --margin: 0 !important; --_margin: 0 !important; --indicator-size: 0 !important; --_indicator-size: 0 !important; --spacing: .375rem !important; --_spacing: .375rem !important; --gap: .375rem !important; --_gap: .375rem !important; --border-width: 0 !important; --_border-width: 0 !important; --border: 0 !important; --_border: 0 !important; }
-    /* Eigen pagina's (Te laat-balie, Lesregistraties): tabbalk op dezelfde 2rem als de kop, panelen zonder eigen vlak */
+    /* Eigen pagina's (Lesregistraties, Leaderboard): tabbalk op dezelfde 2rem als de kop, panelen zonder eigen vlak */
     :is(#dt-cbp, #dt-lrp) dna-tab-bar { padding: 0 2rem .5rem !important; }
     :is(#dt-cbp, #dt-lrp) dna-tab[slot="tab"] { background: transparent !important; box-shadow: none !important; border-radius: 0 !important; --background: transparent !important; }
     dna-tab-button { --border-radius: 999px !important; --_border-radius: 999px !important; --padding: .375rem .875rem !important; --_padding: .375rem .875rem !important; --background: transparent !important; --_background: transparent !important; --active: ${t.tint} !important; --_active: ${t.tint} !important; --color: ${t.muted} !important; --_color: ${t.muted} !important; --indicator-size: 0 !important; --_indicator-size: 0 !important; --border-width: 0 !important; --_border-width: 0 !important; --border: 0 !important; --_border: 0 !important; --width: auto !important; --_width: auto !important; --margin: 0 !important; --_margin: 0 !important; font: 500 .875rem/1.25 ${t.font} !important; letter-spacing: -.005em; }

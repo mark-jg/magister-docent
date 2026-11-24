@@ -179,7 +179,7 @@ test("routes voor eigen pagina's: de route staat achter Magisters adres, en Teru
   assert.strictEqual(b.stappen.length, 2, "dezelfde route geeft geen dubbele stap");
   DT.route.zet("opleidingen", { tab: "overzicht", zoom: "k:MIP1A" });
   assert.strictEqual(b.extra.location.hash, "#/vandaag?dt=opleidingen&dt.tab=overzicht&dt.zoom=k:MIP1A");
-  assert.strictEqual(DT.route.pad(), "#/vandaag"); assert.strictEqual(DT.route.nu("opleidingen").zoom, "k:MIP1A"); assert.strictEqual(DT.route.nu("cb"), null);
+  assert.strictEqual(DT.route.pad(), "#/vandaag"); assert.strictEqual(DT.route.nu("opleidingen").zoom, "k:MIP1A"); assert.strictEqual(DT.route.nu("lesreg"), null);
   b.ga(-1); b.ga(-1); b.ga(1);
   assert.deepStrictEqual(gezien, ["overzicht", "overzicht", null, null, "overzicht", "overzicht"], "elke stap meldt zich via popstate en hashchange");
   DT.route.zet("opleidingen", { tab: "verloop" }, true);
@@ -199,9 +199,9 @@ test("routes: Magisters eigen toevoegingen blijven staan, en zonder adres werkt 
   assert.strictEqual(b.extra.location.hash, "#/begeleiding/123?innerUrl=abc");
   /* Magister haalde de toevoeging weg: voor deze sessie alleen nog via de geschiedenis. */
   b.opslag["dt-route-adres"] = "uit";
-  DT.route.zet("cb", { view: "signalen" });
+  DT.route.zet("lesreg", { view: "signalen" });
   assert.strictEqual(b.extra.location.hash, "#/begeleiding/123?innerUrl=abc", "het adres blijft staan");
-  assert.strictEqual(DT.route.nu("cb").view, "signalen"); assert.strictEqual(b.stappen.length, 4);
+  assert.strictEqual(DT.route.nu("lesreg").view, "signalen"); assert.strictEqual(b.stappen.length, 4);
 });
 
 test("tempo: aanvragen starten met tussenpozen, en na een 429 houdt alles in en gaat het daarna rustiger", async (t) => {

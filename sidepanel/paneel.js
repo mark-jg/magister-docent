@@ -1,6 +1,6 @@
 /* De eigen inhoud van de zijkolom: acties, de tabellen van de pagina, notities en links (Start), het thema
  * (Uiterlijk) en de periodes (Meer). Draait in de zijkolom van de browser (sidepanel.html), niet meer in de Magister-pagina zelf: alles
- * wat de pagina nodig heeft (tabellen, exports, de Te laat-balie openen) gaat als bericht naar het Magister-tabblad
+ * wat de pagina nodig heeft (tabellen, exports, een eigen pagina openen) gaat als bericht naar het Magister-tabblad
  * via DtKolom (sidepanel.js) en wordt daar afgehandeld door content/kolom.js. */
 DT.register({
   id: "panel",
@@ -161,11 +161,9 @@ DT.register({
             DT.saveSettings({ theme: { mode: document.documentElement.classList.contains("dt-dark") ? "light" : "dark" } });
           }],
           ["export", "Excel", "Alt+E", () => DtKolom.opdracht("export")],
-          ["mail", "Mail coach", "Alt+M", () => DtKolom.opdracht("mail-coach")],
           ...(DT.settings.aanwezigexport?.enabled !== false ? [["aanwezigexport", "Klas → Excel", "", pagina("klasExcel")]] : []),
           ...(DT.settings.lesreg?.enabled !== false ? [["aanwezigexport", "Lesregistraties", "", pagina("lesreg")]] : []),
           ...(DT.settings.aanwezigexport?.enabled !== false ? [["aanwezigexport", "Bespreeklijst", "", pagina("bespreeklijst")]] : []),
-          ...(DT.settings.cb?.enabled ? [["cb", "Te laat-balie", "", pagina("cb")]] : []),
           ...(DT.settings.developer?.enabled ? [["inspector", "Inspector", "Alt+I", () => DtKolom.opdracht("inspector")]] : []),
           ["options", "Modules", "", () => DtKolom.toon("modules")]
         ];

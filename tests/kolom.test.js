@@ -2,7 +2,7 @@
 const { test } = require("node:test"), assert = require("node:assert");
 const { laad, kaal } = require("./hulp");
 
-function pagina({ modulesAan = { tables: true, cb: true }, isTop = true } = {}) {
+function pagina({ modulesAan = { tables: true, lesreg: true }, isTop = true } = {}) {
   const gedaan = [], toasts = [], luisteraars = [];
   const tabel = (naam, rijen) => ({ naam, rijen, isConnected: true, scrollIntoView: () => gedaan.push(`toon ${naam}`) });
   const tables = { _tables: [tabel("Cijfers", 12), tabel("Aanwezigheid", 30)], scan: () => gedaan.push("scan"), name: (t) => t.naam,
@@ -36,17 +36,17 @@ test("tabel die intussen van de pagina is verdwenen: een duidelijke melding, gee
 });
 
 test("module uit: geen tabellen, en een actie van een uitgeschakeld onderdeel wordt geweigerd", () => {
-  const p = pagina({ modulesAan: { tables: false, cb: false } });
+  const p = pagina({ modulesAan: { tables: false, lesreg: false } });
   assert.deepStrictEqual(p.vraag({ vraag: "tabellen" }), { ok: true, uit: true, tabellen: [] });
-  assert.strictEqual(p.vraag({ vraag: "actie", naam: "cb" }).ok, false);
+  assert.strictEqual(p.vraag({ vraag: "actie", naam: "lesreg" }).ok, false);
   assert.deepStrictEqual(p.gedaan, []);
 });
 
-test("acties: de Te laat-balie openen; een onbekende actie doet niets", () => {
+test("acties: Lesregistraties openen; een onbekende actie doet niets", () => {
   const p = pagina();
-  assert.deepStrictEqual(p.vraag({ vraag: "actie", naam: "cb" }), { ok: true });
+  assert.deepStrictEqual(p.vraag({ vraag: "actie", naam: "lesreg" }), { ok: true });
   assert.strictEqual(p.vraag({ vraag: "actie", naam: "wis-alles" }).ok, false);
-  assert.deepStrictEqual(p.gedaan, ["open cb"]);
+  assert.deepStrictEqual(p.gedaan, ["open lesreg"]);
 });
 
 test("paginatekst: de tekst van de pagina, zonder stapels lege regels", () => {

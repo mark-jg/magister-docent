@@ -31,7 +31,6 @@ DT.register({
       if (msg.command === "toggle-theme") { if (DT.isTop) DT.module("theme")?.toggle(DT); return; }
       if (msg.command === "export") DT.module("tables")?.exportAll(DT);
       if (msg.command === "inspector") DT.module("inspector")?.start(DT);
-      if (msg.command === "mail-coach") DT.module("melding")?.trigger(DT);
     };
     chrome.runtime.onMessage.addListener(this._msg);
   },

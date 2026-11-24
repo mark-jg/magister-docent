@@ -73,7 +73,7 @@
         console.warn("[DT] instellingen bewaren mislukt", e);
         const m = String(e?.message || e);
         try {
-          DT.toast(/QUOTA_BYTES/i.test(m) ? "Instellingen niet bewaard: er staat te veel in (bijvoorbeeld veel links, coaches, periodes of verborgen elementen). Ruim iets op bij Instellingen."
+          DT.toast(/QUOTA_BYTES/i.test(m) ? "Instellingen niet bewaard: er staat te veel in (bijvoorbeeld veel links, periodes of verborgen elementen). Ruim iets op bij Instellingen."
             : /context invalidated/i.test(m) ? "Instellingen niet bewaard: de extensie is bijgewerkt. Herlaad dit tabblad."
             : /MAX_WRITE/i.test(m) ? "Instellingen niet bewaard: te veel wijzigingen kort na elkaar. Probeer het over een minuut opnieuw."
             : `Instellingen niet bewaard: ${m}`, "err", 8000);
@@ -253,7 +253,7 @@
     },
     deepQuery(selector, root = document) { return DT.deepQueryAll(selector, root)[0] || null; },
 
-    /* Routes voor de eigen pagina's (Opleidingen, Te laat-balie, Leaderboard, …), zodat Terug en Vooruit in de
+    /* Routes voor de eigen pagina's (Opleidingen, Leaderboard, Lesregistraties, …), zodat Terug en Vooruit in de
      * browser ermee werken en de adresbalk laat zien waar je bent. Magister kent die pagina's niet en zou bij een
      * eigen adres terugspringen naar zijn startpagina. De route staat daarom als toevoeging achter Magisters eigen
      * adres, zoals Magister dat zelf ook doet (#/begeleiding/…?innerUrl=…):

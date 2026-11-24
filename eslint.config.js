@@ -8,13 +8,9 @@ const globals = require("globals");
 const GEDEELD = {
   DT: "writable", DT_DEFAULTS: "writable", DT_PRESETS_LIST: "writable", DT_MODULES_LIST: "writable", DT_ICONS: "readonly",
   XLSX: "readonly",                       // lib/xlsx.full.min.js
-  TardyKern: "writable",                  // modules/cb-kern.js
   LesOpslag: "writable",                  // modules/lesopslag.js
   OplReken: "writable",                   // modules/opleidingen-reken.js
   MenuReken: "writable",                  // modules/hoofdmenu.js
-  DtCb: "writable",                       // modules/cb.js, aangevuld door modules/cb-*.js
-  DTForms: "writable",                    // modules/magisterforms.js
-  PvaDocx: "writable",                    // modules/pva-docx.js
   XlsxVisueel: "writable",                // modules/xlsx-visueel.js
   vzStats: "writable", vzLosseLessen: "writable", vzBron: "writable", docentenVan: "writable", isoWeek: "writable",   // modules/verzuiminzicht.js
   openLeerling: "writable", klasOf: "writable", jarigList: "writable", jarigCardHtml: "writable",   // modules/jarig.js
@@ -22,7 +18,6 @@ const GEDEELD = {
   DtKolom: "writable",                    // sidepanel/sidepanel.js
   DT_KOLOM_ANTWOORD: "writable",          // content/kolom.js
   setValue: "writable",                   // modules/quickinput.js
-  dtUnzip: "writable",                    // options/updater.js
 };
 
 /* Een module die over meerdere bestanden is verdeeld deelt haar namen op het hoogste niveau: die worden hier uit
@@ -38,7 +33,7 @@ function namenUit(...bestanden) {
 const THEMA = ["content/modules/theme-kleur.js", "content/modules/theme-pagina.js", "content/modules/theme-apple.js", "content/modules/theme-themas.js", "content/modules/theme-magisterkleuren.js"];
 
 module.exports = [
-  { ignores: ["lib/**", "node_modules/**", "dist/**", "content/modules/cb-kern.js"] },   // cb-kern.js wordt gegenereerd (scripts/tardy-kern.py)
+  { ignores: ["lib/**", "node_modules/**", "dist/**"] },
   {
     files: ["content/**/*.js", "options/**/*.js", "sidepanel/**/*.js", "background.js"],
     languageOptions: {

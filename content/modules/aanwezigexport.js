@@ -249,8 +249,7 @@ DT.register({
 
   /* ================= Bespreeklijst voor het teamoverleg =================
    * Klas kiezen (uit Magister), periode en norm; per student aanwezigheid (%, gemist, ziek, ongeoorloofd, te
-   * laat) en de plannen van aanpak uit deze browser (open plan, eerstvolgende of verlopen evaluatie). Gesorteerd
-   * op aanwezigheid, onder de norm gemarkeerd; naar Excel te exporteren. */
+   * laat). Gesorteerd op aanwezigheid, onder de norm gemarkeerd; naar Excel te exporteren. */
   async bespreeklijst(DT) {
     if (this._dlg) return;
     const peil = this.ymd(new Date());
@@ -288,15 +287,12 @@ DT.register({
         const z = await api(`/api/leerlingen/zoeken?q=**&top=300&skip=0&peildatum=${peil}&klassen=${encodeURIComponent(klasSel.value)}&velden=stamnummer&velden=naam`);
         const lln = (lijst(z) || []).map((x) => ({ id: x.id, naam: this.naam(x), achternaam: x.achternaam || "", stam: String(x.code ?? x.stamnummer ?? "") }))
           .sort((a, b) => a.achternaam.localeCompare(b.achternaam, "nl"));
-        const opslag = await chrome.storage.local.get(null);
         const rijen = [], werk = lln.slice(); let klaar = 0;
         const doe = async () => {
           while (werk.length && !afbreken) {
             const l = werk.shift();
             const { regs, rooster } = await vzBron.haal(l.id, per.van, per.tot, { api, pauze: 120, los: 0, vers: true }), T = regs && rooster ? vzStats(regs, rooster, per.van, per.tot).totaal : null;
-            const plannen = Array.isArray(opslag[`pva:${l.id}`]) ? opslag[`pva:${l.id}`] : [];
-            const open = plannen.map((p) => ({ p, e: (p.evaluaties || []).find((x) => x.datum && !x.op && !x.doelen) })).filter((x) => x.e).sort((x, y) => x.e.datum.localeCompare(y.e.datum))[0];
-            rijen.push({ l, T, plannen: plannen.length, open });
+            rijen.push({ l, T });
             klaar++; balk.firstChild.style.width = `${Math.round(100 * klaar / lln.length)}%`; status.textContent = `Student ${klaar} van ${lln.length}`;
           }
         };
@@ -304,34 +300,33 @@ DT.register({
         if (afbreken) return;
         rijen.sort((x, y) => (x.T?.telt ? x.T.pct : 101) - (y.T?.telt ? y.T.pct : 101));
         data = { rijen, per, n, klas: klasSel.value };
-        const onder = rijen.filter((x) => x.T?.telt && x.T.pct < n).length, laat = rijen.filter((x) => x.open && x.open.e.datum < peil).length;
-        status.textContent = `${rijen.length} studenten · ${onder} onder ${n}% · ${laat} evaluatie${laat === 1 ? "" : "s"} verlopen`;
+        const onder = rijen.filter((x) => x.T?.telt && x.T.pct < n).length;
+        status.textContent = `${rijen.length} studenten · ${onder} onder ${n}%`;
         const td = (t, c = "") => DT.el("td", { class: c, text: t == null ? "" : String(t) });
         uitkomst.replaceChildren(DT.el("table", { class: "dt-bl-tabel" }, [
-          DT.el("thead", {}, DT.el("tr", {}, ["Student", "Aanwezig", "Lessen", "Gemist", "Ziek", "Ongeoorl.", "Te laat", "Plan van aanpak"].map((t) => DT.el("th", { text: t })))),
-          DT.el("tbody", {}, rijen.map(({ l, T, open, plannen }) => DT.el("tr", { class: T?.telt && T.pct < n ? (T.pct < n - 10 ? "is-rood" : "is-oranje") : "" }, [
+          DT.el("thead", {}, DT.el("tr", {}, ["Student", "Aanwezig", "Lessen", "Gemist", "Ziek", "Ongeoorl.", "Te laat"].map((t) => DT.el("th", { text: t })))),
+          DT.el("tbody", {}, rijen.map(({ l, T }) => DT.el("tr", { class: T?.telt && T.pct < n ? (T.pct < n - 10 ? "is-rood" : "is-oranje") : "" }, [
             td(l.naam), (() => { const c = DT.el("td", { class: "getal dt-bl-pct" }); if (!T?.telt) { c.textContent = "—"; return c; } const k = T.pct < 70 ? "#e5484d" : T.pct < 80 ? "#f5a524" : T.pct < 90 ? "#9bc53d" : "#2fa36b";
               c.append(DT.el("span", { class: "dt-bl-balk" }, DT.el("i", { style: `width:${T.pct}%;background:${k}` })), DT.el("b", { text: `${T.pct}%` })); return c; })(), td(T?.telt ?? "", "getal"), td(T?.afwezig ?? "", "getal"), td(T?.ziek ?? "", "getal"), td(T?.ongeoorloofd ?? "", "getal"), td(T?.teLaat ?? "", "getal"),
-            td(open ? `evaluatie ${open.e.datum < peil ? "verlopen" : ""} ${open.e.datum.split("-").reverse().join("-")}`.replace("  ", " ") : plannen ? `${plannen} plan${plannen === 1 ? "" : "nen"}, afgerond` : "", open && open.e.datum < peil ? "is-laat" : ""),
           ]))),
-        ]), DT.el("p", { class: "dt-xk-hint", text: `Oranje: onder ${n}%. Rood: meer dan 10 procentpunt onder de norm. Plannen van aanpak komen uit deze browser.` }));
+        ]), DT.el("p", { class: "dt-xk-hint", text: `Oranje: onder ${n}%. Rood: meer dan 10 procentpunt onder de norm.` }));
         excel.disabled = false;
       } catch (e) { status.textContent = `Er ging iets mis: ${e.message || e}`; }
       bezig = false; start.disabled = false;
     });
     excel.addEventListener("click", () => {
       if (!data) return;
-      const kop = ["Student", "Stamnummer", "Aanwezig %", "Lessen (tellen mee)", "Gemist", "Ziek", "Ongeoorloofd", "Te laat", "Onder norm", "Plannen van aanpak", "Eerstvolgende evaluatie"];
-      const rijen = data.rijen.map(({ l, T, open, plannen }) => [l.naam, l.stam, T?.telt ? this.pct(T.pct) : "", T?.telt ?? "", T?.afwezig ?? "", T?.ziek ?? "", T?.ongeoorloofd ?? "", T?.teLaat ?? "",
-        T?.telt && T.pct < data.n ? "ja" : "", plannen || "", open ? open.e.datum.split("-").reverse().join("-") : ""]);
+      const kop = ["Student", "Stamnummer", "Aanwezig %", "Lessen (tellen mee)", "Gemist", "Ziek", "Ongeoorloofd", "Te laat", "Onder norm"];
+      const rijen = data.rijen.map(({ l, T }) => [l.naam, l.stam, T?.telt ? this.pct(T.pct) : "", T?.telt ?? "", T?.afwezig ?? "", T?.ziek ?? "", T?.ongeoorloofd ?? "", T?.teLaat ?? "",
+        T?.telt && T.pct < data.n ? "ja" : ""]);
       const n = rijen.length + 1;
-      this.schrijf(DT, `Bespreeklijst ${data.klas} ${data.per.kort || data.per.naam}`, [["Bespreeklijst", this.blad([kop, ...rijen], [28, 11, 11, 12, 9, 8, 12, 8, 11, 12, 16])]],
+      this.schrijf(DT, `Bespreeklijst ${data.klas} ${data.per.kort || data.per.naam}`, [["Bespreeklijst", this.blad([kop, ...rijen], [28, 11, 11, 12, 9, 8, 12, 8, 11])]],
         { Bespreeklijst: { kleurschaal: [`C2:C${n}`], balken: [`E2:E${n}`, `G2:G${n}`], balkenBlauw: [`H2:H${n}`],
-          grafieken: [{ type: "bar", titel: `Aanwezig % · ${data.klas}`, cat: `A2:A${n}`, reeksen: [{ naam: "Aanwezig %", val: `C2:C${n}` }], pct: true, van: [12, 0], tot: [21, Math.max(18, Math.min(60, n + 4))] }] } });
+          grafieken: [{ type: "bar", titel: `Aanwezig % · ${data.klas}`, cat: `A2:A${n}`, reeksen: [{ naam: "Aanwezig %", val: `C2:C${n}` }], pct: true, van: [10, 0], tot: [19, Math.max(18, Math.min(60, n + 4))] }] } });
     });
     dlg.append(DT.el("div", { class: "dt-xk-card dt-bl-card" }, [
       DT.el("h2", { text: "Bespreeklijst voor het teamoverleg" }),
-      DT.el("p", { class: "dt-xk-sub", text: "Per student de aanwezigheid en de plannen van aanpak, gesorteerd van laag naar hoog." }),
+      DT.el("p", { class: "dt-xk-sub", text: "Per student de aanwezigheid, gesorteerd van laag naar hoog." }),
       DT.el("div", { class: "dt-row dt-bl-keuze" }, [
         DT.el("label", { class: "dt-xk-field" }, [DT.el("span", { text: "Klas" }), klasSel]),
         DT.el("label", { class: "dt-xk-field" }, [DT.el("span", { text: "Periode" }), perSel]),
@@ -352,7 +347,7 @@ DT.register({
       .dt-bl-tabel td { padding: 5px 8px; border-bottom: 1px solid rgba(128,128,128,.15); } .dt-bl-tabel td.getal { text-align: right; font-variant-numeric: tabular-nums; }
       .dt-bl-tabel tr.is-oranje td:nth-child(2) { color: #ac5000; font-weight: 700; } .dt-bl-tabel tr.is-rood td:nth-child(2) { color: #c70e13; font-weight: 700; }
       .dt-bl-pct { white-space: nowrap; } .dt-bl-pct b { display: inline-block; min-width: 36px; } .dt-bl-balk { display: inline-block; width: 70px; height: 8px; margin-right: 6px; border-radius: 4px; background: rgba(128,128,128,.2); overflow: hidden; vertical-align: middle; } .dt-bl-balk i { display: block; height: 100%; }
-      .dt-bl-tabel td.is-laat { color: #c70e13; font-weight: 600; }`;
+`;
     document.head.append(st);
   },
 

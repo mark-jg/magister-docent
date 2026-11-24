@@ -11,10 +11,10 @@ function klap(sectie, open) {
   knop.setAttribute("aria-expanded", String(aan)); inhoud.hidden = !aan;
 }
 document.addEventListener("click", (e) => { const knop = e.target.closest?.(".modnaam"); if (knop) klap(knop.closest(".mod")); });
-/* Een link naar een onderdeel (options.html#updates) klapt het open en zet het in beeld. In de zijkolom hoort
+/* Een link naar een onderdeel (options.html#zijkolom) klapt het open en zet het in beeld. In de zijkolom hoort
  * het onderdeel bij een tabblad; dat wordt dan ook gekozen. */
 function naarAnker() {
-  const sectie = location.hash.length > 1 ? document.getElementById(location.hash.slice(1) === "update" ? "updates" : location.hash.slice(1)) : null;
+  const sectie = location.hash.length > 1 ? document.getElementById(location.hash.slice(1)) : null;
   if (!sectie) return;
   if (sectie.dataset.blad && document.documentElement.dataset.blad) document.documentElement.dataset.blad = sectie.dataset.blad;
   klap(sectie, true);
@@ -62,13 +62,6 @@ async function load() {
     else el.value = v ?? "";
   }
   renderLinks();
-  // Oude instelling (één adres + naam) overzetten naar de coachlijst.
-  settings.melding.coaches ||= [];
-  if (!settings.melding.coaches.length && settings.melding.to) {
-    settings.melding.coaches.push({ name: settings.melding.name || "", email: settings.melding.to });
-    save();
-  }
-  renderCoaches();
   syncDev();
   syncThema();
   const ex = document.getElementById("extraList");
@@ -93,20 +86,6 @@ function renderLinks() {
   });
 }
 
-function renderCoaches() {
-  const host = document.getElementById("coaches");
-  host.replaceChildren();
-  settings.melding.coaches.forEach((c, i) => {
-    const name = Object.assign(document.createElement("input"), { type: "text", value: c.name || "", placeholder: "Naam (voor de aanhef)" });
-    const email = Object.assign(document.createElement("input"), { type: "text", value: c.email || "", placeholder: "naam@school.nl" });
-    const del = Object.assign(document.createElement("button"), { textContent: "Verwijderen" });
-    name.oninput = () => { settings.melding.coaches[i].name = name.value; save(); };
-    email.oninput = () => { settings.melding.coaches[i].email = email.value.trim(); save(); };
-    del.onclick = () => { settings.melding.coaches.splice(i, 1); renderCoaches(); save(); };
-    host.append(name, email, del);
-  });
-}
-
 /* Bewaren met een korte vertraging: Chrome staat maar een beperkt aantal schrijfacties per minuut toe, en
  * bij elke toetsaanslag bewaren liep daar tegenaan. Een mislukte opslag blijft zichtbaar in de statusregel. */
 let t, saveTimer, wachtend = false;
@@ -127,7 +106,7 @@ async function saveNow() {
     s.classList.add("show"); t = setTimeout(() => s.classList.remove("show"), 1200);
   } catch (e) {
     const m = String(e?.message || e);
-    s.textContent = /QUOTA_BYTES/i.test(m) ? "Niet opgeslagen: de instellingen zijn te groot voor Chrome. Verwijder iets (links, coaches, periodes, verborgen elementen)."
+    s.textContent = /QUOTA_BYTES/i.test(m) ? "Niet opgeslagen: de instellingen zijn te groot voor Chrome. Verwijder iets (links, periodes, verborgen elementen)."
       : /MAX_WRITE/i.test(m) ? "Niet opgeslagen: te veel wijzigingen kort na elkaar. Wacht een minuut en wijzig nog iets."
       : `Niet opgeslagen: ${m}`;
     s.style.background = "#b3261e"; s.style.color = "#fff";
@@ -154,44 +133,12 @@ document.addEventListener("input", (e) => {
 });
 
 document.getElementById("addLink").onclick = () => { settings.links.push({ label: "", url: "" }); renderLinks(); };
-document.getElementById("addCoach").onclick = () => { settings.melding.coaches.push({ name: "", email: "" }); renderCoaches(); document.querySelector("#coaches input:last-of-type")?.focus(); };
 document.getElementById("reset").onclick = async () => {
   if (!confirm("Alle instellingen terugzetten naar standaard?")) return;
   settings = structuredClone(DEFAULTS); save(); await saveNow(); load();
 };
 
 document.getElementById("versionLine").textContent = `Versie ${chrome.runtime.getManifest().version}`;
-function showUpdateStatus(info) {
-  const out = document.getElementById("updateStatus");
-  if (!info) out.textContent = "Controleren mislukt.";
-  else if (info.error) out.textContent = `Kon GitHub niet bereiken: ${info.error}.`;
-  else if (info.available) { out.textContent = ""; out.append(`Versie ${info.latest} beschikbaar: `, Object.assign(document.createElement("a"), { href: info.page, target: "_blank", rel: "noopener", textContent: "open het extensiemenu om te downloaden" })); }
-  else if (!info.latest) out.textContent = "Toegang in orde, er is nog geen release gepubliceerd.";
-  else out.textContent = `Je hebt de nieuwste versie (${info.current}).`;
-}
-
-document.getElementById("checkUpdate").onclick = async () => {
-  document.getElementById("updateStatus").textContent = "Controleren…";
-  showUpdateStatus(await chrome.runtime.sendMessage({ type: "checkUpdate" }).catch(() => null));
-};
-
-/* GitHub-token: apart van de gesynchroniseerde instellingen, alleen lokaal op dit apparaat. */
-const tokenField = document.getElementById("ghToken");
-chrome.storage.local.get("ghToken").then(({ ghToken }) => { tokenField.value = ghToken || ""; });
-let tokenTimer;
-tokenField.oninput = () => {
-  clearTimeout(tokenTimer);
-  tokenTimer = setTimeout(async () => {
-    document.getElementById("updateStatus").textContent = "Token opgeslagen, controleren…";
-    showUpdateStatus(await chrome.runtime.sendMessage({ type: "setToken", token: tokenField.value }).catch(() => null));
-  }, 600);
-};
-document.getElementById("ghTokenClear").onclick = async () => {
-  tokenField.value = "";
-  document.getElementById("updateStatus").textContent = "Token gewist.";
-  await chrome.runtime.sendMessage({ type: "setToken", token: "" }).catch(() => null);
-};
-
 function merge(base, patch) {
   for (const [k, v] of Object.entries(patch || {})) {
     if (v && typeof v === "object" && !Array.isArray(v) && base[k] && typeof base[k] === "object" && !Array.isArray(base[k])) merge(base[k], v);

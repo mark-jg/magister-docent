@@ -22,7 +22,6 @@
     const naar = tabs[(nu + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
     e.preventDefault(); DtKolom.toon(naar.dataset.blad); naar.focus();
   });
-  for (const id of ["updKnop", "updatesKnop"]) document.getElementById(id).addEventListener("click", () => DtKolom.toon("meer", "updates"));
   document.getElementById("herlaadKnop").addEventListener("click", async () => { const tab = await DtKolom.tab(); if (tab) chrome.tabs.reload(tab.id); });
 
   /* De lijst met tabellen hoort bij de pagina die je voor je hebt: bijwerken als je van tabblad of scherm wisselt. */
