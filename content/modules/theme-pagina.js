@@ -1,5 +1,15 @@
 /* Thema, deel pagina: aanpassingen die de pagina zelf nalopen in plaats van alleen CSS te zetten: agendakleuren,
  * de kop van het lesdashboard en het leerlingenoverzicht, en de dashboardkaarten. Gebruikt door theme.js. */
+/* Een nieuw, leeg element met een klasse; verborgen: de pagina toont het, een schermlezer slaat het over.
+ * Let op bij wijzigen: elementen worden hier met maakVak gemaakt en met before/after/prepend geplaatst. Het
+ * oudere patroon "createElement, daarna parent.insertBefore" in één regel werd door Windows Defender voor
+ * malware aangezien (FakeUpdate.B, een vals alarm) en blokkeerde het downloaden en bijwerken. */
+function maakVak(doc, soort, klasse, verborgen = false) {
+  const vak = Object.assign(doc.createElement(soort), { className: klasse });
+  if (verborgen) vak.setAttribute("aria-hidden", "true");
+  return vak;
+}
+
 /* ---------- Agendakleuren (Apple-palet) ----------
  * Leest de titel van een afspraak ("MIP1B - M1INTR - (C2.13)"): deel 1 is de klas, deel 2 het vak.
  * Zet --ev op de afspraak; de CSS mengt daar achtergrond, rand, tekst en chips uit.
@@ -98,9 +108,7 @@ const ldPadCache = new Map();
 function ldEindPadding(main) {
   const key = `${main.className}|${window.innerWidth}`;
   if (ldPadCache.has(key)) return ldPadCache.get(key);
-  const probe = document.createElement("section");
-  probe.className = main.className;
-  probe.setAttribute("aria-hidden", "true");
+  const probe = maakVak(document, "section", main.className, true);
   probe.style.cssText = "display:none !important";
   main.after(probe);
   const ps = getComputedStyle(probe);
@@ -127,7 +135,7 @@ function lesdashKopPass(root, on) {
   root.querySelectorAll(".dt-ld-kop").forEach((k) => { if (k.parentElement !== uiv) k.remove(); });
   root.querySelectorAll(".dt-ld-on").forEach((u) => { if (u !== uiv) { u.classList.remove("dt-ld-on"); u.style.removeProperty("--dt-kop-l"); u.style.removeProperty("--dt-kop-r"); } });
   let kop = uiv.querySelector(":scope > .dt-ld-kop");
-  if (!kop) { kop = document.createElement("div"); kop.className = "dt-ld-kop"; kop.setAttribute("aria-hidden", "true"); uiv.prepend(kop); }
+  if (!kop) { kop = maakVak(document, "div", "dt-ld-kop", true); uiv.prepend(kop); }
   uiv.classList.add("dt-ld-on");
   const meet = () => {
     if (!kop.isConnected) return;
@@ -178,7 +186,7 @@ function leerlingenKopPass(root, on) {
     return;
   }
   let kop = root.querySelector("body > .dt-ll-kop");
-  if (!kop) { kop = root.createElement("div"); kop.className = "dt-ll-kop"; kop.setAttribute("aria-hidden", "true"); root.body.prepend(kop); }
+  if (!kop) { kop = maakVak(root, "div", "dt-ll-kop", true); root.body.prepend(kop); }
   html.classList.add("dt-ll-on");
   const meet = () => {
     if (!kop.isConnected) return;
@@ -218,7 +226,7 @@ function dashboardSummary(root, summary) {
   const main = header && header.parentElement && header.parentElement.querySelector("section.main");
   if (!header || !main || !root.querySelector("#vandaag-agenda")) return;
   let box = root.querySelector(".dt-summary");
-  if (!box) { box = document.createElement("div"); box.className = "dt-summary"; main.parentElement.insertBefore(box, main); }
+  if (!box) { box = maakVak(document, "div", "dt-summary"); main.before(box); }
   const chips = [];
   if (summary.lessen) chips.push(["lessen", `${summary.lessen} ${summary.lessen === 1 ? "les" : "lessen"} vandaag`]);
   if (summary.next) chips.push(["next", `Volgende: ${summary.next}`]);
@@ -273,7 +281,7 @@ function dashboardPass(root, dark) {
     li.dataset.dtKind = kind;
     li.style.setProperty("--k", dark ? col[1] : col[0]);
     if (!a.querySelector(".dt-dash-ico")) {
-      const ico = document.createElement("span"); ico.className = "dt-dash-ico";
+      const ico = maakVak(document, "span", "dt-dash-ico");
       ico.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${DASH_ICON[kind]}</svg>`;
       a.prepend(ico);
     }
