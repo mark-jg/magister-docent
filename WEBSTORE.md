@@ -119,16 +119,9 @@ https://github.com/mark-jg/magister-docent/blob/webstore/PRIVACY.md
 
 ## 5. Testinstructies (Test instructions)
 
-Optioneel, maar het helpt de beoordelaar:
+Optioneel, maximaal 500 tekens:
 ```
-Docentdeck works only on Magister (*.magister.net), the student information system used by Dutch schools. It requires a staff account of a school, so we cannot provide test credentials.
-
-What to check without an account:
-- The extension only runs on *.magister.net; on other sites it does nothing.
-- The side panel (toolbar icon or Alt+D) opens the settings, including Meer > Back-up en opslag.
-- No network requests go to any server other than the school's own Magister domain; there is no remote code, analytics or tracking.
-
-On Magister the extension adds themes, an export button on data tables, a side panel and pages such as Opleidingen and Lesregistraties (see the screenshots, made with demo data).
+Works only on Magister (*.magister.net), the student information system of Dutch schools. It needs a school staff account, so we cannot provide test credentials. Without an account you can check: it does nothing on other sites; the toolbar icon (or Alt+D) opens the side panel with settings; there is no remote code, analytics or tracking, and requests only go to the school's own Magister domain. Screenshots show the features with demo data.
 ```
 
 ## 6. Afbeeldingen (Graphic assets)
