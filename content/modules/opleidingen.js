@@ -326,7 +326,7 @@ DT.register({
       case "ga": case "zoom": if (knoop) { if (!this._zoom) this._terug = this._pagina.scrollTop; this._zoom = knoop.id; this.route(); this.teken(DT); this._pagina.scrollTop = 0; } break;
       case "terug": this._zoom = null; this.route(); this.teken(DT); this._pagina.scrollTop = this._terug || 0; break;
       case "keuze-ok": this.keuzeBewaar(DT); break;
-      case "keuze-alles": case "keuze-niets": for (const x of this._pagina.querySelectorAll("input[data-groep]")) x.checked = el.dataset.act === "keuze-alles"; this.keuzeTotaal(); break;
+      case "keuze-alles": case "keuze-niets": for (const x of this._pagina.querySelectorAll("input[data-klas]")) x.checked = el.dataset.act === "keuze-alles"; this.keuzeTotaal(); break;
       case "keuze-open": this._tab = "opslag"; this._zoom = null; this.route(); this.teken(DT); this._pagina.scrollTop = 0; break;
       case "tab": this._tab = el.dataset.t; this._zoom = null; this.route(); this.teken(DT); this._pagina.scrollTop = 0; break;
       case "mut-soort": this._mutSoort = el.dataset.w || null; this._mutAlles = false; this.teken(DT); break;
@@ -340,7 +340,8 @@ DT.register({
     }
   },
   kies(DT, e) {
-    if (e.target.matches?.("input[data-groep]")) return this.keuzeTotaal();
+    if (e.target.matches?.("input[data-groep]")) for (const x of e.target.closest("details").querySelectorAll("input[data-klas]")) x.checked = e.target.checked;
+    if (e.target.matches?.("input[data-groep], input[data-klas]")) return this.keuzeTotaal();
     const el = e.target.closest?.("select[data-act]"); if (!el) return;
     if (el.dataset.act === "periode") { this._per = el.value; this.herbereken(); this.teken(DT); }
     if (el.dataset.act === "jaren") { this._jaren = Number(el.value) || 0; try { localStorage.setItem("dt-opl-jaren", String(this._jaren)); } catch {} if (!this._aanwBezig) this.laad(DT); }
@@ -511,7 +512,7 @@ DT.register({
     else if (this._tab === "verloop") h += verloopKaart + this.lesKaart(perOpl, zicht) + this.cohortKaart();
     else if (this._tab === "mutaties") h += this.mutatieKaart();
     else if (this._tab === "opslag") h += this.keuzeKaart() + this.opslagKaart();
-    else h += (this._kies ? `<p class="dt-opl-melding">Je ziet ${this._kies.size} van de ${this._groepen.length} opleidingen (${E([...this._kies].sort().join(", "))}). <button type="button" class="dt-opl-knop is-stil" data-act="keuze-open">Wijzigen</button></p>` : "") + kpis + boomKaart(d.boom, "Opleidingen, leerjaren en klassen", "Klik op een opleiding of leerjaar om uit te klappen, of op Details voor het verloop, de aanwezigheid en de mutaties.") + this.aandacht(sinds);
+    else h += (this._kies ? `<p class="dt-opl-melding">${E(this.keuzeTekst())} <button type="button" class="dt-opl-knop is-stil" data-act="keuze-open">Wijzigen</button></p>` : "") + kpis + boomKaart(d.boom, "Opleidingen, leerjaren en klassen", "Klik op een opleiding of leerjaar om uit te klappen, of op Details voor het verloop, de aanwezigheid en de mutaties.") + this.aandacht(sinds);
     h += `<p class="dt-opl-zacht dt-opl-voet">Uit Magister, met jouw rechten: je ziet de klassen die jij in Magister mag zien. Aanwezig % = aanwezig en te laat, gedeeld door de lessen die meetellen; een vrijstelling telt niet mee (zoals Inzicht). Het verloop per opleiding gaat ervan uit dat een klas elk jaar bij dezelfde opleiding en hetzelfde leerjaar hoort. De aanwezigheid gaat over hele weken en over de studenten die nu in de klas zitten.</p>`;
     const top = this._pagina.scrollTop;
     this._lijf.innerHTML = h;
@@ -817,9 +818,15 @@ DT.register({
       .dt-opl-chip i { width: 10px; height: 10px; border-radius: 2px; } .dt-opl-chip:hover { background: var(--opl-hover); } .dt-opl-chip:focus-visible, .dt-opl-ga:focus-visible { outline: 2px solid var(--opl-acc); outline-offset: 1px; }
       .dt-opl-chip[aria-pressed="false"] { color: var(--opl-zacht); text-decoration: line-through; border-style: dashed; } .dt-opl-chip[aria-pressed="false"] i { opacity: .25; }
       .dt-opl-ga { appearance: none; border: 0; background: none; padding: 0; color: var(--opl-acc); font: inherit; font-weight: 600; cursor: pointer; text-align: left; } .dt-opl-ga:hover { text-decoration: underline; } .dt-opl-ga small { font-weight: 400; }
-      .dt-opl-kies { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px 16px; margin: 12px 0; }
-      .dt-opl-kies label { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--opl-lijn); border-radius: var(--opl-r); cursor: pointer; } .dt-opl-kies label:hover { background: var(--opl-hover); }
-      .dt-opl-kies small { margin-left: auto; color: var(--opl-zacht); font-size: 12px; white-space: nowrap; } .dt-opl-kies input { accent-color: var(--opl-acc); }
+      .dt-opl-kies { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 16px; margin: 12px 0; align-items: start; }
+      .dt-opl-kiesgroep { border: 1px solid var(--opl-lijn); border-radius: var(--opl-r); } .dt-opl-kiesgroep[open] { grid-column: 1 / -1; }
+      .dt-opl-kiesgroep summary { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: var(--opl-r); cursor: pointer; list-style: none; } .dt-opl-kiesgroep summary:hover { background: var(--opl-hover); }
+      .dt-opl-kiesgroep summary::-webkit-details-marker { display: none; } .dt-opl-kiesgroep summary:focus-visible { outline: 2px solid var(--opl-acc); outline-offset: 1px; }
+      .dt-opl-kiesgroep summary::before { content: ""; width: 6px; height: 6px; margin: 0 2px; border: solid var(--opl-zacht); border-width: 0 2px 2px 0; transform: rotate(-45deg); transition: transform .15s; } .dt-opl-kiesgroep[open] > summary::before { transform: rotate(45deg); }
+      .dt-opl-kiesgroep summary small { margin-left: auto; } .dt-opl-kiesgroep > div { display: flex; flex-wrap: wrap; gap: 6px 20px; padding: 4px 10px 10px 34px; }
+      .dt-opl-kies label { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+      .dt-opl-kies small { color: var(--opl-zacht); font-size: 12px; white-space: nowrap; } .dt-opl-kies input { accent-color: var(--opl-acc); }
+      @media (prefers-reduced-motion: reduce) { .dt-opl-kiesgroep summary::before { transition: none; } }
       .dt-opl-tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--opl-lijn); margin-bottom: 16px; }
       .dt-opl-tab { appearance: none; border: 0; border-bottom: 3px solid transparent; background: none; padding: 8px 14px; margin-bottom: -1px; color: var(--opl-zacht); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; border-radius: var(--opl-r) var(--opl-r) 0 0; }
       .dt-opl-tab:hover { background: var(--opl-hover); color: var(--opl-fg); } .dt-opl-tab[aria-selected="true"] { color: var(--opl-fg); border-bottom-color: var(--opl-acc); }

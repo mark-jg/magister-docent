@@ -177,21 +177,48 @@
       });
     },
 
-    /* Zoals DT.api (met de hele JSON), maar wacht en probeert opnieuw als Magister om rust vraagt (429) of
-     * even niet kan (503): 1,5 s, 3 s, 6 s … hooguit zes pogingen. opWachten(poging) wordt vóór elke pauze
+    /* Zoals DT.api (met de hele JSON), maar in een rustig tempo (zie DT.tempo) en het wacht en probeert opnieuw
+     * als Magister om rust vraagt (429) of even niet kan (503): 1,5 s, 3 s, 6 s …, of zo lang als Magister zelf
+     * vraagt (Retry-After), hooguit zes pogingen. opWachten(poging) wordt vóór elke pauze
      * aangeroepen, bijvoorbeeld om het in een voortgangsregel te melden; gooit die een fout (de gebruiker
      * brak af), dan stopt het ophalen daarmee. */
     async apiRetry(url, { opWachten = null, pogingen = 6, basis = 1500, ...opties } = {}) {
+      const t = DT.tempo;
       let r;
       for (let poging = 0; poging < pogingen; poging++) {
+        await DT.beurt();
+        const begin = Date.now();
         r = await DT.api(url, { full: true, timeout: 25000, ...opties });
-        if (r.status !== 429 && r.status !== 503) return r;
-        DT.druk = Date.now();   // Magister vraagt om rust: wie veel ophaalt doet het daarna een tijd kalmer aan (vzBron)
+        if (r.status !== 429 && r.status !== 503) {
+          /* Het gaat goed: na een reeks antwoorden weer iets vlotter, maar niet sneller dan wat eerder te snel bleek. */
+          if (++t.goed >= 25) { t.goed = 0; if (Date.now() - (DT.druk || 0) > 10 * 60e3) t.vloer = t.BASIS; t.tussen = Math.max(t.vloer, Math.round(t.tussen * 0.85)); }
+          return r;
+        }
+        const nu = Date.now(), gevraagd = Number(r.retryAfter) > 0 ? Math.min(60, Number(r.retryAfter)) * 1000 : 0;
+        DT.druk = nu;   // Magister vraagt om rust: wie veel ophaalt doet het daarna een tijd kalmer aan (vzBron)
+        /* Alle aanvragen houden even in, niet alleen deze. Het tempo gaat omlaag; antwoorden op aanvragen die al
+         * onderweg waren toen dat gebeurde tellen niet nog eens mee. */
+        t.rust = Math.max(t.rust, nu + Math.max(gevraagd, basis * 2 ** poging));
+        if (begin >= t.sinds) { t.sinds = nu; t.goed = 0; t.vloer = Math.min(1000, Math.max(t.vloer, Math.round(t.tussen * 1.5))); t.tussen = Math.min(t.MAX, t.tussen * 2); }
         if (poging === pogingen - 1) break;
         if (opWachten) opWachten(poging);
-        await new Promise((ok) => setTimeout(ok, basis * 2 ** poging));
       }
       return r;
+    },
+
+    /* Het tempo voor wie veel bij Magister ophaalt (alles wat via apiRetry gaat, dus ook vzBron): tussen het begin
+     * van twee aanvragen zit minstens `tussen` ms, voor alle modules samen. Vraagt Magister om rust, dan wacht
+     * iedereen tot `rust` en verdubbelt de tussentijd (hooguit MAX); `vloer` onthoudt tien minuten lang welk tempo
+     * te snel was, zodat het daarna niet meteen weer tegen dezelfde grens loopt. */
+    tempo: { BASIS: 150, MAX: 2400, tussen: 150, vloer: 150, volgende: 0, rust: 0, sinds: 0, goed: 0 },
+    async beurt() {
+      const t = DT.tempo;
+      for (;;) {
+        const nu = Date.now(), start = Math.max(nu, t.volgende, t.rust);
+        t.volgende = start + t.tussen;
+        if (start > nu) await new Promise((ok) => setTimeout(ok, start - nu));
+        if (Date.now() >= t.rust) return;   // intussen vroeg Magister om rust: opnieuw aansluiten
+      }
     },
 
     /* De rijen uit een API-antwoord (een lijst, of { items: [...] }); null als de aanvraag mislukte. */

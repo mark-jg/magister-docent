@@ -237,5 +237,13 @@ test("mutaties: instroom uit de aanmelding, overstap met de nieuwe klas, en extr
 
 test("keuze vooraf: klassen groeperen op het begin van de klasnaam", () => {
   assert.strictEqual(R.groep("MIP1A"), "MIP"); assert.strictEqual(R.groep("sdv2b"), "SDV"); assert.strictEqual(R.groep("1A"), "1A");
-  assert.deepStrictEqual(kaal(R.groepen({ MIP1A: 20, MIP2A: 18, SDV1A: null, "1A": 5 })), [{ groep: "1A", klassen: 1, studenten: 5 }, { groep: "MIP", klassen: 2, studenten: 38 }, { groep: "SDV", klassen: 1, studenten: 0 }]);
+  assert.deepStrictEqual(kaal(R.groepen({ MIP1A: 20, MIP2A: 18, SDV1A: null, "1A": 5 })), [{ groep: "1A", klassen: 1, studenten: 5, leden: [{ naam: "1A", aantal: 5 }] }, { groep: "MIP", klassen: 2, studenten: 38, leden: [{ naam: "MIP1A", aantal: 20 }, { naam: "MIP2A", aantal: 18 }] }, { groep: "SDV", klassen: 1, studenten: 0, leden: [{ naam: "SDV1A", aantal: null }] }]);
+});
+
+test("keuze vooraf: een hele opleiding of losse klassen", () => {
+  const g = R.groepen({ MIP2A: 18, MIP1A: 20, MIP10A: 9, SDV1A: 12, SDV1B: 11 });
+  assert.deepStrictEqual(kaal(g[0].leden.map((l) => l.naam)), ["MIP1A", "MIP2A", "MIP10A"], "klassen op naam, met cijfers als getal");
+  assert.deepStrictEqual(kaal(R.keuze(g, new Set(["MIP1A", "MIP2A", "MIP10A", "SDV1B"]))), { groepen: ["MIP"], klassen: ["SDV1B"] });
+  assert.deepStrictEqual(kaal(R.keuze(g, new Set(["SDV1A"]))), { groepen: [], klassen: ["SDV1A"] });
+  assert.deepStrictEqual(kaal(R.keuze(g, new Set(["MIP1A", "MIP2A", "MIP10A", "SDV1A", "SDV1B"]))), { groepen: null, klassen: [] }, "alles aan: geen beperking");
 });

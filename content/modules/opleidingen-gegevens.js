@@ -17,41 +17,62 @@ Object.assign(DT.module("opleidingen"), {
   /* Wie veel klassen mag zien, vraagt bij het laden veel van Magister (per student drie aanvragen, per klas tientallen
    * lessen). Daarom kun je vooraf kiezen welke opleidingen meedoen: alleen die worden opgehaald en getoond. De keuze
    * gaat op het begin van de klasnaam (MIP1A → MIP); dat is bekend na één aanvraag. Bij meer dan DREMPEL klassen
-   * vraagt de pagina het vóór er iets wordt opgehaald. _kies: de gekozen groepen, of null voor alles. */
+   * vraagt de pagina het vóór er iets wordt opgehaald. Een opleiding kan in haar geheel meedoen, of alleen een
+   * paar klassen ervan. _kies: de opleidingen die geheel meedoen, of null voor alles; _kiesKl: de losse klassen. */
   DREMPEL: 30,
   async keuzeLaden(telling) {
     const k = await this.opslag("keuze"), alle = OplReken.groepen(telling), bestaat = new Set(alle.map((g) => g.groep));
     const gekozen = Array.isArray(k.groepen) ? k.groepen.filter((g) => bestaat.has(g)) : [];
+    const los = Array.isArray(k.klassen) ? k.klassen.filter((x) => x in telling && !gekozen.includes(OplReken.groep(x))) : [];
     this._groepen = alle;
-    this._kies = gekozen.length && gekozen.length < alle.length ? new Set(gekozen) : null;
+    this._kies = los.length || (gekozen.length && gekozen.length < alle.length) ? new Set(gekozen) : null;
+    this._kiesKl = new Set(los);
     return !k.gezien && Object.keys(telling).length > this.DREMPEL;   // true: eerst kiezen
   },
   kiesFilter(telling) {
     if (!this._kies) return { ...telling };
-    return Object.fromEntries(Object.entries(telling).filter(([k]) => this._kies.has(OplReken.groep(k))));
+    return Object.fromEntries(Object.entries(telling).filter(([k]) => this._kies.has(OplReken.groep(k)) || this._kiesKl?.has(k)));
   },
+  keuzeTekst() {
+    const heel = [...this._kies].sort(), los = [...(this._kiesKl || [])].sort(), delen = [];
+    if (heel.length) delen.push(`${heel.length} van de ${this._groepen.length} opleidingen (${heel.join(", ")})`);
+    if (los.length) delen.push(`${los.length} losse ${los.length === 1 ? "klas" : "klassen"} (${los.join(", ")})`);
+    return `Je ziet ${delen.join(" en ")}.`;
+  },
+  /* Na elke wijziging: het vakje van de opleiding volgt haar klassen (aan, uit of deels), en de optelling eronder. */
   keuzeTotaal() {
-    const aan = [...this._pagina.querySelectorAll("input[data-groep]:checked")], el = this._pagina.querySelector(".dt-opl-kiestotaal"); if (!el) return;
-    const n = aan.reduce((s, x) => s + (+x.dataset.n || 0), 0), kl = aan.reduce((s, x) => s + (+x.dataset.k || 0), 0);
-    el.textContent = aan.length ? `${aan.length} gekozen: ${this.getal(kl)} klassen, ${this.getal(n)} studenten. De eerste keer zijn dat ongeveer ${this.getal(3 * n + 30 * kl)} aanvragen aan Magister; daarna per dag ongeveer ${this.getal(2 * n + 6 * kl)}.` : "Kies minstens één opleiding.";
+    const el = this._pagina.querySelector(".dt-opl-kiestotaal"); if (!el) return;
+    let n = 0, kl = 0;
+    for (const g of this._pagina.querySelectorAll("input[data-groep]")) {
+      const vakjes = [...g.closest("details").querySelectorAll("input[data-klas]")], aan = vakjes.filter((x) => x.checked);
+      g.checked = aan.length === vakjes.length; g.indeterminate = aan.length > 0 && aan.length < vakjes.length;
+      g.closest("summary").querySelector("small").textContent = g.indeterminate ? `${aan.length} van ${vakjes.length} klassen` : `${vakjes.length} ${vakjes.length === 1 ? "klas" : "klassen"} · ${this.getal(+g.dataset.n || 0)}`;
+      kl += aan.length; n += aan.reduce((s, x) => s + (+x.dataset.n || 0), 0);
+    }
+    el.textContent = kl ? `${this.getal(kl)} ${kl === 1 ? "klas" : "klassen"} gekozen, ${this.getal(n)} studenten. De eerste keer zijn dat ongeveer ${this.getal(3 * n + 30 * kl)} aanvragen aan Magister; daarna per dag ongeveer ${this.getal(2 * n + 6 * kl)}.` : "Kies minstens één opleiding of klas.";
   },
   async keuzeBewaar(DT) {
-    const vakjes = [...this._pagina.querySelectorAll("input[data-groep]")], aan = vakjes.filter((x) => x.checked).map((x) => x.dataset.groep);
-    if (!aan.length) return DT.toast("Kies minstens één opleiding.", "err", 3500);
+    const aan = new Set([...this._pagina.querySelectorAll("input[data-klas]:checked")].map((x) => x.dataset.klas));
+    if (!aan.size) return DT.toast("Kies minstens één opleiding of klas.", "err", 3500);
     if (this._aanwBezig) { this._stopAanw = true; while (this._aanwBezig) await this.wacht(150); }
-    await this.bewaar("keuze", { gezien: true, groepen: aan.length === vakjes.length ? null : aan });
+    await this.bewaar("keuze", { gezien: true, ...OplReken.keuze(this._groepen, aan) });
     this._autoUit = false; this._tab = "overzicht"; this._zoom = null; this.route();
     this.laad(DT);
   },
   /* eerst: de pagina heeft nog niets opgehaald en wacht op de keuze. */
   keuzeKaart(eerst = false) {
     const E = (s) => this.esc(s), alle = this._groepen || [];
-    if (!eerst && alle.length < 2) return "";
-    const aan = (g) => (eerst ? false : !this._kies || this._kies.has(g.groep));
+    if (!eerst && alle.reduce((n, g) => n + g.klassen, 0) < 2) return "";
+    const aan = (g, l) => !eerst && (!this._kies || this._kies.has(g.groep) || !!this._kiesKl?.has(l.naam));
+    const groep = (g) => {
+      const n = g.leden.filter((l) => aan(g, l)).length;
+      return `<details class="dt-opl-kiesgroep"${(n && n < g.leden.length) || alle.length === 1 ? " open" : ""}><summary><label><input type="checkbox" data-groep="${E(g.groep)}" data-n="${g.studenten}"${n === g.leden.length ? " checked" : ""}><b>${E(g.groep)}</b></label><small></small></summary>
+        <div>${g.leden.map((l) => `<label><input type="checkbox" data-klas="${E(l.naam)}" data-n="${l.aantal || 0}"${aan(g, l) ? " checked" : ""}>${E(l.naam)}${l.aantal ? `<small>${l.aantal}</small>` : ""}</label>`).join("")}</div></details>`;
+    };
     return `<dna-card class="dt-opl-kaart"><h2>${eerst ? "Kies eerst welke opleidingen je wilt zien" : "Welke opleidingen doen mee"}</h2>
-      <p class="dt-opl-zacht">${eerst ? `Je mag ${alle.reduce((n, g) => n + g.klassen, 0)} klassen zien. Alles ophalen vraagt veel van Magister, dus er is nog niets opgehaald. ` : ""}Alleen de gekozen opleidingen worden opgehaald, bijgewerkt en getoond. De indeling gaat op het begin van de klasnaam. Wat al is opgehaald blijft bewaard als je een opleiding uitzet.</p>
-      <div class="dt-opl-kies">${alle.map((g) => `<label><input type="checkbox" data-groep="${E(g.groep)}" data-n="${g.studenten}" data-k="${g.klassen}"${aan(g) ? " checked" : ""}><b>${E(g.groep)}</b><small>${g.klassen} ${g.klassen === 1 ? "klas" : "klassen"} · ${this.getal(g.studenten)}</small></label>`).join("")}</div>
-      <p class="dt-opl-zacht dt-opl-kiestotaal">${eerst ? "Kies minstens één opleiding." : ""}</p>
+      <p class="dt-opl-zacht">${eerst ? `Je mag ${alle.reduce((n, g) => n + g.klassen, 0)} klassen zien. Alles ophalen vraagt veel van Magister, dus er is nog niets opgehaald. ` : ""}Vink een hele opleiding aan, of klap haar open om losse klassen te kiezen. Alleen wat je kiest wordt opgehaald, bijgewerkt en getoond. De indeling gaat op het begin van de klasnaam. Wat al is opgehaald blijft bewaard als je iets uitzet.</p>
+      <div class="dt-opl-kies">${alle.map(groep).join("")}</div>
+      <p class="dt-opl-zacht dt-opl-kiestotaal"></p>
       <p><button type="button" class="dt-opl-knop" data-act="keuze-ok">${eerst ? "Ophalen" : "Keuze opslaan en opnieuw laden"}</button><button type="button" class="dt-opl-knop is-stil" data-act="keuze-alles">Alles aan</button><button type="button" class="dt-opl-knop is-stil" data-act="keuze-niets">Alles uit</button></p></dna-card>`;
   },
 

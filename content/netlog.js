@@ -130,7 +130,7 @@
       const res = await of(doel.href, { method: "GET", credentials: "include", headers: { Accept: "application/json", ...eigen } });
       let json = null, text = ""; try { text = await res.clone().text(); json = JSON.parse(text); } catch {}
       try { record("GET (Docent Tools)", url, res.status, text, performance.now() - t0); } catch {}
-      reply(e, { type: "dt:api:result", id, status: res.status, shape: json ? shape(json) : null, json: full ? json : undefined, hadHeaders: !!lastHeaders, kopnamen: lastHeaders ? Object.keys(lastHeaders) : [] });
+      reply(e, { type: "dt:api:result", id, status: res.status, retryAfter: res.status === 429 || res.status === 503 ? res.headers.get("Retry-After") : undefined, shape: json ? shape(json) : null, json: full ? json : undefined, hadHeaders: !!lastHeaders, kopnamen: lastHeaders ? Object.keys(lastHeaders) : [] });
     } catch (err) { reply(e, { type: "dt:api:result", id, status: 0, error: String(err) }); }
   });
   /* Op verzoek van de extensie naar een Magister-scherm gaan zoals Magister dat zelf doet
