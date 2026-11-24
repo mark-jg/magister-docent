@@ -70,23 +70,24 @@ const LesOpslag = {
       };
     });
   },
-  /* Een vraag aan de map met een tijdslimiet. Chrome geeft op sommige vragen nooit antwoord, bijvoorbeeld op
-   * queryPermission voor een map die een andere versie van de extensie (de dev-versie) heeft gekozen; zonder limiet
-   * bleven Lesregistraties en Opleidingen dan eindeloos wachten. Na de limiet geldt de terugvalwaarde. */
+  /* Een vraag aan de map met een tijdslimiet. Staat er in de adresbalk nog een vraag van Chrome over de map open
+   * (bijvoorbeeld "Deze site mag bestanden bewerken"), dan geeft Chrome op queryPermission pas antwoord als je die
+   * hebt beantwoord; zonder limiet bleven Lesregistraties en Opleidingen dan eindeloos wachten. Na de limiet geldt
+   * de terugvalwaarde. */
   metLimiet(belofte, ms, terug) {
     return Promise.race([Promise.resolve(belofte).catch(() => terug), new Promise((ok) => setTimeout(() => ok(terug), ms))]);
   },
-  /* { h, mag }: de gekozen map (of null) en of Chrome er nu in mag schrijven. Toegang vraagt een klik. Geeft Chrome
-   * geen antwoord op de vraag naar toegang, dan is de bewaarde map onbruikbaar (gekozen door een andere versie van de
-   * extensie): dan geldt er geen map, zodat je een nieuwe kunt kiezen. */
+  /* { h, mag, wacht }: de gekozen map (of null), of Chrome er nu in mag schrijven, en of Chrome nog op een antwoord
+   * in de adresbalk wacht (dan is er voorlopig geen toegang). Toegang vraagt een klik. */
   async map() {
     try {
-      const h = await this.metLimiet(this.kv("map"), 3000, null); if (!h) return { h: null, mag: false };
+      const h = await this.metLimiet(this.kv("map"), 3000, null); if (!h) return { h: null, mag: false, wacht: false };
       const mag = await this.metLimiet(h.queryPermission({ mode: "readwrite" }), 3000, "geen antwoord");
-      return mag === "geen antwoord" ? { h: null, mag: false } : { h, mag: mag === "granted" };
-    } catch { return { h: null, mag: false }; }
+      return { h, mag: mag === "granted", wacht: mag === "geen antwoord" };
+    } catch { return { h: null, mag: false, wacht: false }; }
   },
-  async toegang(h) { return await this.metLimiet(h.requestPermission({ mode: "readwrite" }), 60000, "denied") === "granted"; },
+  async toegang(h) { return await this.metLimiet(h.requestPermission({ mode: "readwrite" }), 20000, "denied") === "granted"; },
+  WACHT: "Chrome wacht op je antwoord in de adresbalk: klik daar op het map-icoontje en kies Toestaan.",
   /* Een map kiezen; die geldt daarna ook voor de back-up van Opleidingen. Geeft { h, mag } of null bij annuleren. */
   async kies() {
     const h = await window.showDirectoryPicker({ id: "dt-opl", mode: "readwrite" });
