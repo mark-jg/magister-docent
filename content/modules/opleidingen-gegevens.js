@@ -359,8 +359,10 @@ Object.assign(DT.module("opleidingen"), {
   async mapLaden() {
     this._map = null; this._mapWacht = null;
     try {
-      const h = await this.kv("map"); if (!h) return;
-      const mag = await h.queryPermission({ mode: "readwrite" });
+      /* Met tijdslimiet (LesOpslag.binnen): Chrome geeft op queryPermission soms nooit antwoord. */
+      const h = await LesOpslag.metLimiet(this.kv("map"), 3000, null); if (!h) return;
+      const mag = await LesOpslag.metLimiet(h.queryPermission({ mode: "readwrite" }), 3000, "geen antwoord");
+      if (mag === "geen antwoord") return;   // onbruikbare map (van een andere versie van de extensie): kies een nieuwe
       if (mag === "granted") this._map = h; else this._mapWacht = h;
     } catch {}
   },
@@ -368,7 +370,9 @@ Object.assign(DT.module("opleidingen"), {
   async backupLezen() {
     if (!this._map) return false;
     try {
-      const b = JSON.parse(await (await (await this._map.getFileHandle(this.bestand())).getFile()).text());
+      const tekst = await LesOpslag.metLimiet((async () => (await (await this._map.getFileHandle(this.bestand())).getFile()).text())(), 15000, null);
+      if (tekst == null) return false;
+      const b = JSON.parse(tekst);
       if (!b || b.host !== location.host) return false;
       await this.bewaar("jaar", OplReken.nieuwste(await this.opslag("jaar"), b.jaar));
       for (const naam of ["momenten", "tel", "indeling2"]) await this.bewaar(naam, { ...(b[naam] || {}), ...(await this.opslag(naam)) });
