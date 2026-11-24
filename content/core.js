@@ -335,6 +335,21 @@
       else if (!DT._taken.size && DT._taakStop) { DT._taakStop(); DT._taakStop = null; }
       DT.taakTeken();
     },
+    /* De tekstkleur van het blok: die van een gewoon menu-item. Niet van het actieve item of het item onder de
+     * muis, want dat is vaak wit op een gekleurd vlak en wisselt met de pagina. Is die kleur op de achtergrond
+     * van het menu toch slecht te lezen (of onbekend), dan donker of licht naar gelang die achtergrond. */
+    rgb(tekst) { const m = /rgba?\(\s*([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?/.exec(String(tekst || "")); return m ? { r: +m[1], g: +m[2], b: +m[3], a: m[4] == null ? 1 : m[4].endsWith("%") ? parseFloat(m[4]) / 100 : +m[4] } : null; },
+    helder(c) { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); },
+    contrast(a, b) { const x = DT.helder(a), y = DT.helder(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); },
+    taakKleur(host, ul) {
+      let achter = null;
+      for (let el = host.parentElement; el && !achter; el = el.parentElement) { const c = DT.rgb(getComputedStyle(el).backgroundColor); if (c && c.a > 0.5) achter = c; }
+      achter ||= { r: 255, g: 255, b: 255 };
+      const links = ul ? [...ul.querySelectorAll(":scope > li > a")] : [];
+      const gewoon = links.filter((a) => !a.matches(":hover, .active, .selected, [aria-current]") && !a.parentElement.matches(".active, .selected, .expanded, [class*='active'], [class*='selected']"));
+      for (const a of gewoon) { const c = DT.rgb(getComputedStyle(a).color); if (c && c.a > 0.5 && DT.contrast(c, achter) >= 4.5) return `rgb(${c.r}, ${c.g}, ${c.b})`; }
+      return DT.helder(achter) > 0.4 ? "#1d1d1f" : "#ffffff";
+    },
     taakTeken() {
       let host = document.getElementById("dt-taken");
       if (!DT._taken.size) { host?.remove(); DT._taakBeeld = ""; return; }
@@ -344,11 +359,11 @@
       if (host.parentElement !== ouder || (voet && host.nextElementSibling !== voet)) { if (voet) voet.before(host); else ouder.append(host); }
       host.classList.toggle("is-los", ouder === document.body);
       /* Staat de voet vast onderin, dan komt het blok er vast boven; de kleur is die van de menu-items. */
-      const vast = !!voet && /absolute|fixed/.test(getComputedStyle(voet).position), link = ul?.querySelector("li > a");
-      const plek = vast ? `${voet.offsetHeight}px` : "", kleur = link ? getComputedStyle(link).color : "";
+      const vast = !!voet && /absolute|fixed/.test(getComputedStyle(voet).position);
+      const plek = vast ? `${voet.offsetHeight}px` : "", kleur = ouder === document.body ? "" : DT.taakKleur(host, ul);
       if (host.classList.contains("is-vast") !== vast) host.classList.toggle("is-vast", vast);
       if (host.style.bottom !== plek) host.style.bottom = plek;
-      if (kleur && host.dataset.kleur !== kleur) { host.dataset.kleur = kleur; host.style.color = kleur; }
+      if (host.dataset.kleur !== kleur) { host.dataset.kleur = kleur; host.style.color = kleur; }
       /* Alleen opnieuw opbouwen als er iets veranderd is: de waarnemer ziet ook onze eigen wijzigingen. */
       const beeld = JSON.stringify([...DT._taken].map(([id, t]) => [id, t.titel, t.tekst, t.deel == null ? null : Math.round(t.deel * 100), !!t.klaar, !!t.fout, !!t.stop]));
       if (beeld === DT._taakBeeld) return;
