@@ -7,7 +7,11 @@
  *  - Per les: elk lesmoment (datum, tijd, vak, docent) met wie er te laat of afwezig was;
  *  - Per vak en per docent: de totalen.
  * Alles is naar Excel te exporteren (ook een blad met elke les per student en de registraties). Er wordt niets in
- * Magister gewijzigd; alles via je eigen Magister-sessie. */
+ * Magister gewijzigd; alles via je eigen Magister-sessie.
+ *
+ * Staan de resultaten er, dan maken de keuzes plaats voor een samenvatting (klassen, periode, filter, herkomst van
+ * de gegevens) met de knop "Andere selectie". Is er een gedeelde map gekozen, dan worden de lessen per klas daar
+ * bewaard (LesOpslag in lesopslag.js) en hoeft een volgende lijst alleen de laatste weken bij te werken. */
 DT.register({
   id: "lesreg",
   init(DT) {
@@ -27,7 +31,7 @@ DT.register({
     this.sluit(); DT.deepQueryAll("#dt-lr-tegel").forEach((el) => el.remove());
   },
   /* stil: niets aan de geschiedenis doen (de pagina verdween of het adres wisselde). */
-  sluit(stil = false) { if (!stil && this._dlg && DT.route.nu("lesreg")) DT.route.zet(null); this._bar = null; this._dlg?.remove(); this._dlg = null; document.querySelectorAll(".dt-lr-open").forEach((el) => el.classList.remove("dt-lr-open")); },
+  sluit(stil = false) { if (!stil && this._dlg && DT.route.nu("lesreg")) DT.route.zet(null); this._bar = null; this._ui = null; this._dlg?.remove(); this._dlg = null; document.querySelectorAll(".dt-lr-open").forEach((el) => el.classList.remove("dt-lr-open")); },
 
   /* ---------- tegel op Aanwezigheid ---------- */
   mount(DT) {
@@ -48,6 +52,12 @@ DT.register({
   sj(nu = new Date()) { return new Date(nu.getFullYear() - (nu.getMonth() < 7 ? 1 : 0), 7, 1); },
   naam(p) { return [p?.roepnaam || p?.voorletters, p?.tussenvoegsel, p?.achternaam].filter(Boolean).join(" "); },
   tijd(d) { return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; },
+  /* Een moment (ms) als "vandaag om 14:02", "gisteren om 09:15" of "20-11-2026 om 14:02". */
+  moment(ms) {
+    if (!ms || !isFinite(ms)) return "nog niet";
+    const d = new Date(ms), nu = new Date(), dag = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime(), n = Math.round((dag(nu) - dag(d)) / 864e5);
+    return `${n === 0 ? "vandaag" : n === 1 ? "gisteren" : this.datum(d)} om ${this.tijd(d)}`;
+  },
   datum(d) { return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`; },
   CAT: { OK: "aanwezig", TL: "te laat", AB_OK: "absent geoorloofd", AB_NO: "absent ongeoorloofd", ZK: "ziek", UI: "uitgestuurd", VR: "vrijgesteld" },
 
@@ -117,10 +127,33 @@ DT.register({
     const balk = DT.el("div", { class: "dt-lr-balk" }, DT.el("i"));
     const resultaat = DT.el("div", { class: "dt-lr-resultaat" });
     const start = this.knop(DT, "Ophalen", null, true);
-    let afbreken = false, bezig = false;
-    const weg = () => { afbreken = true; this.sluit(); };
-    start.addEventListener("click", async () => {
-      if (bezig) return;
+    let kaart;
+    /* Weggaan breekt niets af: het ophalen loopt door en de stand staat onderin het hoofdmenu (zie ronde). */
+    const weg = () => this.sluit();
+    const stop = DT.el("button", { type: "button", class: "dt-lr-link dt-lr-stop", text: "Stoppen" });
+    stop.addEventListener("click", () => { if (this._ronde?.bezig) this._ronde.stop = true; });
+    /* De gedeelde map (dezelfde als de back-up van Opleidingen): daar blijven de lijsten per klas bewaard. */
+    const O = LesOpslag;
+    let map = window.showDirectoryPicker ? await O.map() : null;
+    const mapRegel = DT.el("p", { class: "dt-lr-zacht dt-lr-mapregel" });
+    const toonMap = () => {
+      if (!map) return mapRegel.replaceChildren();
+      if (map.h) return mapRegel.replaceChildren(`Lijsten worden bewaard in de map "${map.h.name}" (submap ${O.SUB}); een volgende keer worden alleen de laatste weken bijgewerkt.${map.mag ? "" : " Chrome vraagt bij Ophalen om toegang tot de map."}`);
+      const kies = DT.el("button", { type: "button", class: "dt-lr-link", text: "Map kiezen" });
+      kies.addEventListener("click", async () => { try { map = await O.kies(); toonMap(); } catch (e) { if (e?.name !== "AbortError") DT.toast(`Map kiezen lukte niet: ${e?.message || e}`, "err", 5000); } });
+      mapRegel.replaceChildren("Kies een map (op de computer of in OneDrive) om lijsten te bewaren: een volgende keer wordt dan alleen bijgewerkt wat nieuw is. Dezelfde map dient voor de back-up van Opleidingen. ", kies);
+    };
+    toonMap();
+    const toonBezig = (aan) => { if (aan) start.setAttribute("disabled", ""); else start.removeAttribute("disabled"); balk.classList.toggle("is-bezig", aan); stop.style.display = aan ? "" : "none"; };
+    /* wijze: "" gewoon ophalen, "aanvullen" ook als dat net nog is gedaan, "vol" alles opnieuw (volledige controle). */
+    const draai = async (klasNamen, p, wijze, klasTekst) => {
+      if (this._ronde?.bezig) return;
+      /* Toegang tot de map vraagt een klik; dit is er een. */
+      if (map?.h && !map.mag) { map.mag = await O.toegang(map.h); toonMap(); }
+      resultaat.replaceChildren(); kaart.style.display = ""; toonBezig(true);
+      this.ronde(DT, klasNamen, p, { map: map?.mag ? map.h : null, vol: wijze === "vol", vers: wijze === "aanvullen", klasTekst });
+    };
+    start.addEventListener("click", () => {
       if (!gekozen.size) return DT.toast("Kies eerst één of meer klassen.", "err");
       try { localStorage.setItem("dt-lesreg-klassen", JSON.stringify([...gekozen])); } catch {}
       let p = keuzes.find((k) => k.key === per.value);
@@ -129,14 +162,23 @@ DT.register({
         if (isNaN(x) || isNaN(y) || y < x) return DT.toast("Kies een geldige begin- en einddatum.", "err");
         p = { key: "eigen", naam: `${this.datum(x)} t/m ${this.datum(y)}`, van: x, tot: y > new Date() ? new Date() : y };
       }
-      bezig = true; start.setAttribute("disabled", ""); resultaat.replaceChildren(); balk.classList.add("is-bezig");
-      try {
-        this._data = await this.ophalen(DT, [...gekozen], p, (i, n, t) => { if (afbreken) throw new Error("afgebroken"); balk.firstChild.style.width = `${Math.round(100 * i / Math.max(1, n))}%`; status.textContent = t; });
-        this._filter = { vakken: new Set(), docenten: new Set(), weergave: this._filter?.weergave || "student" };
-        this.teken(DT, resultaat, status);
-      } catch (e) { if (String(e.message) !== "afgebroken") status.textContent = `Er ging iets mis: ${e.message || e}`; }
-      bezig = false; start.removeAttribute("disabled"); balk.classList.remove("is-bezig");
+      /* Voor de samenvatting: een hele opleiding bij naam, de rest als losse klassen. lopend: de periode loopt tot nu. */
+      const klasTekst = groepen.flatMap((g) => {
+        const aan = g.leden.filter((k) => gekozen.has(k.naam)).map((k) => k.naam);
+        return aan.length > 1 && aan.length === g.leden.length ? [`${g.groep} (alle ${aan.length} klassen)`] : aan;
+      }).join(", ");
+      draai([...gekozen], { ...p, lopend: Date.now() - p.tot < 60e3 }, "", klasTekst);
     });
+    /* Wat de lopende ronde aan deze pagina meldt. */
+    this._ui = {
+      voortgang: (r) => { balk.firstChild.style.width = `${Math.round(100 * r.i / Math.max(1, r.n))}%`; status.textContent = r.tekst; },
+      /* De resultaten staan er: de keuzes maken plaats voor een samenvatting met "Andere selectie". */
+      klaar: () => { toonBezig(false); this._ongezien = false; kaart.style.display = "none"; this.teken(DT, resultaat, status); },
+      fout: (tekst) => { toonBezig(false); status.textContent = tekst; },
+    };
+    this._andere = () => { resultaat.replaceChildren(); kaart.style.display = ""; status.textContent = ""; balk.firstChild.style.width = "0"; pagina_.scrollIntoView?.({ block: "start" }); };
+    /* Dezelfde lijst nog eens, vanuit de samenvatting: aanvullen of volledig controleren. */
+    this._opnieuw = (wijze) => { const d = this._data; if (d) draai(d.klassen, d.per.lopend ? { ...d.per, tot: new Date() } : d.per, wijze, d.klasTekst); };
     /* Magisters eigen paginakop met kruimelpad, zoals Meldingen en Registraties (invert als de echte kop dat ook is). */
     const kop = DT.el("dna-page-header", { heading: "Lesregistraties" });
     const echt = DT.deepQuery("att-attendance-dashboard")?.shadowRoot?.querySelector("dna-page-header");
@@ -146,13 +188,13 @@ DT.register({
     kop.append(DT.el("dna-breadcrumb", { slot: "breadcrumb" }, terug), DT.el("dna-breadcrumb", { slot: "breadcrumb", text: "Lesregistraties" }));
     const pagina_ = DT.el("section", { id: "dt-lrp", class: "dt-lr", "aria-label": "Lesregistraties" }, [kop,
       DT.el("div", { class: "dt-lr-inhoud" }, [
-        DT.el("dna-card", { class: "dt-lr-kaart" }, [
+        (kaart = DT.el("dna-card", { class: "dt-lr-kaart" }, [
           DT.el("h2", { text: "Selectie" }),
           DT.el("p", { class: "dt-lr-zacht", text: groepen.length > 1 ? "Vink een hele opleiding aan, of klap haar open om losse klassen te kiezen. Kies daarna een periode; filteren op vak of docent kan in de resultaten." : "Kies één of meer klassen en een periode. Daarna filter je op vak of docent." }),
           DT.el("div", { class: "dt-lr-veldgroep" }, [DT.el("span", { class: "dt-lr-label", text: groepen.length > 1 ? "Opleidingen en klassen" : "Klassen" }), kiezer]),
           DT.el("div", { class: "dt-lr-rij" }, [DT.el("label", { class: "dt-lr-veldgroep" }, [DT.el("span", { class: "dt-lr-label", text: "Periode" }), per]), eigen, start]),
-          balk, status,
-        ]),
+          mapRegel, balk, DT.el("div", { class: "dt-lr-voortgang" }, [status, stop]),
+        ])),
         resultaat,
       ])]);
     const tiles = document.querySelector("mg-att-tiles"), uv = tiles?.parentElement;
@@ -161,6 +203,36 @@ DT.register({
     this._dlg = pagina_;
     if (!DT.route.nu("lesreg")) DT.route.zet("lesreg", {});
     this.componenten();
+    /* Loopt er nog een ronde, of is er een klaar terwijl je ergens anders was? Dan gaat de pagina daar verder. */
+    toonBezig(!!this._ronde?.bezig);
+    if (this._ronde?.bezig) this._ui.voortgang(this._ronde);
+    else if (this._ongezien && this._data) { DT.taak("lesreg", null); this._ui.klaar(); }
+    else if (this._ronde?.fout) { DT.taak("lesreg", null); status.textContent = this._ronde.fout; this._ronde.fout = ""; }
+  },
+  /* Eén ronde ophalen. Die hangt niet aan de pagina: ga je in Magister ergens anders heen, dan loopt ze door, staat
+   * de stand onderin het hoofdmenu (DT.taak) en gaat alles wat is opgehaald naar de map. Is de pagina open, dan
+   * krijgt die de voortgang en het resultaat (this._ui); anders blijft de melding in het menu staan tot je klikt. */
+  async ronde(DT, klassen, per, opties) {
+    const r = this._ronde = { bezig: true, stop: false, i: 0, n: 1, tekst: "", fout: "" }, open = () => this.open(DT);
+    try {
+      const d = await this.ophalen(DT, klassen, per, (i, n, tekst) => {
+        if (r.stop) throw new Error("afgebroken");
+        Object.assign(r, { i, n, tekst }); this._ui?.voortgang(r);
+        DT.taak("lesreg", { titel: "Lesregistraties", tekst: tekst.replace(/^Student (\d+ van \d+):.*/, "student $1") || "bezig…", deel: i / Math.max(1, n), open, stop: () => { r.stop = true; } });
+      }, opties);
+      d.klasTekst = opties.klasTekst || "";
+      this._data = d; this._filter = { vakken: new Set(), docenten: new Set(), weergave: this._filter?.weergave || "student" };
+      r.bezig = false;
+      if (this._ui) { DT.taak("lesreg", null); this._ui.klaar(); }
+      else { this._ongezien = true; DT.taak("lesreg", { titel: "Lesregistraties", tekst: "De lijst is klaar: klik om te bekijken", klaar: true, open }); }
+    } catch (e) {
+      r.bezig = false;
+      const gestopt = String(e?.message) === "afgebroken";
+      r.fout = gestopt ? `Gestopt.${opties.map ? " Wat al was opgehaald staat in de map." : ""}` : `Er ging iets mis: ${e?.message || e}`;
+      if (this._ui) { DT.taak("lesreg", null); this._ui.fout(r.fout); r.fout = ""; }
+      else if (gestopt) { DT.taak("lesreg", null); r.fout = ""; }
+      else DT.taak("lesreg", { titel: "Lesregistraties", tekst: r.fout, fout: true, open });
+    }
   },
   /* Magisters onderdelen negeren attributen die de extensie zet; het netwerk-script in de pagina zet ze opnieuw. */
   componenten() {
@@ -173,8 +245,11 @@ DT.register({
   },
 
   /* ---------- ophalen ---------- */
-  async ophalen(DT, klassen, per, voortgang) {
-    const peil = this.ymd(new Date());
+  /* Met een map (LesOpslag): per student alleen ophalen wat de bewaarde lijst nog niet dekt, meestal de laatste
+   * weken, en het resultaat weer bewaren. De opslag geldt voor het lopende schooljaar; een periode die eerder
+   * begint wordt gewoon in haar geheel opgehaald. bron: waar de gegevens van deze lijst vandaan kwamen. */
+  async ophalen(DT, klassen, per, voortgang, { map = null, vol = false, vers = false } = {}) {
+    const O = LesOpslag, nu = new Date(), peil = this.ymd(nu);
     const lijst = (x) => (x && x.status === 200 && x.json) ? (Array.isArray(x.json) ? x.json : x.json.items || []) : null;
     const api = (url) => DT.apiRetry(url, { opWachten: () => voortgang(klaar, lln.length, "Even wachten: Magister vraagt om rustiger aan te doen…") });
     const lln = [];
@@ -186,21 +261,42 @@ DT.register({
       for (const x of lijst(z)) if (!lln.some((l) => l.id === x.id)) lln.push({ id: x.id, naam: this.naam(x), achternaam: x.achternaam || "", stam: String(x.code ?? x.stamnummer ?? ""), klas });
     }
     lln.sort((a, b) => a.klas.localeCompare(b.klas, "nl", { numeric: true }) || a.achternaam.localeCompare(b.achternaam, "nl"));
+    const metMap = !!map && per.van >= new Date(O.sjJaar(nu), 7, 1);
+    const bewaard = {}, gewijzigd = new Set(), bron = { map: metMap ? map.name : null, uit: 0, deels: 0, geheel: 0, oud: 0, op: Date.now(), fout: null };
+    if (metMap) for (const klas of klassen) { voortgang(0, 1, `Bewaarde lijst van ${klas} lezen…`); bewaard[klas] = await O.lees(map, klas) || { studenten: {} }; }
     const werk = lln.slice(), uit = [];
     const doe = async () => {
       while (werk.length) {
-        const l = werk.shift();
-        voortgang(klaar, lln.length, `Student ${klaar + 1} van ${lln.length}: ${l.naam}`);
-        const { regs, rooster, status } = await vzBron.haal(l.id, per.van, per.tot, { api, pauze: 120, vers: true });
-        const S = regs && rooster ? vzStats(regs, rooster, per.van, per.tot) : null;
-        uit.push({ l, lessen: S ? S.lessen : [], fout: S ? null : (status.regs !== 200 ? status.regs : status.rooster) });
+        const l = werk.shift(), id = String(l.id), st = metMap ? bewaard[l.klas].studenten[id] : null, dekt = !!st?.van && st.van <= O.ymd(per.van);
+        /* Volledig controleren: alles wat er van de student bewaard is opnieuw, niet alleen deze periode. */
+        const eerste = vol && st?.van && O.datum(st.van) < per.van ? O.datum(st.van) : per.van;
+        const p = metMap ? O.plan(vol ? null : st, eerste, per.tot, nu, vers) : { begin: per.van, vol: true }, tot = metMap ? nu : per.tot;
+        voortgang(klaar, lln.length, `Student ${klaar + 1} van ${lln.length}: ${l.naam}${!p.begin ? " (uit de map)" : p.vol ? "" : " (laatste weken aanvullen)"}`);
+        let lessen = st ? st.lessen : null, fout = null;
+        if (!p.begin) bron.uit++;
+        else {
+          const { regs, rooster, status } = await vzBron.haal(l.id, p.begin, tot, { api, pauze: 120, vers: true });
+          if (regs && rooster) {
+            const nieuw = vzStats(regs, rooster, p.begin, tot).lessen, toen = Date.now();
+            lessen = p.vol ? nieuw : O.voeg(st.lessen, nieuw, p.begin);
+            if (metMap) { bewaard[l.klas].studenten[id] = { naam: l.naam, van: p.vol ? O.ymd(p.begin) : st.van, tot: O.ymd(nu), op: toen, vol: p.vol ? toen : st.vol || 0, lessen }; gewijzigd.add(l.klas); }
+            if (p.vol) bron.geheel++; else bron.deels++;
+          } else if (dekt) bron.oud++;   // ophalen mislukte: wat er stond blijft staan
+          else { lessen = null; fout = status.regs !== 200 ? status.regs : status.rooster; }
+        }
+        /* Voor de samenvatting: de oudste aanvulling en de oudste volledige controle van de studenten in de lijst. */
+        const rec = metMap && !fout ? bewaard[l.klas].studenten[id] : null;
+        if (rec) { bron.aangevuld = Math.min(bron.aangevuld ?? Infinity, rec.op || 0); bron.volledig = Math.min(bron.volledig ?? Infinity, rec.vol || 0); }
+        uit.push({ l, lessen: !lessen ? [] : metMap ? O.binnen(lessen, per.van, per.tot) : lessen, fout });
         klaar++;
       }
     };
-    await Promise.all([doe(), doe()]);
+    /* Ook na afbreken of een fout: wat al is opgehaald gaat naar de map. */
+    try { await Promise.all([doe(), doe()]); }
+    finally { for (const klas of gewijzigd) try { await O.schrijf(map, klas, bewaard[klas].studenten); } catch (e) { bron.fout = String(e?.message || e); } }
     voortgang(lln.length, lln.length, "");
     uit.sort((x, y) => lln.indexOf(x.l) - lln.indexOf(y.l));
-    return { per, klassen, studenten: uit };
+    return { per, klassen, studenten: uit, bron };
   },
 
   /* ---------- berekenen ---------- */
@@ -329,7 +425,32 @@ DT.register({
     this._bar = bar;
     const kaartkop = (titel, sub, ...rechts) => DT.el("div", { class: "dt-lr-kaartkop" }, [DT.el("div", { class: "dt-lr-wie" }, [DT.el("h2", { text: titel }), sub ? DT.el("small", { text: sub }) : null].filter(Boolean)), ...rechts]);
     const grafiek = this.weekGrafiek(DT);
+    /* Wat er gekozen is, in één oogopslag; de keuzes zelf komen terug met "Andere selectie". */
+    const b = d.bron || {}, n = d.studenten.length, O = LesOpslag;
+    const dagen = b.volledig ? Math.floor((Date.now() - b.volledig) / 864e5) : null, teOud = !!b.map && (dagen == null || dagen >= O.CONTROLE);
+    const bron = !b.map ? `Uit Magister opgehaald om ${this.tijd(new Date(b.op || Date.now()))}. Niet bewaard${window.showDirectoryPicker ? ": er is geen map gekozen, of de periode begint vóór dit schooljaar" : ""}.`
+      : [`Bewaard in de map "${b.map}".`, b.uit === n ? "Er is nu niets opnieuw opgehaald." : b.uit ? `${b.uit} van ${n} studenten kwamen uit de map.` : "", b.deels ? `Van ${b.deels} zijn de laatste weken aangevuld.` : "", b.geheel ? `${b.geheel} ${b.geheel === 1 ? "is" : "zijn"} helemaal opgehaald.` : "",
+        b.oud ? `Bij ${b.oud} lukte het ophalen niet: daar staat de vorige stand.` : "", b.fout ? `Bewaren lukte niet (${b.fout}).` : ""].filter(Boolean).join(" ");
+    const rij = (label, ...waarde) => DT.el("div", {}, [DT.el("dt", { text: label }), DT.el("dd", {}, waarde)]);
+    /* Na een tijd zonder volledige controle: wijzigingen in oudere lessen kunnen gemist zijn. */
+    const controleer = DT.el("button", { type: "button", class: "dt-lr-link", text: "Nu volledig controleren" }); controleer.addEventListener("click", () => this._opnieuw?.("vol"));
+    const melding = teOud ? DT.el("p", { class: "dt-lr-melding", role: "note" }, [dagen == null ? "Deze lijst is nog niet volledig gecontroleerd. " : `De laatste volledige controle is ${dagen} dagen geleden. Wijzigingen in lessen van langer dan twee weken terug zijn sindsdien niet meegenomen. `, controleer]) : null;
+    const keuze = DT.el("dna-card", { class: "dt-lr-kaart dt-lr-keuze" }, [
+      kaartkop("Selectie", "", ...(b.map ? [this.knop(DT, "Aanvullen", () => this._opnieuw?.("aanvullen"), false, "klein"), this.knop(DT, "Volledig controleren", () => this._opnieuw?.("vol"), false, "klein")] : [this.knop(DT, "Opnieuw ophalen", () => this._opnieuw?.(""), false, "klein")]),
+        this.knop(DT, "Andere selectie", () => this._andere?.(), false, "klein")),
+      melding,
+      DT.el("dl", { class: "dt-lr-keuzes" }, [
+        rij("Klassen", d.klasTekst || d.klassen.join(", ")),
+        rij("Periode", d.per.key === "eigen" ? d.per.naam : `${d.per.naam} · ${this.datum(d.per.van)} t/m ${this.datum(d.per.tot)}`),
+        rij("Vak", f.vakken.size ? [...f.vakken].join(", ") : `alle ${vakken.length} vakken`),
+        rij("Docent", f.docenten.size ? [...f.docenten].join(", ") : `alle ${docenten.length} docenten`),
+        rij("In deze lijst", `${n} ${n === 1 ? "student" : "studenten"} · ${totaal.telt} lessen · ${totaal.pct ?? "—"}% aanwezig`),
+        b.map ? rij("Laatst aangevuld", this.moment(b.aangevuld)) : null,
+        b.map ? rij("Volledig gecontroleerd", `${this.moment(b.volledig)}${dagen > 1 ? ` (${dagen} dagen geleden)` : ""}`) : null,
+        rij("Gegevens", bron),
+      ])]);
     doel.replaceChildren(...[
+      keuze,
       DT.el("dna-card", { class: "dt-lr-kaart" }, [kaartkop("Filter", "Ctrl/Cmd-klik om meerdere vakken of docenten te kiezen."),
         DT.el("div", { class: "dt-lr-filters" }, [filterLijst("Vak", vakken, f.vakken), filterLijst("Docent", docenten, f.docenten)])]),
       kpis,
@@ -449,6 +570,14 @@ DT.register({
       .dt-lr-chips { display: flex; flex-wrap: wrap; gap: 6px; }
       .dt-lr-chip { appearance: none; height: 30px; padding: 0 12px; border: 1px solid var(--lr-lijn); border-radius: 999px; background: var(--lr-kaart); color: inherit; font-size: 13px; cursor: pointer; }
       .dt-lr-chip:hover { background: var(--lr-hover); }
+      .dt-lr-mapregel { margin-top: 12px; } .dt-lr-mapregel .dt-lr-link, .dt-lr-keuzes .dt-lr-link { font-size: inherit; }
+      .dt-lr-keuze .dt-lr-kaartkop { margin-bottom: 8px; }
+      .dt-lr-voortgang { display: flex; align-items: baseline; gap: 12px; margin-top: 8px; } .dt-lr-voortgang .dt-lr-status { flex: 1; min-width: 0; } .dt-lr-stop { font-size: 13px; }
+      .dt-lr-melding { margin: 0 0 12px; padding: 8px 12px; border-radius: var(--lr-r); border: 1px solid color-mix(in srgb, #f5a524 60%, transparent); background: color-mix(in srgb, #f5a524 14%, transparent); font-size: 13px; }
+      .dt-lr-melding .dt-lr-link { font-size: inherit; }
+      .dt-lr-keuzes { margin: 0; display: grid; gap: 6px; } .dt-lr-keuzes > div { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; }
+      .dt-lr-keuzes dt { color: var(--lr-zacht); font-size: 13px; } .dt-lr-keuzes dd { margin: 0; overflow-wrap: anywhere; }
+      @media (max-width: 560px) { .dt-lr-keuzes > div { grid-template-columns: 1fr; gap: 0; } }
       .dt-lr-groepen { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 16px; align-items: start; }
       .dt-lr-groep { border: 1px solid var(--lr-lijn); border-radius: var(--lr-r); } .dt-lr-groep[open] { grid-column: 1 / -1; }
       .dt-lr-groep summary { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: var(--lr-r); cursor: pointer; list-style: none; font-size: 14px; } .dt-lr-groep summary:hover { background: var(--lr-hover); }

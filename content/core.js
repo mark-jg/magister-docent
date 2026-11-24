@@ -321,6 +321,49 @@
       },
     },
 
+    /* Lopend werk zichtbaar onderin Magisters hoofdmenu, net boven de knop om het menu in te klappen: zo zie je
+     * ook op een andere pagina dat de plugin nog bezig is. Staat het menu er niet, dan linksonder in beeld.
+     *   DT.taak(id, { titel, tekst, deel, klaar, fout, open, stop })   tonen of bijwerken
+     *   DT.taak(id, null)                                              weghalen
+     * deel: 0..1 voor de voortgangsring (weglaten: draaiend); klaar of fout: het werk loopt niet meer, het blok
+     * blijft staan tot erop geklikt of het gesloten wordt. open(): klik op het blok; stop(): klik op het kruisje
+     * terwijl het loopt. */
+    _taken: new Map(),
+    taak(id, t) {
+      if (t) DT._taken.set(id, t); else DT._taken.delete(id);
+      if (DT._taken.size && !DT._taakStop) DT._taakStop = DT.observe(() => DT.taakTeken(), { debounce: 300, poll: 2000 });
+      else if (!DT._taken.size && DT._taakStop) { DT._taakStop(); DT._taakStop = null; }
+      DT.taakTeken();
+    },
+    taakTeken() {
+      let host = document.getElementById("dt-taken");
+      if (!DT._taken.size) { host?.remove(); DT._taakBeeld = ""; return; }
+      const ul = document.querySelector("ul.main-menu"), voet = document.querySelector(".menu-footer") || null;
+      const ouder = voet?.parentElement || ul?.parentElement || document.body;
+      if (!host) { host = DT.el("div", { id: "dt-taken", role: "status", "aria-live": "polite" }); DT._taakBeeld = ""; }
+      if (host.parentElement !== ouder || (voet && host.nextElementSibling !== voet)) { if (voet) voet.before(host); else ouder.append(host); }
+      host.classList.toggle("is-los", ouder === document.body);
+      /* Staat de voet vast onderin, dan komt het blok er vast boven; de kleur is die van de menu-items. */
+      const vast = !!voet && /absolute|fixed/.test(getComputedStyle(voet).position), link = ul?.querySelector("li > a");
+      const plek = vast ? `${voet.offsetHeight}px` : "", kleur = link ? getComputedStyle(link).color : "";
+      if (host.classList.contains("is-vast") !== vast) host.classList.toggle("is-vast", vast);
+      if (host.style.bottom !== plek) host.style.bottom = plek;
+      if (kleur && host.dataset.kleur !== kleur) { host.dataset.kleur = kleur; host.style.color = kleur; }
+      /* Alleen opnieuw opbouwen als er iets veranderd is: de waarnemer ziet ook onze eigen wijzigingen. */
+      const beeld = JSON.stringify([...DT._taken].map(([id, t]) => [id, t.titel, t.tekst, t.deel == null ? null : Math.round(t.deel * 100), !!t.klaar, !!t.fout, !!t.stop]));
+      if (beeld === DT._taakBeeld) return;
+      DT._taakBeeld = beeld;
+      host.replaceChildren(...[...DT._taken].map(([id, t]) => {
+        const loopt = !t.klaar && !t.fout;
+        const ring = DT.el("span", { class: "dt-taak-ring", "aria-hidden": "true", ...(loopt && t.deel != null ? { style: `--dt-deel:${Math.round(Math.max(0, Math.min(1, t.deel)) * 100)}%` } : {}) });
+        const open = DT.el("button", { type: "button", class: "dt-taak-open", title: `${t.titel}: ${t.tekst || ""}` }, [ring, DT.el("span", { class: "dt-taak-tekst" }, [DT.el("b", { text: t.titel }), DT.el("small", { text: t.tekst || "" })])]);
+        open.addEventListener("click", () => { const nu = DT._taken.get(id); if (nu && (nu.klaar || nu.fout)) DT.taak(id, null); t.open?.(); });
+        const weg = loopt && !t.stop ? null : DT.el("button", { type: "button", class: "dt-taak-weg", title: loopt ? "Stoppen" : "Sluiten", "aria-label": `${t.titel}: ${loopt ? "stoppen" : "sluiten"}`, text: "×" });
+        weg?.addEventListener("click", () => { if (loopt) t.stop(); else DT.taak(id, null); });
+        return DT.el("div", { class: `dt-taak${t.klaar ? " is-klaar" : t.fout ? " is-fout" : t.deel == null ? " is-draait" : ""}` }, [open, weg]);
+      }));
+    },
+
     /* Een eigen item onderaan Magisters hoofdmenu: een kopie van een bestaand item (zo klopt de opmaak in elk
      * thema), met eigen icoon, tekst en klik. Aanroepen bij elke ronde van DT.observe: het item wordt één keer
      * gemaakt (Magister bouwt het menu soms opnieuw op). Geeft het <li>, of null als het menu er nog niet is.
