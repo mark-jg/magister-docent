@@ -245,6 +245,15 @@
   </section>
 
   <h2 class="bladkop" data-blad="meer">Meer</h2>
+  <section class="mod" id="backup" data-blad="meer">
+    <div class="modkop"><button type="button" class="modnaam" aria-expanded="false" aria-controls="backup-inhoud"><span>Back-up en opslag</span><small>Map voor de back-up van Opleidingen en de lijsten van Lesregistraties</small></button></div>
+    <div class="inhoud" id="backup-inhoud" hidden>
+    <p>Kies een map op deze computer of in OneDrive. Opleidingen zet daar na elke update een back-up neer, en Lesregistraties bewaart er de lijsten per klas, zodat een volgende keer alleen de laatste weken worden bijgewerkt. Een andere computer met dezelfde map kan verder waar je was. De bestanden bevatten namen van studenten: kies een plek die daarvoor is toegestaan.</p>
+    <p id="mapStatus" style="color:var(--muted)">Map opvragen…</p>
+    <label class="row"><button id="mapKies">Map kiezen</button> <button id="mapToegang" hidden>Toegang geven</button> <button id="mapVergeet" hidden>Vergeten</button></label>
+    <p style="font-size:13px;color:var(--muted)">Kiezen en toegang geven gebeuren op het Magister-tabblad: daar verschijnt een venstertje met een knop. Chrome vraagt één keer per sessie om toegang tot de map.</p>
+    </div>
+  </section>
   <section class="mod" id="zijkolom" data-blad="meer">
     <div class="modkop"><button type="button" class="modnaam" aria-expanded="false" aria-controls="zijkolom-inhoud"><span>Zijkolom</span><small>Handvat, snelle links en de volgorde op Start</small></button><label class="switch"><input type="checkbox" data-path="panel.enabled"><span></span></label></div>
     <div class="inhoud" id="zijkolom-inhoud" hidden>
