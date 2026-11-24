@@ -86,10 +86,24 @@ DT.register({
     klassen.sort((a, b) => String(a.naam).localeCompare(String(b.naam), "nl", { numeric: true }));
     let bewaard = []; try { bewaard = JSON.parse(localStorage.getItem("dt-lesreg-klassen") || "[]"); } catch {}
     const gekozen = new Set(bewaard.filter((k) => klassen.some((x) => x.naam === k)));
-    const chips = DT.el("div", { class: "dt-lr-chips" }, klassen.map((k) => {
-      const b = DT.el("button", { type: "button", class: "dt-lr-chip", "aria-pressed": String(gekozen.has(k.naam)), text: `${k.naam}${k.aantal ? ` (${k.aantal})` : ""}` });
-      b.addEventListener("click", () => { gekozen.has(k.naam) ? gekozen.delete(k.naam) : gekozen.add(k.naam); b.setAttribute("aria-pressed", String(gekozen.has(k.naam))); });
-      return b;
+    /* De klassen per opleiding (het begin van de klasnaam, zoals op de pagina Opleidingen): het vakje kiest de hele
+     * opleiding, openklappen toont de losse klassen. Met maar één opleiding staan de klassen er gewoon. */
+    const groepen = OplReken.groepen(Object.fromEntries(klassen.map((k) => [k.naam, k.aantal ?? null])));
+    const kiezer = DT.el("div", { class: groepen.length > 1 ? "dt-lr-groepen" : "" }, groepen.map((g) => {
+      const vak = DT.el("input", { type: "checkbox", "aria-label": `Alle klassen van ${g.groep}` }), tel = DT.el("small", { class: "dt-lr-zacht" });
+      const knoppen = g.leden.map((k) => DT.el("button", { type: "button", class: "dt-lr-chip", "data-klas": k.naam, text: `${k.naam}${k.aantal ? ` (${k.aantal})` : ""}` }));
+      const bij = () => {
+        const n = g.leden.filter((k) => gekozen.has(k.naam)).length;
+        for (const b of knoppen) b.setAttribute("aria-pressed", String(gekozen.has(b.dataset.klas)));
+        vak.checked = n === g.leden.length; vak.indeterminate = n > 0 && n < g.leden.length;
+        tel.textContent = vak.indeterminate ? `${n} van ${g.leden.length} klassen` : `${g.leden.length} ${g.leden.length === 1 ? "klas" : "klassen"}${g.studenten ? ` · ${g.studenten}` : ""}`;
+      };
+      for (const b of knoppen) b.addEventListener("click", () => { const k = b.dataset.klas; gekozen.has(k) ? gekozen.delete(k) : gekozen.add(k); bij(); });
+      vak.addEventListener("change", () => { for (const k of g.leden) vak.checked ? gekozen.add(k.naam) : gekozen.delete(k.naam); bij(); });
+      bij();
+      const chips = DT.el("div", { class: "dt-lr-chips" }, knoppen);
+      if (groepen.length < 2) return chips;
+      return DT.el("details", { class: "dt-lr-groep", ...(vak.indeterminate ? { open: "" } : {}) }, [DT.el("summary", {}, [DT.el("label", {}, [vak, DT.el("b", { text: g.groep })]), tel]), chips]);
     }));
     const keuzes = this.periodes(DT);
     const per = DT.el("select", { class: "dt-lr-veld dt-lr-periode" }, keuzes.map((k) => DT.el("option", { value: k.key, text: k.naam })));
@@ -134,8 +148,8 @@ DT.register({
       DT.el("div", { class: "dt-lr-inhoud" }, [
         DT.el("dna-card", { class: "dt-lr-kaart" }, [
           DT.el("h2", { text: "Selectie" }),
-          DT.el("p", { class: "dt-lr-zacht", text: "Kies één of meer klassen en een periode. Daarna filter je op vak of docent." }),
-          DT.el("div", { class: "dt-lr-veldgroep" }, [DT.el("span", { class: "dt-lr-label", text: "Klassen" }), chips]),
+          DT.el("p", { class: "dt-lr-zacht", text: groepen.length > 1 ? "Vink een hele opleiding aan, of klap haar open om losse klassen te kiezen. Kies daarna een periode; filteren op vak of docent kan in de resultaten." : "Kies één of meer klassen en een periode. Daarna filter je op vak of docent." }),
+          DT.el("div", { class: "dt-lr-veldgroep" }, [DT.el("span", { class: "dt-lr-label", text: groepen.length > 1 ? "Opleidingen en klassen" : "Klassen" }), kiezer]),
           DT.el("div", { class: "dt-lr-rij" }, [DT.el("label", { class: "dt-lr-veldgroep" }, [DT.el("span", { class: "dt-lr-label", text: "Periode" }), per]), eigen, start]),
           balk, status,
         ]),
@@ -435,6 +449,14 @@ DT.register({
       .dt-lr-chips { display: flex; flex-wrap: wrap; gap: 6px; }
       .dt-lr-chip { appearance: none; height: 30px; padding: 0 12px; border: 1px solid var(--lr-lijn); border-radius: 999px; background: var(--lr-kaart); color: inherit; font-size: 13px; cursor: pointer; }
       .dt-lr-chip:hover { background: var(--lr-hover); }
+      .dt-lr-groepen { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 16px; align-items: start; }
+      .dt-lr-groep { border: 1px solid var(--lr-lijn); border-radius: var(--lr-r); } .dt-lr-groep[open] { grid-column: 1 / -1; }
+      .dt-lr-groep summary { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: var(--lr-r); cursor: pointer; list-style: none; font-size: 14px; } .dt-lr-groep summary:hover { background: var(--lr-hover); }
+      .dt-lr-groep summary::-webkit-details-marker { display: none; } .dt-lr-groep summary:focus-visible { outline: 2px solid var(--lr-acc); outline-offset: 1px; }
+      .dt-lr-groep summary::before { content: ""; width: 6px; height: 6px; margin: 0 2px; border: solid var(--lr-zacht); border-width: 0 2px 2px 0; transform: rotate(-45deg); transition: transform .15s; } .dt-lr-groep[open] > summary::before { transform: rotate(45deg); }
+      .dt-lr-groep label { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; } .dt-lr-groep input { accent-color: var(--lr-acc); }
+      .dt-lr-groep summary small { margin-left: auto; white-space: nowrap; } .dt-lr-groep .dt-lr-chips { padding: 4px 10px 10px 34px; }
+      @media (prefers-reduced-motion: reduce) { .dt-lr-groep summary::before { transition: none; } }
       .dt-lr-chip[aria-pressed="true"] { background: var(--lr-actief); border-color: var(--lr-acc); font-weight: 700; }
       .dt-lr-link { appearance: none; border: 0; background: none; padding: 0; color: var(--lr-acc); font-size: 12px; font-weight: 600; cursor: pointer; }
       .dt-lr-link:hover { text-decoration: underline; }

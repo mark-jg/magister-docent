@@ -203,3 +203,18 @@ test("routes: Magisters eigen toevoegingen blijven staan, en zonder adres werkt 
   assert.strictEqual(b.extra.location.hash, "#/begeleiding/123?innerUrl=abc", "het adres blijft staan");
   assert.strictEqual(DT.route.nu("cb").view, "signalen"); assert.strictEqual(b.stappen.length, 4);
 });
+
+test("tempo: aanvragen starten met tussenpozen, en na een 429 houdt alles in en gaat het daarna rustiger", async (t) => {
+  const p = kernMetPagina(t), starts = []; let weiger = 1;
+  const loop = async (ms) => { for (let i = 0; i < ms / 10; i++) { for (let j = 0; j < 8; j++) await Promise.resolve(); p.tijd(10); } };
+  p.DT.api = async (url) => { starts.push([url, Date.now()]); return url === "/b" && weiger-- > 0 ? { status: 429, retryAfter: "4" } : { status: 200, json: [] }; };
+  const t0 = Date.now(), alle = Promise.all(["/a", "/b", "/c", "/d"].map((u) => p.DT.apiRetry(u)));
+  await loop(8000); await alle;
+  const op = (u) => starts.filter((s) => s[0] === u).map((s) => s[1] - t0);
+  assert.deepStrictEqual([op("/a")[0], op("/b")[0]], [0, 150], "niet tegelijk, maar 150 ms na elkaar");
+  assert.strictEqual(op("/b").length, 2, "de geweigerde aanvraag is opnieuw gedaan");
+  for (const u of ["/b", "/c", "/d"]) assert.ok(op(u).at(-1) >= 150 + 4000, `${u} wacht zo lang als Magister vraagt`);
+  const na = starts.map((s) => s[1] - t0).filter((x) => x >= 4000).sort((a, b) => a - b);
+  assert.ok(na[1] - na[0] >= 300 && na[2] - na[1] >= 300, "daarna met dubbele tussenpozen");
+  assert.strictEqual(p.DT.tempo.tussen, 300); assert.ok(p.DT.tempo.vloer > 150, "het te snelle tempo wordt onthouden");
+});

@@ -72,11 +72,23 @@ var OplReken = {
   /* De groep van een klas voor de keuze vooraf: de letters waarmee de klasnaam begint (MIP1A → MIP). Dat kost
    * geen aanvraag: de klasnamen komen mee met de telling. */
   groep(klas) { return ((/^[A-Za-z]+/.exec(String(klas || "")) || [""])[0] || String(klas || "")).toUpperCase(); },
-  /* Alle groepen uit een telling { klas: aantal }: [{ groep, klassen, studenten }], op naam. */
+  /* Alle groepen uit een telling { klas: aantal }: [{ groep, klassen, studenten, leden: [{ naam, aantal }] }], op naam. */
   groepen(telling) {
-    const uit = {};
-    for (const [k, n] of Object.entries(telling || {})) { const g = (uit[this.groep(k)] ||= { groep: this.groep(k), klassen: 0, studenten: 0 }); g.klassen++; g.studenten += n || 0; }
-    return Object.values(uit).sort((a, b) => a.groep.localeCompare(b.groep, "nl", { numeric: true }));
+    const uit = {}, nl = (a, b) => a.localeCompare(b, "nl", { numeric: true });
+    for (const [k, n] of Object.entries(telling || {})) {
+      const g = (uit[this.groep(k)] ||= { groep: this.groep(k), klassen: 0, studenten: 0, leden: [] });
+      g.klassen++; g.studenten += n || 0; g.leden.push({ naam: k, aantal: n ?? null });
+    }
+    for (const g of Object.values(uit)) g.leden.sort((a, b) => nl(a.naam, b.naam));
+    return Object.values(uit).sort((a, b) => nl(a.groep, b.groep));
+  },
+  /* Van de aangevinkte klassen (een Set) naar wat bewaard wordt: { groepen, klassen }. Een opleiding waarvan alles
+   * aan staat telt als geheel, zodat een nieuwe klas daar vanzelf bij hoort; van de andere staan de klassen los.
+   * groepen is null als alles aan staat. */
+  keuze(groepen, aan) {
+    const heel = groepen.filter((g) => g.leden.every((l) => aan.has(l.naam))).map((g) => g.groep);
+    const los = groepen.filter((g) => !heel.includes(g.groep)).flatMap((g) => g.leden.filter((l) => aan.has(l.naam)).map((l) => l.naam));
+    return { groepen: heel.length === groepen.length ? null : heel, klassen: los };
   },
   /* Geen leerjaar uit Magister: het eerste cijfer in de klasnaam (MV2A → 2). */
   leerjaarUitKlas(klas) { const m = /[1-9]/.exec(String(klas || "")); return m ? +m[0] : null; },
