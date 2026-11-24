@@ -70,14 +70,23 @@ const LesOpslag = {
       };
     });
   },
-  /* { h, mag }: de gekozen map (of null) en of Chrome er nu in mag schrijven. Toegang vraagt een klik. */
+  /* Een vraag aan de map met een tijdslimiet. Chrome geeft op sommige vragen nooit antwoord, bijvoorbeeld op
+   * queryPermission voor een map die een andere versie van de extensie (de dev-versie) heeft gekozen; zonder limiet
+   * bleven Lesregistraties en Opleidingen dan eindeloos wachten. Na de limiet geldt de terugvalwaarde. */
+  metLimiet(belofte, ms, terug) {
+    return Promise.race([Promise.resolve(belofte).catch(() => terug), new Promise((ok) => setTimeout(() => ok(terug), ms))]);
+  },
+  /* { h, mag }: de gekozen map (of null) en of Chrome er nu in mag schrijven. Toegang vraagt een klik. Geeft Chrome
+   * geen antwoord op de vraag naar toegang, dan is de bewaarde map onbruikbaar (gekozen door een andere versie van de
+   * extensie): dan geldt er geen map, zodat je een nieuwe kunt kiezen. */
   async map() {
     try {
-      const h = await this.kv("map"); if (!h) return { h: null, mag: false };
-      return { h, mag: await h.queryPermission({ mode: "readwrite" }) === "granted" };
+      const h = await this.metLimiet(this.kv("map"), 3000, null); if (!h) return { h: null, mag: false };
+      const mag = await this.metLimiet(h.queryPermission({ mode: "readwrite" }), 3000, "geen antwoord");
+      return mag === "geen antwoord" ? { h: null, mag: false } : { h, mag: mag === "granted" };
     } catch { return { h: null, mag: false }; }
   },
-  async toegang(h) { try { return await h.requestPermission({ mode: "readwrite" }) === "granted"; } catch { return false; } },
+  async toegang(h) { return await this.metLimiet(h.requestPermission({ mode: "readwrite" }), 60000, "denied") === "granted"; },
   /* Een map kiezen; die geldt daarna ook voor de back-up van Opleidingen. Geeft { h, mag } of null bij annuleren. */
   async kies() {
     const h = await window.showDirectoryPicker({ id: "dt-opl", mode: "readwrite" });
@@ -88,8 +97,12 @@ const LesOpslag = {
   /* Het bestand van een klas: { tekst, studenten: { id: { naam, van, tot, op, lessen } } }, of null. */
   async lees(map, klas, sj = this.sjJaar()) {
     try {
-      const dir = await map.getDirectoryHandle(this.SUB);
-      const b = JSON.parse(await (await (await dir.getFileHandle(this.bestand(klas, sj))).getFile()).text());
+      const tekst = await this.metLimiet((async () => {
+        const dir = await map.getDirectoryHandle(this.SUB);
+        return (await (await dir.getFileHandle(this.bestand(klas, sj))).getFile()).text();
+      })(), 15000, null);
+      if (tekst == null) return null;
+      const b = JSON.parse(tekst);
       if (!b || b.versie !== this.VERSIE || b.host !== location.host || b.klas !== klas) return null;
       const studenten = {};
       for (const [id, st] of Object.entries(b.studenten || {})) studenten[id] = { naam: st.naam, van: st.van, tot: st.tot, op: st.op, vol: st.vol || 0, lessen: this.uitpak(st.l, b.tekst || []) };
