@@ -7,9 +7,8 @@
     klasExcel: () => DT.module("aanwezigexport")?.klas(DT),
     bespreeklijst: () => DT.module("aanwezigexport")?.bespreeklijst(DT),
     lesreg: () => DT.module("lesreg")?.open(DT, null),
-    ai: () => DT.module("ai")?.open(DT),
   };
-  const MODULE = { klasExcel: "aanwezigexport", bespreeklijst: "aanwezigexport", lesreg: "lesreg", ai: "ai" };
+  const MODULE = { klasExcel: "aanwezigexport", bespreeklijst: "aanwezigexport", lesreg: "lesreg" };
 
   function antwoord(msg) {
     const T = DT.module("tables");

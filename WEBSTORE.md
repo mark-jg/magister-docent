@@ -24,7 +24,7 @@ Docent Tools voor Magister maakt Magister prettiger en sneller voor docenten en 
 • Inzicht in verzuim per vak, docent, weekdag en lesuur; eigen periodes in de verzuimoverzichten
 • Lesregistraties en overzichten per opleiding, leerjaar en klas
 • Jarige leerlingen op Vandaag, een overzicht op de leerlingkaart en een commandopalet (Ctrl+K)
-• Hulpmiddelen voor het digibord en een AI-hulp die zelf niets verstuurt
+• Hulpmiddelen voor het digibord: geluidsmeter, kaartenpakje en lesbord
 
 Docent Tools is niet gemaakt door Iddink of Magister en heeft er geen band mee. Magister is een merk van zijn eigenaar.
 
@@ -35,7 +35,7 @@ Docent Tools is niet gemaakt door Iddink of Magister en heeft er geen band mee. 
 **Verantwoording van de rechten:**
 
 - `storage`: om instellingen, notities en opgehaalde overzichten lokaal te bewaren.
-- `clipboardWrite`: om tabellen en AI-prompts op het klembord te zetten als de gebruiker daarom vraagt.
+- `clipboardWrite`: om tabellen en paginatekst op het klembord te zetten als de gebruiker daarom vraagt.
 - `sidePanel`: de zijkolom met acties en instellingen naast Magister.
 - Hosttoegang `*://*.magister.net/*`: de extensie werkt alleen op Magister en gebruikt daar de eigen sessie van de gebruiker om gegevens te tonen en te exporteren. Het subdomein verschilt per school, daarom is het jokerteken nodig.
 

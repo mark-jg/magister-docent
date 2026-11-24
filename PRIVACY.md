@@ -20,8 +20,6 @@ Docent Tools voor Magister is een browserextensie voor docenten en ander persone
 
 Niets. De extensie stuurt geen gegevens naar de maker of naar derden.
 
-**AI-hulp:** hiermee stel je een prompt samen. De extensie kopieert die naar je klembord en opent de AI-dienst die je hebt gekozen (Claude, ChatGPT of Microsoft Copilot) in een nieuw tabblad. Er wordt niets automatisch verstuurd: je plakt de tekst zelf. Met de knop "Namen maskeren" haal je eerst de namen weg. Deel geen herleidbare leerlinggegevens met een AI-dienst als het beleid van je school dat niet toestaat.
-
 **Microfoon:** de lestool "Stille safari" gebruikt de microfoon om het geluidsniveau in de klas te meten. Dat gebeurt alleen nadat je toestemming geeft, het geluid blijft in de browser en er wordt niets opgenomen.
 
 ## Verwijderen

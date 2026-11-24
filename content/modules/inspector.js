@@ -143,7 +143,7 @@ DT.register({
    * componenten (tags met een streepje) en div-gebaseerde grids. */
   report(DT) {
     const out = [];
-    const skip = (el) => el.closest?.("#dt-panel, #dt-handle, #dt-toasts, #dt-inspect-bar, #dt-ai-dialog, .dt-table-tools");
+    const skip = (el) => el.closest?.("#dt-panel, #dt-handle, #dt-toasts, #dt-inspect-bar, .dt-table-tools");
     const kids = (el) => [...(el.shadowRoot ? el.shadowRoot.children : []), ...el.children];
     const anon = (s) => s.replace(/\d{3,}/g, "{id}");
 

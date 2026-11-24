@@ -70,7 +70,6 @@ DT.register({
       { label: "Thema wisselen", hint: "Alt+T", go: () => DT.module("theme")?.toggle(DT) },
       { label: "Tabellen naar Excel", hint: "Alt+E", go: () => DT.module("tables")?.exportAll(DT) },
       { label: "Zoeken (leerling, groep, stamnummer)", hint: "Alt+S", go: () => this.focusSearch(DT) },
-      { label: "Naar AI-assistent", hint: "", go: () => DT.module("ai")?.open(DT) },
       ...(DT.settings.developer?.enabled ? [{ label: "Inspector", hint: "Alt+I", go: () => DT.module("inspector")?.start(DT) }] : []),
       { label: "Instellingen", hint: "", go: () => chrome.runtime.sendMessage({ type: "openOptions" }) },
       ...(globalThis.DT_THEMAS_LIST || []).map(([id, label, sub]) => ({

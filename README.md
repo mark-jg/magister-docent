@@ -2,7 +2,7 @@
 
 Chrome-extensie voor Magister (docenten/personeel). Alles draait lokaal in je browser: er wordt niets naar een server gestuurd.
 
-Dit is de **webstore-versie** (branch `webstore`): dezelfde extensie als `main`, zonder de onderdelen die alleen voor één school gelden (Te laat-balie, Plan van aanpak met de eigen Word-sjablonen, Mail bij Melding Expertisecentrum) en zonder de zelf-updater via GitHub. Updates lopen via de Chrome Web Store.
+Dit is de **webstore-versie** (branch `webstore`): dezelfde extensie als `main`, zonder de onderdelen die alleen voor één school gelden (Te laat-balie, Plan van aanpak met de eigen Word-sjablonen, Mail bij Melding Expertisecentrum), zonder de AI-hulp en zonder de zelf-updater via GitHub. Updates lopen via de Chrome Web Store.
 
 ## Installeren
 
@@ -33,7 +33,6 @@ De extensie zelf heeft geen buildstap. Voor de linter en de tests is Node nodig 
 | Zijkolom: thema, modules, acties, periodes, klok en weeknummer, snelle links, notities, de tabellen van de pagina en alle instellingen. Staat naast Magister in de zijkolom van de browser, valt dus niet over de pagina en is in breedte te verstellen | Alt+D, het icoon van Docent Tools in de werkbalk, of het handvat aan de rand van de pagina |
 | Tabellen: zwevend knopje "Exporteren" bij hover over een datatabel (kalenders en roosters worden overgeslagen), en een overzicht van alle tabellen in de zijkolom. Naar Excel, CSV of klembord (plakt als cellen), sorteerbare koppen; per soort tabel instelbaar welke kolommen meegaan, kopregel, namen maskeren, lege rijen en kolommen weglaten | knoppen boven elke tabel, "Instellen" voor de opties; Alt+E exporteert alle tabellen op de pagina |
 | Sneller invoeren: Enter springt naar de volgende rij, Ctrl+Shift+V plakt een kolom uit Excel in opeenvolgende velden | automatisch in invoertabellen |
-| AI-hulp: prompt uit tabel of selectie, met sjablonen en knop "Namen maskeren" | knop "Naar AI" boven een tabel of in het paneel |
 | Opgeruimde interface: verberg elementen die je niet gebruikt | Inspector (Alt+I), beweeg over een element en druk op H |
 | Snelle aanwezigheid (Lesdashboard > leerlinglijst): "Iedereen aanwezig", springen naar een naam, toetsenbordmodus met letters per kolom | Alt+A, of de balk boven de registratielijst |
 | Navigatie: commandopalet met alle menu-onderdelen en acties | Ctrl+K (of Alt+K); Alt+1 t/m 9 springt naar hoofdmenu-items; Alt+S naar het zoekveld |
@@ -76,7 +75,7 @@ scripts/webstore-zip.sh  Zip voor de Chrome Web Store bouwen
 - Donker thema: "Inversie" werkt overal; "Echte kleuren" gebruikt de designsysteem-variabelen van Magister en is mooier op de nieuwe schermen, maar laat oude schermen licht.
 - Magister is een single-page app; de extensie volgt paginawijzigingen automatisch.
 - Als Iddink de interface aanpast, kan een module tijdelijk niet werken. De generieke functies (thema, export, paneel) zijn daar het minst gevoelig voor.
-- Overleg met ICT/FG van de school voor je de extensie op een beheerde werkplek installeert, en deel geen herleidbare leerlinggegevens met externe AI-diensten zonder dat dit volgens het schoolbeleid is toegestaan.
+- Overleg met ICT/FG van de school voor je de extensie op een beheerde werkplek installeert.
 
 ## Wijzigingen
 

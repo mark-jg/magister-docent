@@ -1,11 +1,11 @@
 /* Tabellen: herkent datatabellen (geen kalenders of roosters) en toont bij hover
  * een klein knopje "Exporteren" rechtsboven de tabel, met Excel, CSV, Kopiëren,
- * Naar AI en Kolommen en opties. Het zijpaneel toont alle tabellen van de pagina.
+ * Kolommen en opties. Het zijpaneel toont alle tabellen van de pagina.
  *
  * Via "Instellen" (of direct bij een export, als "Altijd vragen" aanstaat) kies je:
  *  - welke kolommen meegaan
  *  - of de kopregel meegaat
- *  - of namen gemaskeerd worden (voor delen of AI-gebruik)
+ *  - of namen gemaskeerd worden (voor delen)
  *  - of lege rijen en lege kolommen weggelaten worden
  * De keuze wordt onthouden per soort tabel (op basis van de kolomkoppen), dus de
  * Insight-tabel en het lesdashboard houden elk hun eigen instelling.
@@ -144,7 +144,6 @@ DT.register({
       item("Excel", ".xlsx", () => this.run(DT, t, "xlsx", nm)),
       item("CSV", ".csv", () => this.run(DT, t, "csv", nm)),
       item("Kopiëren", "plakken in Excel", () => this.run(DT, t, "copy", nm)),
-      item("Naar AI", "met sjablonen", () => this.run(DT, t, "ai", nm)),
       DT.el("div", { class: "dt-menu-sep" }),
       item("Kolommen en opties…", "", () => this.dialog(DT, t, null, nm))
     ]);
@@ -216,7 +215,7 @@ DT.register({
     const matrix = DT.tableToMatrix(table);
     const { prefs } = await this.getPrefs(DT, matrix);
     const ask = DT.settings.tables.alwaysAsk;
-    if (ask || (format === "ai" && !prefs)) return this.dialog(DT, table, format, name);
+    if (ask) return this.dialog(DT, table, format, name);
     this.output(DT, this.shape(matrix, prefs), format, name);
   },
 
@@ -224,7 +223,6 @@ DT.register({
     if (!rows.length) return DT.toast("Niets te exporteren met deze instellingen", "err");
     const tsv = rows.map((r) => r.join("\t")).join("\n");
     if (format === "copy") return DT.copy(tsv);
-    if (format === "ai") return DT.module("ai")?.open(DT, tsv);
     if (format === "csv") {
       const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\r\n");
       DT.download(`${safe(name)}.csv`, "\uFEFF" + csv, "text/csv;charset=utf-8");
@@ -272,7 +270,7 @@ DT.register({
         DT.el("div", { style: "padding:0 16px 14px;font-size:12px;color:var(--dt-muted)", text: "Deze keuze wordt onthouden voor tabellen met dezelfde kolommen." }),
         DT.el("div", { class: "dt-row", style: "padding:0 16px 16px;justify-content:flex-end" }, [
           DT.el("button", { class: "dt-btn", text: "Opslaan", onclick: async () => { await this.savePrefs(key, collect(), all); close(); DT.toast("Exportinstellingen opgeslagen", "ok"); } }),
-          ...(format ? [DT.el("button", { class: "dt-btn dt-btn-primary", text: { xlsx: "Excel", csv: "CSV", copy: "Kopiëren", ai: "Naar AI" }[format], onclick: () => doExport(format) })]
+          ...(format ? [DT.el("button", { class: "dt-btn dt-btn-primary", text: { xlsx: "Excel", csv: "CSV", copy: "Kopiëren" }[format], onclick: () => doExport(format) })]
                     : [DT.el("button", { class: "dt-btn dt-btn-primary", text: "Excel", onclick: () => doExport("xlsx") }), DT.el("button", { class: "dt-btn", text: "CSV", onclick: () => doExport("csv") }), DT.el("button", { class: "dt-btn", text: "Kopiëren", onclick: () => doExport("copy") })])
         ])
       );

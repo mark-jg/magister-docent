@@ -64,8 +64,7 @@ DT.register({
           DT.el("button", { class: "dt-btn dt-btn-sm", text: "Pagina als tekst kopiëren", onclick: async () => {
             const r = await DtKolom.vraag({ vraag: "paginaTekst" });
             if (r?.tekst) DT.copy(r.tekst); else DT.toast("Open een Magister-tabblad om de tekst te kopiëren", "err");
-          } }),
-          DT.el("button", { class: "dt-btn dt-btn-sm", text: "Naar AI-assistent", onclick: () => DtKolom.vraag({ vraag: "actie", naam: "ai" }) })
+          } })
         ])
       ])),
       bediening: () => {
@@ -219,7 +218,6 @@ const DT_ICONS = Object.fromEntries(Object.entries({
   periodes: `<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4M7 15h4M13 15h4"/>`,
   melding: `<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 8l9 6 9-6"/>`,
   cb: `<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6M12 2v3"/>`,
-  ai: `<path d="M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4z"/><path d="M18 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/>`,
   theme: `<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>`,
   export: `<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>`,
   mail: `<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 8l9 6 9-6"/>`,

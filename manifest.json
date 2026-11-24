@@ -51,7 +51,6 @@
         "content/modules/quickinput.js",
         "content/modules/navigation.js",
         "content/modules/aanwezigheid.js",
-        "content/modules/ai.js",
         "content/modules/inspector.js",
         "content/modules/jarig.js",
         "content/modules/leerlingdash.js",
