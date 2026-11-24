@@ -1,0 +1,17 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root { --indigo: #635BFF; --violet: #7C3AED; --diep: #2E1A7A; --koraal: #FF7A59; --wit: #fff; }
+html, body { width: var(--b); height: var(--h); overflow: hidden; }
+body { font-family: -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif; color: var(--wit);
+  background: radial-gradient(120% 140% at 0% 0%, #7A72FF 0%, var(--indigo) 35%, var(--violet) 75%, #5B21B6 100%); -webkit-font-smoothing: antialiased; }
+.glans { position: absolute; inset: 0; background: radial-gradient(60% 50% at 85% 10%, rgba(255,255,255,.18), transparent 70%); pointer-events: none; }
+.merk { display: flex; align-items: center; gap: 14px; }
+.merk img { filter: drop-shadow(0 6px 14px rgba(20,10,60,.35)); }
+.naam { font-weight: 800; letter-spacing: -.02em; }
+.voor { font-weight: 500; opacity: .85; }
+.kop { font-weight: 800; letter-spacing: -.025em; line-height: 1.05; }
+.tekst { opacity: .9; line-height: 1.4; font-weight: 450; }
+.accent { color: #FFD3C4; }
+.chip { display: inline-block; padding: 6px 12px; border-radius: 999px; background: rgba(255,255,255,.16); font-weight: 600; }
+.schot { border-radius: 14px; overflow: hidden; box-shadow: 0 30px 60px rgba(20,8,70,.45), 0 0 0 1px rgba(255,255,255,.25); background: #fff; }
+.schot img { display: block; width: 100%; }
+.voet { position: absolute; font-size: 13px; opacity: .65; }
